@@ -14,13 +14,14 @@ import {
 } from '@mui/icons-material';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Helmet } from 'react-helmet-async';
 import Navbar from './Navbar';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 // Register ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
 
 const Contact = () => {
+  useDocumentTitle('Contact Us - Lab System Medical Clinic');
   const titleRef = useRef<HTMLDivElement>(null);
   const contactRef = useRef<HTMLDivElement>(null);
 
@@ -67,11 +68,6 @@ const Contact = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Contact Us - Lab System Medical Clinic</title>
-        <meta name="description" content="Get in touch with Lab System Medical Clinic. Find our location, contact information, and working hours." />
-      </Helmet>
-      
       <Box sx={{ minHeight: '100vh', backgroundColor: '#0a0a0a' }}>
         <Navbar />
         

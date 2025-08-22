@@ -15,8 +15,8 @@ import {
 } from '@mui/icons-material';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Helmet } from 'react-helmet-async';
 import Navbar from './Navbar';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 // Register ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
@@ -55,6 +55,7 @@ const services = [
 ];
 
 const Services = () => {
+  useDocumentTitle('Services - Lab System Medical Clinic');
   const titleRef = useRef<HTMLDivElement>(null);
   const servicesRef = useRef<HTMLDivElement>(null);
 
@@ -91,11 +92,6 @@ const Services = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Our Services - Lab System Medical Clinic</title>
-        <meta name="description" content="Comprehensive histopathology and anatomical pathology services including tissue biopsy analysis, microscopic examination, and expert consultation." />
-      </Helmet>
-      
       <Box sx={{ minHeight: '100vh', backgroundColor: '#0a0a0a' }}>
         <Navbar />
         

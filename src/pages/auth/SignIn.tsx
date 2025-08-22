@@ -22,8 +22,8 @@ import {
 import { keyframes } from '@emotion/react';
 import { styled } from '@mui/material/styles';
 import { gsap } from 'gsap';
-import { Helmet } from 'react-helmet-async';
 import Navbar from '../../components/Navbar';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 const darkTheme = createTheme({
   palette: {
@@ -60,6 +60,7 @@ const BorderWrapper = styled('div')({
 });
 
 export default function SignIn() {
+  useDocumentTitle('Login - Lab System Medical Clinic');
   const [activeTab, setActiveTab] = useState(0);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -92,13 +93,9 @@ export default function SignIn() {
   };
 
   return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <Helmet>
-        <title>Login - Lab System Medical Clinic</title>
-        <meta name="description" content="Sign in to your Lab System Medical Clinic account" />
-      </Helmet>
-      <Box sx={{ minHeight: '100vh', backgroundColor: darkTheme.palette.background.default }}>
+         <ThemeProvider theme={darkTheme}>
+       <CssBaseline />
+       <Box sx={{ minHeight: '100vh', backgroundColor: darkTheme.palette.background.default }}>
         <Navbar />
          <Box
            sx={{

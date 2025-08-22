@@ -24,8 +24,8 @@ import {
 } from '@mui/icons-material';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import Navbar from './Navbar';
 
 // Register GSAP plugins
@@ -571,6 +571,8 @@ const Footer = () => {
 
 // Main MedicalLanding Component
 const MedicalLanding = ({ heroImage }: { heroImage?: string }) => {
+  useDocumentTitle('Lab System Medical Clinic - Empowering People to Improve Their Lives');
+  
   useEffect(() => {
     // Cleanup GSAP ScrollTriggers on unmount
     return () => {
@@ -581,12 +583,6 @@ const MedicalLanding = ({ heroImage }: { heroImage?: string }) => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Helmet>
-                 <title>Lab System Medical Clinic - Empowering People to Improve Their Lives</title>
-         <meta name="description" content="Experience world-class healthcare with cutting-edge technology and compassionate care. Our team of experts is dedicated to your well-being." />
-         <meta name="keywords" content="medical clinic, healthcare, doctors, appointments, Lab System" />
-        <link rel="icon" type="image/jpeg" href="/src/assets/logo.jpg" />
-      </Helmet>
       <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
         <Navbar />
         <Hero heroImage={heroImage} />
