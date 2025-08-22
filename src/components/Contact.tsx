@@ -16,6 +16,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Navbar from './Navbar';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import paImage from '../assets/pa.jpg';
 
 // Register ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
@@ -79,7 +80,7 @@ const Contact = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: 'url(/src/assets/pa.jpg)',
+                         backgroundImage: `url(${paImage})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             filter: 'blur(8px) brightness(0.3)',

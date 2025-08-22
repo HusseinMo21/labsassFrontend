@@ -27,6 +27,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useNavigate } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import Navbar from './Navbar';
+import paImage from '../assets/pa.jpg';
 
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger);
@@ -116,7 +117,7 @@ const theme = createTheme({
 });
 
 // Hero Component
-const Hero = ({ heroImage = "/src/assets/pa.jpg" }) => {
+const Hero = ({ heroImage = paImage }) => {
   const heroRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
