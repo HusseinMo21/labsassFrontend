@@ -551,7 +551,9 @@ const Footer = () => {
         >
           <span>Developed By</span>
           <Link
-            href="#"
+            href="https://semou.it.com/"
+            target="_blank"
+            rel="noopener noreferrer"
             sx={{
               color: 'primary.main',
               textDecoration: 'none',

@@ -1,14 +1,14 @@
 import { Routes, Route } from 'react-router-dom'
-import SignIn from './pages/auth/SignIn'
 import MedicalLanding from './components/MedicalLanding'
 import Services from './components/Services'
+import Contact from './components/Contact'
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<MedicalLanding />} />
-      <Route path="/signin" element={<SignIn />} />
+      <Route path="*" element={<MedicalLanding />} />
       <Route path="/services" element={<Services />} />
+      <Route path="/contact" element={<Contact />} />
     </Routes>
   )
 }

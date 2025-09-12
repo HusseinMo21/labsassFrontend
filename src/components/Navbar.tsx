@@ -10,7 +10,10 @@ import {
   useTheme,
   useMediaQuery,
   Link as MuiLink,
-  Divider
+  Divider,
+  Avatar,
+  Menu,
+  MenuItem
 } from '@mui/material';
 
 // Extend the theme to include custom colors
@@ -36,13 +39,17 @@ import {
   Twitter,
   YouTube,
   Google,
-  Menu,
+  Menu as MenuIcon,
   Close,
-  Login
+  Login,
+  Logout,
+  Dashboard,
+  Person
 } from '@mui/icons-material';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { gsap } from 'gsap';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import logo from '../assets/logo.jpg';
 
 // TopBar Component
@@ -93,8 +100,10 @@ const TopBar = () => {
 const MainNav = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const navRef = useRef(null);
 
   const navLinks = [
@@ -119,11 +128,30 @@ const MainNav = () => {
   }, []);
 
   const handleLoginClick = () => {
-    navigate('/signin');
+    navigate('/login');
   };
 
   const handleNavClick = (path: string) => {
     navigate(path);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+    setAnchorEl(null);
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleDashboardClick = () => {
+    navigate('/dashboard');
+    setAnchorEl(null);
   };
 
   const NavLinks = () => (
@@ -174,23 +202,94 @@ const MainNav = () => {
     </Box>
   );
 
-  const LoginButton = () => (
-    <Button
-      variant="contained"
-      startIcon={<Login />}
-      onClick={handleLoginClick}
-      sx={{
-        bgcolor: 'primary.main',
-        color: 'white',
-        ml: 2,
-        '&:hover': {
-          bgcolor: 'primary.dark',
-        },
-      }}
-    >
-      Login
-    </Button>
-  );
+  const AuthButton = () => {
+    if (user) {
+      return (
+        <>
+          <Button
+            variant="outlined"
+            startIcon={<Dashboard />}
+            onClick={handleDashboardClick}
+            sx={{
+              ml: 2,
+              borderColor: 'primary.main',
+              color: 'primary.main',
+              '&:hover': {
+                borderColor: 'primary.dark',
+                bgcolor: 'rgba(47, 94, 121, 0.04)',
+              },
+            }}
+          >
+            Dashboard
+          </Button>
+          <IconButton
+            onClick={handleMenuOpen}
+            sx={{
+              ml: 1,
+              bgcolor: 'primary.main',
+              color: 'white',
+              '&:hover': {
+                bgcolor: 'primary.dark',
+              },
+            }}
+          >
+            <Person />
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+          >
+            <MenuItem onClick={handleMenuClose}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
+                  {user.name.charAt(0).toUpperCase()}
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {user.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {user.role}
+                  </Typography>
+                </Box>
+              </Box>
+            </MenuItem>
+            <MenuItem onClick={handleLogout}>
+              <Logout sx={{ mr: 1 }} />
+              Logout
+            </MenuItem>
+          </Menu>
+        </>
+      );
+    }
+
+    return (
+      <Button
+        variant="contained"
+        startIcon={<Login />}
+        onClick={handleLoginClick}
+        sx={{
+          bgcolor: 'primary.main',
+          color: 'white',
+          ml: 2,
+          '&:hover': {
+            bgcolor: 'primary.dark',
+          },
+        }}
+      >
+        Login
+      </Button>
+    );
+  };
 
   return (
     <>
@@ -233,7 +332,7 @@ const MainNav = () => {
               <NavLinks />
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <SocialIcons />
-                <LoginButton />
+                <AuthButton />
               </Box>
             </>
           )}
@@ -244,7 +343,7 @@ const MainNav = () => {
               onClick={() => setDrawerOpen(true)}
               aria-label="Open menu"
             >
-              <Menu />
+              <MenuIcon />
             </IconButton>
           )}
         </Box>
@@ -297,7 +396,7 @@ const MainNav = () => {
         <Divider sx={{ my: 2 }} />
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <SocialIcons />
-          <LoginButton />
+          <AuthButton />
         </Box>
       </Drawer>
     </>

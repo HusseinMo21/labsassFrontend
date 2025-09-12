@@ -1,43 +1,147 @@
 import { createTheme } from '@mui/material/styles';
-import { arSD } from '@mui/material/locale';
 
-const theme = createTheme(
-  {
-    palette: {
-      primary: {
-        light: '#9c64a6',
-        main: '#673ab7', // Purple color from Material UI
-        dark: '#482880',
-        contrastText: '#fff',
-      },
-      secondary: {
-        light: '#ff79b0',
-        main: '#ff4081', // Pink accent color
-        dark: '#c60055',
-        contrastText: '#fff',
-      },
-      background: {
-        default: '#f5f5f5',
-        paper: '#fff',
-      },
+const theme = createTheme({
+  palette: {
+    primary: {
+      light: '#4a90e2',
+      main: '#2e7d32', // Medical green for trust and health
+      dark: '#1b5e20',
+      contrastText: '#fff',
     },
-    typography: {
-      fontFamily: [
-        'Roboto',
-        '-apple-system',
-        'BlinkMacSystemFont',
-        '"Segoe UI"',
-        '"Helvetica Neue"',
-        'Arial',
-        'sans-serif',
-        '"Apple Color Emoji"',
-        '"Segoe UI Emoji"',
-        '"Segoe UI Symbol"',
-      ].join(','),
+    secondary: {
+      light: '#ffb74d',
+      main: '#ff9800', // Orange for alerts and highlights
+      dark: '#f57c00',
+      contrastText: '#fff',
     },
-    direction: 'rtl', // Right-to-left for Arabic language
+    success: {
+      light: '#81c784',
+      main: '#4caf50',
+      dark: '#388e3c',
+      contrastText: '#fff',
+    },
+    warning: {
+      light: '#ffb74d',
+      main: '#ff9800',
+      dark: '#f57c00',
+      contrastText: '#fff',
+    },
+    error: {
+      light: '#e57373',
+      main: '#f44336',
+      dark: '#d32f2f',
+      contrastText: '#fff',
+    },
+    info: {
+      light: '#64b5f6',
+      main: '#2196f3',
+      dark: '#1976d2',
+      contrastText: '#fff',
+    },
+    background: {
+      default: '#f8f9fa',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#212529',
+      secondary: '#6c757d',
+    },
   },
-  arSD, // Arabic (Saudi Arabia) locale
-);
+  typography: {
+    fontFamily: [
+      'Inter',
+      'Roboto',
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      '"Helvetica Neue"',
+      'Arial',
+      'sans-serif',
+    ].join(','),
+    h1: {
+      fontWeight: 700,
+      fontSize: '2.5rem',
+    },
+    h2: {
+      fontWeight: 600,
+      fontSize: '2rem',
+    },
+    h3: {
+      fontWeight: 600,
+      fontSize: '1.75rem',
+    },
+    h4: {
+      fontWeight: 600,
+      fontSize: '1.5rem',
+    },
+    h5: {
+      fontWeight: 600,
+      fontSize: '1.25rem',
+    },
+    h6: {
+      fontWeight: 600,
+      fontSize: '1rem',
+    },
+    button: {
+      fontWeight: 600,
+      textTransform: 'none',
+    },
+  },
+  shape: {
+    borderRadius: 12,
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          border: '1px solid rgba(0,0,0,0.05)',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          padding: '10px 24px',
+          fontWeight: 600,
+        },
+        contained: {
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          '&:hover': {
+            boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+          },
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 8,
+          },
+        },
+      },
+    },
+    MuiTableHead: {
+      styleOverrides: {
+        root: {
+          '& .MuiTableCell-head': {
+            fontWeight: 600,
+            backgroundColor: '#f8f9fa',
+          },
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: 6,
+          fontWeight: 500,
+        },
+      },
+    },
+  },
+});
 
 export default theme;
