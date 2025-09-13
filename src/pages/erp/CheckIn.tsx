@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -97,6 +98,7 @@ interface Test {
 }
 
 const CheckIn: React.FC = () => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -115,6 +117,12 @@ const CheckIn: React.FC = () => {
     upfront_payment: 0,
     payment_method: 'cash',
     notes: '',
+    discount_amount: 0,
+    discount_percentage: 0,
+    insurance_provider: '',
+    insurance_policy_number: '',
+    insurance_claim_number: '',
+    expected_delivery_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Tomorrow
   });
   
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -203,12 +211,18 @@ const CheckIn: React.FC = () => {
     return selectedTests.reduce((sum, test) => sum + (Number(test.price) || 0), 0);
   };
 
+  const calculateFinalAmount = () => {
+    const total = calculateTotal();
+    const discount = paymentForm.discount_amount || 0;
+    return Math.max(0, total - discount);
+  };
+
   const calculateBalance = () => {
-    return calculateTotal() - paymentForm.upfront_payment;
+    return calculateFinalAmount() - paymentForm.upfront_payment;
   };
 
   const calculateMinimumUpfront = () => {
-    return Math.ceil(calculateTotal() * 0.5); // 50% minimum
+    return Math.ceil(calculateFinalAmount() * 0.5); // 50% minimum
   };
 
   const formatCurrency = (amount: number) => {
@@ -315,6 +329,17 @@ const CheckIn: React.FC = () => {
     printWindow.document.close();
     printWindow.print();
     printWindow.close();
+  };
+
+  const handleNavigateToReceipts = () => {
+    // Navigate to receipts page with patient filter
+    const patientId = currentVisit?.patient?.id || selectedPatient?.id;
+    if (patientId) {
+      navigate(`/receipts?patient=${patientId}`);
+    } else {
+      navigate('/receipts');
+    }
+    setShowReceiptModal(false);
   };
 
   const handlePrintReceipt = () => {
@@ -451,6 +476,7 @@ const CheckIn: React.FC = () => {
           <h1>PATHOLOGY LAB RECEIPT</h1>
           <p>Date: ${receiptData.date}</p>
           <p>Receipt #: ${receiptData.receipt_number}</p>
+          <p>Lab #: ${receiptData.lab_number || receiptData.barcode}</p>
         </div>
         
         <div class="section">
@@ -493,7 +519,7 @@ const CheckIn: React.FC = () => {
             <span class="value">${formatCurrency(receiptData.upfront_payment || paymentForm.upfront_payment)}</span>
           </div>
           <div class="row">
-            <span class="label">Balance:</span>
+            <span class="label">Remaining:</span>
             <span class="value">${formatCurrency(receiptData.remaining_balance || calculateBalance())}</span>
           </div>
         </div>
@@ -510,7 +536,7 @@ const CheckIn: React.FC = () => {
         </div>
         
         <div class="barcode">
-          ${receiptData.barcode}
+          ${receiptData.barcode || ''}
         </div>
         
         <div class="footer">
@@ -571,7 +597,13 @@ const CheckIn: React.FC = () => {
         })),
         upfront_payment: paymentForm.upfront_payment,
         payment_method: paymentForm.payment_method,
-        notes: paymentForm.notes
+        notes: paymentForm.notes,
+        discount_amount: paymentForm.discount_amount,
+        discount_percentage: paymentForm.discount_percentage,
+        insurance_provider: paymentForm.insurance_provider,
+        insurance_policy_number: paymentForm.insurance_policy_number,
+        insurance_claim_number: paymentForm.insurance_claim_number,
+        expected_delivery_date: paymentForm.expected_delivery_date || new Date().toISOString().split('T')[0]
       };
 
       console.log('Sending visit data:', visitData);
@@ -606,7 +638,17 @@ const CheckIn: React.FC = () => {
       // Reset form
       setSelectedPatient(null);
       setSelectedTests([]);
-      setPaymentForm({ upfront_payment: 0, payment_method: 'cash', notes: '' });
+      setPaymentForm({ 
+        upfront_payment: 0, 
+        payment_method: 'cash', 
+        notes: '',
+        discount_amount: 0,
+        discount_percentage: 0,
+        insurance_provider: '',
+        insurance_policy_number: '',
+        insurance_claim_number: '',
+        expected_delivery_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
       setCurrentStep(0);
     } catch (error) {
       console.error('Failed to complete visit:', error);
@@ -1031,6 +1073,132 @@ const CheckIn: React.FC = () => {
                       </Select>
                     </FormControl>
                   </Grid>
+
+                  {/* Insurance Details - Show only when insurance is selected */}
+                  {paymentForm.payment_method === 'insurance' && (
+                    <>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Insurance Provider"
+                          value={paymentForm.insurance_provider}
+                          onChange={(e) => setPaymentForm(prev => ({
+                            ...prev,
+                            insurance_provider: e.target.value
+                          }))}
+                          sx={{ '& .MuiInputBase-root': { height: 56 } }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Policy Number"
+                          value={paymentForm.insurance_policy_number}
+                          onChange={(e) => setPaymentForm(prev => ({
+                            ...prev,
+                            insurance_policy_number: e.target.value
+                          }))}
+                          sx={{ '& .MuiInputBase-root': { height: 56 } }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          fullWidth
+                          label="Claim Number (Optional)"
+                          value={paymentForm.insurance_claim_number}
+                          onChange={(e) => setPaymentForm(prev => ({
+                            ...prev,
+                            insurance_claim_number: e.target.value
+                          }))}
+                          sx={{ '& .MuiInputBase-root': { height: 56 } }}
+                        />
+                      </Grid>
+                    </>
+                  )}
+
+                  {/* Discount Section */}
+                  <Grid size={{ xs: 12 }}>
+                    <Divider sx={{ my: 2 }}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Discount
+                      </Typography>
+                    </Divider>
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Discount Amount"
+                      type="number"
+                      value={paymentForm.discount_amount}
+                      onChange={(e) => {
+                        const amount = parseFloat(e.target.value) || 0;
+                        const total = calculateTotal();
+                        const percentage = total > 0 ? (amount / total) * 100 : 0;
+                        setPaymentForm(prev => ({
+                          ...prev,
+                          discount_amount: amount,
+                          discount_percentage: percentage
+                        }));
+                      }}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                      }}
+                      helperText={`${paymentForm.discount_percentage.toFixed(1)}% of total`}
+                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
+                    />
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Discount Percentage"
+                      type="number"
+                      value={paymentForm.discount_percentage}
+                      onChange={(e) => {
+                        const percentage = parseFloat(e.target.value) || 0;
+                        const total = calculateTotal();
+                        const amount = (total * percentage) / 100;
+                        setPaymentForm(prev => ({
+                          ...prev,
+                          discount_percentage: percentage,
+                          discount_amount: amount
+                        }));
+                      }}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                      }}
+                      helperText={`$${paymentForm.discount_amount.toFixed(2)} off`}
+                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
+                    />
+                  </Grid>
+
+                  {/* Delivery Date */}
+                  <Grid size={{ xs: 12 }}>
+                    <Divider sx={{ my: 2 }}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Delivery Information
+                      </Typography>
+                    </Divider>
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Expected Delivery Date"
+                      type="date"
+                      value={paymentForm.expected_delivery_date}
+                      onChange={(e) => setPaymentForm(prev => ({
+                        ...prev,
+                        expected_delivery_date: e.target.value
+                      }))}
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
+                      helperText="When will the results be ready?"
+                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
+                    />
+                  </Grid>
                   
                   <Grid size={{ xs: 12 }}>
                     <TextField
@@ -1121,6 +1289,22 @@ const CheckIn: React.FC = () => {
                     </Typography>
                   </Box>
                   
+                  {paymentForm.discount_amount > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="body1">Discount:</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
+                        -{formatCurrency(paymentForm.discount_amount)}
+                      </Typography>
+                    </Box>
+                  )}
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>Final Amount:</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {formatCurrency(calculateFinalAmount())}
+                    </Typography>
+                  </Box>
+                  
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="body1">Upfront Payment:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
@@ -1140,7 +1324,7 @@ const CheckIn: React.FC = () => {
                   
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      Balance Due:
+                      Remaining Due:
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: calculateBalance() > 0 ? 'error.main' : 'success.main' }}>
                       {formatCurrency(calculateBalance())}
@@ -1313,7 +1497,7 @@ const CheckIn: React.FC = () => {
               
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  Balance Due:
+                  Remaining Due:
                 </Typography>
                 <Typography variant="h5" sx={{ 
                   fontWeight: 700, 
@@ -1345,12 +1529,13 @@ const CheckIn: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 1 }}>
           <Button
-            onClick={handlePrintReceipt}
-            startIcon={<Print />}
-            variant="outlined"
+            onClick={handleNavigateToReceipts}
+            startIcon={<Receipt />}
+            variant="contained"
+            color="primary"
             size="large"
           >
-            Print Receipt
+            View in Receipts
           </Button>
           <Button
             onClick={handlePrintLabel}
@@ -1363,7 +1548,7 @@ const CheckIn: React.FC = () => {
           </Button>
           <Button
             onClick={() => setShowReceiptModal(false)}
-            variant="contained"
+            variant="outlined"
             startIcon={<Done />}
             size="large"
           >

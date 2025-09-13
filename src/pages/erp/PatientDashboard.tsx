@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -8,6 +8,7 @@ import {
   CardActions,
   Button,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Assessment,
@@ -16,9 +17,31 @@ import {
   Payment,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import axios from 'axios';
 
 const PatientDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [patientData, setPatientData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPatientData = async () => {
+      try {
+        const response = await axios.get('/api/patient/me');
+        setPatientData(response.data);
+      } catch (error) {
+        console.error('Error fetching patient data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchPatientData();
+    }
+  }, [user]);
 
   const quickActions = [
     {
@@ -44,13 +67,25 @@ const PatientDashboard: React.FC = () => {
     },
   ];
 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         My Dashboard
       </Typography>
       <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>
-        Welcome to your patient portal. Access your medical information below.
+        {patientData ? (
+          <>مرحباً {patientData.name}، مرحباً بك في بوابة المريض. يمكنك الوصول إلى معلوماتك الطبية أدناه.</>
+        ) : (
+          'Welcome to your patient portal. Access your medical information below.'
+        )}
       </Typography>
 
       <Alert severity="info" sx={{ mb: 4 }}>

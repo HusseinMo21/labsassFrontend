@@ -39,6 +39,7 @@ import {
   LocalHospital,
   Business,
   Assignment,
+  QrCodeScanner,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,6 +70,7 @@ const navigationItems: NavigationItem[] = [
   { path: '/users', label: 'Users', icon: <Person />, roles: ['admin'] },
   { path: '/inventory', label: 'Inventory', icon: <Inventory />, roles: ['admin'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['admin'] },
+  { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['admin'] },
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
   { path: '/patient-test-search', label: 'Patient Test Search', icon: <Search />, roles: ['admin'] },
 
@@ -86,10 +88,12 @@ const navigationItems: NavigationItem[] = [
   { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['staff'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['staff'] },
+  { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['staff'] },
 
   // Doctor - Can view and approve reports
   { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },
   { path: '/doctor/reports', label: 'Reports', icon: <Assessment />, roles: ['doctor'] },
+  { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['doctor'] },
 
   // Patient - Can view their own reports after payment
   { path: '/patient/dashboard', label: 'My Dashboard', icon: <Dashboard />, roles: ['patient'] },

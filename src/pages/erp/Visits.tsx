@@ -54,7 +54,6 @@ import {
   Search,
   FilterList,
   Refresh,
-  Print,
   QrCode,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -679,10 +678,6 @@ const Visits: React.FC = () => {
           <CheckCircle sx={{ mr: 1 }} />
           Mark Complete
         </MenuItem>
-        <MenuItem onClick={() => selectedVisitId && window.open(`/visits/${selectedVisitId}/report`, '_blank')}>
-          <Print sx={{ mr: 1 }} />
-          Print Report
-        </MenuItem>
         <MenuItem onClick={() => selectedVisitId && handleDeleteVisit(selectedVisitId)}>
           <Delete sx={{ mr: 1 }} />
           Delete
@@ -813,16 +808,6 @@ const Visits: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setDetailsOpen(false)}>
             Close
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              if (selectedVisit) {
-                window.open(`/visits/${selectedVisit.id}/report`, '_blank');
-              }
-            }}
-          >
-            Print Report
           </Button>
         </DialogActions>
       </Dialog>

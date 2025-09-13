@@ -19,7 +19,9 @@
     "axios": "^1.11.0",
     "gsap": "^3.13.0",
     "react": "^19.1.0",
+    "react-barcode": "^1.6.1",
     "react-dom": "^19.1.0",
+    "react-qr-code": "^2.0.18",
     "react-router-dom": "^7.7.1",
     "react-toastify": "^11.0.5",
     "tailwindcss": "^4.1.11"

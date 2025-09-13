@@ -60,6 +60,7 @@ interface Invoice {
   id: number;
   invoice_number: string;
   invoice_date: string;
+  lab_number?: string;
   total_amount: number;
   discount_amount: number;
   tax_amount: number;
@@ -409,6 +410,7 @@ const Invoices: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Invoice #</TableCell>
+                    <TableCell>Lab #</TableCell>
                     <TableCell>Patient</TableCell>
                     <TableCell>Visit #</TableCell>
                     <TableCell align="right">Amount</TableCell>
@@ -425,6 +427,11 @@ const Invoices: React.FC = () => {
                       <TableCell>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
                           {invoice.invoice_number}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
+                          {invoice.lab_number || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -532,6 +539,12 @@ const Invoices: React.FC = () => {
                     <ListItemText
                       primary="Invoice Number"
                       secondary={selectedInvoice.invoice_number}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="Lab Number"
+                      secondary={selectedInvoice.lab_number || 'N/A'}
                     />
                   </ListItem>
                   <ListItem>

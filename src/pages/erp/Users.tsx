@@ -53,6 +53,10 @@ interface User {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  patient?: {
+    id: number;
+    name: string;
+  };
 }
 
 const Users: React.FC = () => {
@@ -109,7 +113,8 @@ const Users: React.FC = () => {
           search: searchTerm,
         },
       });
-      setUsers(response.data.data || []);
+      const usersData = response.data.data || [];
+      setUsers(usersData);
       setTotalPages(response.data.last_page || 1);
       setError(null);
     } catch (err) {
@@ -247,11 +252,16 @@ const Users: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.role.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const searchLower = searchTerm.toLowerCase();
+    const userName = user.role === 'patient' && user.patient ? user.patient.name : user.name;
+    return (
+      userName.toLowerCase().includes(searchLower) ||
+      user.name.toLowerCase().includes(searchLower) ||
+      user.email.toLowerCase().includes(searchLower) ||
+      user.role.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <Box>
@@ -317,10 +327,13 @@ const Users: React.FC = () => {
                           </Avatar>
                           <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              {user.name}
+                              {user.role === 'patient' && user.patient ? user.patient.name : user.name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               ID: {user.id}
+                              {user.role === 'patient' && user.patient && (
+                                <span> • Patient ID: {user.patient.id}</span>
+                              )}
                             </Typography>
                           </Box>
                         </Box>

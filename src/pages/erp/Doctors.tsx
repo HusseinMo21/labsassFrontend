@@ -53,12 +53,40 @@ interface Patient {
   name: string;
   phone: string;
   whatsapp_number?: string;
-  email?: string;
   gender: string;
-  birth_date: string;
-  address: string;
   visits_count: number;
-  created_at: string;
+  visits?: Visit[];
+  total_paid?: number;
+  total_tests?: number;
+  lab_numbers?: string[];
+}
+
+interface Visit {
+  id: number;
+  visit_number: string;
+  visit_date: string;
+  final_amount: number;
+  status: string;
+  lab_request?: {
+    lab_no: string;
+  };
+  visit_tests?: VisitTest[];
+  invoice?: Invoice;
+}
+
+interface VisitTest {
+  id: number;
+  labTest: {
+    name: string;
+  };
+  status: string;
+}
+
+interface Invoice {
+  id: number;
+  amount_paid: number | string;
+  balance: number | string;
+  status: string;
 }
 
 const Doctors: React.FC = () => {
@@ -109,7 +137,57 @@ const Doctors: React.FC = () => {
     try {
       setPatientsLoading(true);
       const response = await axios.get(`/api/doctors/${doctorId}/patients`);
-      setPatients(response.data.patients);
+      const patientsData = response.data.patients;
+      
+      // Fetch detailed information for each patient
+      const patientsWithDetails = await Promise.all(
+        patientsData.map(async (patient: Patient) => {
+          try {
+            const detailResponse = await axios.get(`/api/patients/${patient.id}`);
+            const detailedPatient = detailResponse.data;
+            
+            // Calculate financial summary
+            const totalPaid = detailedPatient.visits?.reduce((sum: number, visit: Visit) => {
+              return sum + (Number(visit.invoice?.amount_paid) || 0);
+            }, 0) || 0;
+            
+            const totalTests = detailedPatient.visits?.reduce((sum: number, visit: any) => {
+              return sum + (visit.visit_tests?.length || 0);
+            }, 0) || 0;
+            
+            const labNumbers = detailedPatient.visits?.map((visit: any) => {
+              return visit.lab_request?.lab_no;
+            }).filter(Boolean) || [];
+            
+            // Debug logging
+            console.log(`Patient ${patient.name}:`, {
+              visits: detailedPatient.visits?.length,
+              totalPaid,
+              totalTests,
+              labNumbers,
+              visitDetails: detailedPatient.visits?.map(v => ({
+                id: v.id,
+                visitTests: v.visit_tests?.length,
+                labRequest: v.lab_request?.lab_no,
+                invoice: v.invoice?.amount_paid
+              }))
+            });
+            
+            return {
+              ...patient,
+              visits: detailedPatient.visits,
+              total_paid: totalPaid,
+              total_tests: totalTests,
+              lab_numbers: labNumbers
+            };
+          } catch (error) {
+            console.error(`Failed to fetch details for patient ${patient.id}:`, error);
+            return patient;
+          }
+        })
+      );
+      
+      setPatients(patientsWithDetails);
     } catch (error) {
       toast.error('Failed to fetch doctor patients');
     } finally {
@@ -418,6 +496,9 @@ const Doctors: React.FC = () => {
                     <TableCell>WhatsApp</TableCell>
                     <TableCell>Gender</TableCell>
                     <TableCell>Visits</TableCell>
+                    <TableCell>Total Paid</TableCell>
+                    <TableCell>Tests</TableCell>
+                    <TableCell>Lab Numbers</TableCell>
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -462,6 +543,52 @@ const Doctors: React.FC = () => {
                           </Typography>
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={`$${(Number(patient.total_paid) || 0).toFixed(2)}`}
+                          color="success"
+                          variant="outlined"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={`${patient.total_tests || 0} tests`}
+                          color="info"
+                          variant="outlined"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {patient.lab_numbers && patient.lab_numbers.length > 0 ? (
+                            patient.lab_numbers.slice(0, 2).map((labNo, index) => (
+                              <Chip 
+                                key={index}
+                                label={labNo}
+                                color="secondary"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))
+                          ) : (
+                            <Chip 
+                              label="No labs"
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                          {patient.lab_numbers && patient.lab_numbers.length > 2 && (
+                            <Chip 
+                              label={`+${patient.lab_numbers.length - 2}`}
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
                       <TableCell align="center">
                         {(patient.whatsapp_number || patient.phone) && (
                           <Tooltip title="Contact via WhatsApp">
@@ -494,4 +621,5 @@ const Doctors: React.FC = () => {
 };
 
 export default Doctors;
+
 

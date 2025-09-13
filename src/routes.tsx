@@ -18,6 +18,7 @@ import Inventory from './pages/erp/Inventory';
 import Reports from './pages/erp/Reports';
 import AccountantDashboard from './pages/erp/AccountantDashboard';
 import PatientDashboard from './pages/erp/PatientDashboard';
+import BarcodeDemo from './pages/BarcodeDemo';
 import LabInsightsDashboard from './pages/erp/LabInsightsDashboard';
 import PatientTestSearch from './pages/erp/PatientTestSearch';
 import SampleTracking from './pages/erp/SampleTracking';
@@ -223,6 +224,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <Reports />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/barcode-demo',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <BarcodeDemo />
         </ERPLayout>
       </ProtectedRoute>
     ),

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -38,6 +39,7 @@ import axios from 'axios';
 interface Receipt {
   id: number;
   receipt_number: string;
+  lab_number?: string;
   visit_number: string;
   visit_date: string;
   visit_time: string;
@@ -74,6 +76,7 @@ interface Receipt {
 }
 
 const Receipts: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,6 +98,16 @@ const Receipts: React.FC = () => {
     fetchReceipts();
   }, [currentPage]);
 
+  // Handle patient filter from URL parameters
+  useEffect(() => {
+    const patientId = searchParams.get('patient');
+    if (patientId) {
+      setSearchTerm(patientId);
+      // You could also filter the receipts by patient ID here
+      // For now, we'll just set the search term
+    }
+  }, [searchParams]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -111,6 +124,7 @@ const Receipts: React.FC = () => {
         page: currentPage,
         per_page: 15,
         include_receipts: true,
+        _t: Date.now(), // Cache busting parameter
       };
 
       // Add search parameters if search term exists
@@ -119,6 +133,12 @@ const Receipts: React.FC = () => {
       }
 
       const response = await axios.get('/api/visits', { params });
+      
+      // Debug: Log the first visit to see what data we're getting
+      if (response.data.data && response.data.data.length > 0) {
+        console.log('First visit data:', response.data.data[0]);
+        console.log('Lab number in first visit:', response.data.data[0].lab_number);
+      }
       
       // Filter to only include visits with receipt numbers and normalize data
       const receiptsData = response.data.data
@@ -161,14 +181,50 @@ const Receipts: React.FC = () => {
     setSearchTimeout(timeout);
   };
 
-  const handleViewDetails = (receipt: Receipt) => {
-    setSelectedReceipt(receipt);
-    setDetailsOpen(true);
+  const handleViewDetails = async (receipt: Receipt) => {
+    try {
+      // Fetch the proper receipt data with correct barcode URL
+      const response = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
+      const receiptData = response.data.receipt_data;
+      
+      // Update the receipt with the proper receipt data
+      const updatedReceipt = {
+        ...receipt,
+        ...receiptData,
+        barcode: receiptData.barcode
+      };
+      
+      setSelectedReceipt(updatedReceipt);
+      setDetailsOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch receipt details:', error);
+      // Fallback to original receipt data
+      setSelectedReceipt(receipt);
+      setDetailsOpen(true);
+    }
   };
 
-  const handlePrint = (receipt: Receipt) => {
-    setSelectedReceipt(receipt);
-    setPrintOpen(true);
+  const handlePrint = async (receipt: Receipt) => {
+    try {
+      // Fetch the proper receipt data with correct barcode URL
+      const response = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
+      const receiptData = response.data.receipt_data;
+      
+      // Update the receipt with the proper receipt data
+      const updatedReceipt = {
+        ...receipt,
+        ...receiptData,
+        barcode: receiptData.barcode
+      };
+      
+      setSelectedReceipt(updatedReceipt);
+      setPrintOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch receipt data for printing:', error);
+      // Fallback to original receipt data
+      setSelectedReceipt(receipt);
+      setPrintOpen(true);
+    }
   };
 
   const printReceipt = (receipt: Receipt) => {
@@ -278,6 +334,7 @@ const Receipts: React.FC = () => {
           <h1>PATHOLOGY LAB RECEIPT</h1>
           <p>Date: ${new Date(receipt.visit_date).toLocaleDateString()}</p>
           <p>Receipt #: ${receipt.receipt_number}</p>
+          <p>Lab #: ${receipt.lab_number || 'N/A'}</p>
         </div>
         
         <div class="section">
@@ -320,7 +377,7 @@ const Receipts: React.FC = () => {
             <span class="value">${formatCurrency(receipt.upfront_payment)}</span>
           </div>
           <div class="row">
-            <span class="label">Balance:</span>
+            <span class="label">Remaining:</span>
             <span class="value">${formatCurrency(receipt.remaining_balance)}</span>
           </div>
         </div>
@@ -458,12 +515,13 @@ const Receipts: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Receipt #</TableCell>
+                  <TableCell>Lab #</TableCell>
                   <TableCell>Visit #</TableCell>
                   <TableCell>Patient</TableCell>
                   <TableCell>Date & Time</TableCell>
                   <TableCell>Total Amount</TableCell>
                   <TableCell>Paid</TableCell>
-                  <TableCell>Balance</TableCell>
+                  <TableCell>Remaining</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Billing</TableCell>
                   <TableCell>Actions</TableCell>
@@ -475,6 +533,11 @@ const Receipts: React.FC = () => {
                   <TableCell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
                       {receipt.receipt_number}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
+                      {receipt.lab_number || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -583,6 +646,7 @@ const Receipts: React.FC = () => {
                 <Typography variant="h6" gutterBottom>Receipt Information</Typography>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2"><strong>Receipt #:</strong> {selectedReceipt.receipt_number}</Typography>
+                  <Typography variant="body2"><strong>Lab #:</strong> {selectedReceipt.lab_number || 'N/A'}</Typography>
                   <Typography variant="body2"><strong>Visit #:</strong> {selectedReceipt.visit_number}</Typography>
                   <Typography variant="body2"><strong>Date:</strong> {new Date(selectedReceipt.visit_date).toLocaleDateString()}</Typography>
                   <Typography variant="body2"><strong>Time:</strong> {selectedReceipt.visit_time}</Typography>
@@ -687,7 +751,7 @@ const Receipts: React.FC = () => {
                 Paid: {formatCurrency(selectedReceipt.upfront_payment)}
               </Typography>
               <Typography variant="body2" gutterBottom>
-                Balance: {formatCurrency(selectedReceipt.remaining_balance)}
+                Remaining: {formatCurrency(selectedReceipt.remaining_balance)}
               </Typography>
             </Box>
           )}

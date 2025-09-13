@@ -416,10 +416,17 @@ const Reports: React.FC = () => {
 
       console.log('Making request to:', `/api/reports/${completedTest.id}/print`);
       
+      // Show loading toast
+      const loadingToast = toast.loading('Generating PDF report...');
+      
       // Generate PDF using the backend endpoint
       const response = await axios.get(`/api/reports/${completedTest.id}/print`, {
         responseType: 'blob',
+        timeout: 30000, // 30 second timeout for PDF generation
       });
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
 
       console.log('PDF response received:', response);
       console.log('Response status:', response.status);
@@ -477,13 +484,18 @@ const Reports: React.FC = () => {
         window.URL.revokeObjectURL(url);
       }, 10000); // 10 seconds delay to allow preview
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('PDF generation error:', error);
       console.error('Error response:', error.response);
       console.error('Error status:', error.response?.status);
       console.error('Error data:', error.response?.data);
       
-      if (error.response?.status === 404) {
+      // Dismiss loading toast if it exists
+      toast.dismiss();
+      
+      if (error.code === 'ECONNABORTED') {
+        toast.error('PDF generation timed out. Please try again.');
+      } else if (error.response?.status === 404) {
         toast.error('PDF endpoint not found. Please check if the backend server is running.');
       } else if (error.response?.status === 401) {
         toast.error('Authentication required. Please log in again.');

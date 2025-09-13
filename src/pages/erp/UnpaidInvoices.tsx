@@ -176,14 +176,8 @@ const UnpaidInvoices: React.FC = () => {
       
       if (isFullyPaid) {
         // Generate final payment receipt
-        const receiptResponse = await axios.get(`/api/check-in/visits/${selectedInvoice.visit.id}/final-payment-receipt`, {
-          params: {
-            payment_amount: paymentForm.amount,
-            payment_method: paymentForm.payment_method
-          }
-        });
-        
-        setReceiptData(receiptResponse.data.receipt_data);
+        const receiptResponse = await axios.get(`/api/invoices/${selectedInvoice.id}/final-payment-receipt`);
+        setReceiptData(receiptResponse.data);
         setShowReceiptModal(true);
         toast.success('Payment completed! Final receipt generated.');
       } else {
@@ -232,86 +226,455 @@ const UnpaidInvoices: React.FC = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const printFinalPaymentReceipt = () => {
-    const printWindow = window.open('', '_blank');
-    printWindow?.document.write(`
-      <html>
+  const handlePrintOriginalReceipt = async (invoice: Invoice) => {
+    try {
+      // Fetch the original receipt data from the visit
+      const response = await axios.get(`/api/check-in/visits/${invoice.visit.id}/receipt`);
+      const receiptData = response.data.receipt_data;
+      
+      // Validate receipt data
+      if (!receiptData) {
+        toast.error('No receipt data found');
+        return;
+      }
+      
+      // Print the original receipt using the same logic as CheckIn component
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Popup blocked. Please allow popups for this site.');
+        return;
+      }
+
+      const receiptHTML = `
+        <!DOCTYPE html>
+        <html>
         <head>
-          <title>Final Payment Receipt - ${receiptData?.receipt_number}</title>
+          <title>Receipt - ${receiptData.receipt_number}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-            .section { margin-bottom: 15px; }
-            .row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-            .total { font-weight: bold; border-top: 1px solid #000; padding-top: 10px; }
-            .credentials { background: #f0f0f0; padding: 10px; margin-top: 20px; }
-            .payment-breakdown { background: #f8f9fa; padding: 10px; margin: 10px 0; }
-            @media print { body { margin: 0; } }
+            @page { 
+              size: 80mm 200mm; 
+              margin: 5mm; 
+            }
+            body { 
+              font-family: 'Courier New', monospace; 
+              font-size: 12px; 
+              line-height: 1.2; 
+              margin: 0; 
+              padding: 0; 
+              width: 70mm;
+            }
+            .header { 
+              text-align: center; 
+              border-bottom: 1px solid #000; 
+              padding-bottom: 8px; 
+              margin-bottom: 8px; 
+            }
+            .header h1 { 
+              font-size: 14px; 
+              margin: 0 0 4px 0; 
+              font-weight: bold;
+            }
+            .header p { 
+              margin: 2px 0; 
+              font-size: 10px; 
+            }
+            .section { 
+              margin-bottom: 8px; 
+            }
+            .section h3 { 
+              font-size: 11px; 
+              margin: 0 0 4px 0; 
+              font-weight: bold;
+              border-bottom: 1px dotted #000;
+              padding-bottom: 2px;
+            }
+            .row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin-bottom: 2px; 
+              font-size: 10px;
+            }
+            .row .label { 
+              flex: 1; 
+            }
+            .row .value { 
+              flex: 1; 
+              text-align: right; 
+              font-weight: bold;
+            }
+            .total { 
+              font-weight: bold; 
+              border-top: 1px solid #000; 
+              padding-top: 4px; 
+              margin-top: 4px;
+            }
+            .total .row { 
+              font-size: 11px; 
+            }
+            .barcode { 
+              text-align: center; 
+              font-family: 'Courier New', monospace; 
+              font-size: 8px; 
+              margin: 4px 0; 
+              padding: 2px; 
+              background: #f0f0f0; 
+              border: 1px solid #000;
+            }
+            .footer { 
+              text-align: center; 
+              font-size: 8px; 
+              margin-top: 8px; 
+              border-top: 1px dotted #000; 
+              padding-top: 4px;
+            }
+            .test-item { 
+              margin-bottom: 1px; 
+              font-size: 9px;
+            }
+            .test-name { 
+              display: inline-block; 
+              width: 60%; 
+            }
+            .test-price { 
+              display: inline-block; 
+              width: 35%; 
+              text-align: right; 
+            }
+            @media print { 
+              body { margin: 0; padding: 0; }
+              .no-print { display: none; }
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            <h2>FINAL PAYMENT RECEIPT</h2>
-            <p>Date: ${receiptData?.date}</p>
-            <p>Receipt #: ${receiptData?.receipt_number}</p>
+            <h1>PATHOLOGY LAB RECEIPT</h1>
+            <p>Date: ${receiptData.date}</p>
+            <p>Receipt #: ${receiptData.receipt_number}</p>
+            <p>Lab #: ${receiptData.lab_number || 'N/A'}</p>
           </div>
           
           <div class="section">
             <h3>Patient Information</h3>
-            <div class="row"><span>Name:</span><span>${receiptData?.patient_name}</span></div>
-            <div class="row"><span>Age:</span><span>${receiptData?.patient_age}</span></div>
-            <div class="row"><span>Phone:</span><span>${receiptData?.patient_phone}</span></div>
+            <div class="row">
+              <span class="label">Name:</span>
+              <span class="value">${receiptData.patient_name}</span>
+            </div>
+            <div class="row">
+              <span class="label">Age:</span>
+              <span class="value">${receiptData.patient_age}</span>
+            </div>
+            <div class="row">
+              <span class="label">Phone:</span>
+              <span class="value">${receiptData.patient_phone}</span>
+            </div>
           </div>
           
           <div class="section">
-            <h3>Tests</h3>
-            ${receiptData?.tests?.map(test => `
-              <div class="row">
-                <span>${test.name}</span>
-                <span>$${test.price}</span>
-              </div>
-            `).join('')}
+            <h3>Tests (${receiptData.tests?.length || 0})</h3>
+            ${(receiptData.tests || []).map(test => `
+                <div class="test-item">
+                  <span class="test-name">${test.name}</span>
+                  <span class="test-price">$${test.price}</span>
+                </div>
+              `).join('')}
           </div>
           
           <div class="section total">
-            <div class="row"><span>Total Amount:</span><span>$${receiptData?.total_amount}</span></div>
-            <div class="row"><span>Discount:</span><span>$${receiptData?.discount_amount}</span></div>
-            <div class="row"><span>Final Amount:</span><span>$${receiptData?.final_amount}</span></div>
+            <div class="row">
+              <span class="label">Total:</span>
+              <span class="value">$${receiptData.total_amount}</span>
+            </div>
+            <div class="row">
+              <span class="label">Discount:</span>
+              <span class="value">$${receiptData.discount_amount || 0}</span>
+            </div>
+            <div class="row">
+              <span class="label">Final:</span>
+              <span class="value">$${receiptData.final_amount}</span>
+            </div>
+            <div class="row">
+              <span class="label">Paid:</span>
+              <span class="value">$${receiptData.upfront_payment}</span>
+            </div>
+            <div class="row">
+              <span class="label">Remaining:</span>
+              <span class="value">$${receiptData.remaining_balance}</span>
+            </div>
+            <div class="row">
+              <span class="label">Method:</span>
+              <span class="value">${(receiptData.payment_method || 'N/A').toUpperCase()}</span>
+            </div>
+            <div class="row">
+              <span class="label">Status:</span>
+              <span class="value">${(receiptData.billing_status || 'N/A').toUpperCase()}</span>
+            </div>
           </div>
           
-          <div class="payment-breakdown">
-            <h4>Payment Breakdown</h4>
-            <div class="row"><span>Paid Before:</span><span>$${receiptData?.paid_before}</span></div>
-            <div class="row"><span>Paid Now:</span><span>$${receiptData?.paid_now}</span></div>
-            <div class="row"><span>Remaining:</span><span>$${receiptData?.remaining_balance}</span></div>
-          </div>
-          
-          <div class="section">
-            <div class="row"><span>Payment Method:</span><span>${receiptData?.payment_method}</span></div>
-            <div class="row"><span>Expected Delivery:</span><span>${receiptData?.expected_delivery_date}</span></div>
-            <div class="row"><span>Barcode:</span><span>${receiptData?.barcode}</span></div>
-            <div class="row"><span>Processed by:</span><span>${receiptData?.check_in_by}</span></div>
-          </div>
-          
-          ${receiptData?.patient_credentials ? `
-          <div class="credentials">
-            <h4>Patient Portal Access</h4>
-            <p><strong>Username:</strong> ${receiptData.patient_credentials.username}</p>
-            <p><strong>Password:</strong> ${receiptData.patient_credentials.password}</p>
-            <p>Access your results at: [Patient Portal URL]</p>
+          ${receiptData.barcode ? `
+          <div class="barcode">
+            ${receiptData.barcode}
           </div>
           ` : ''}
+          
+          <div class="footer">
+            <p>Thank you for choosing our lab!</p>
+            <p>Visit: ${receiptData.visit_id || 'N/A'}</p>
+          </div>
         </body>
       </html>
-    `);
-    printWindow?.document.close();
-    printWindow?.print();
+      `;
+      
+      printWindow.document.write(receiptHTML);
+      printWindow.document.close();
+      printWindow.print();
+      
+    } catch (error) {
+      console.error('Error printing original receipt:', error);
+      toast.error('Failed to print original receipt');
+    }
+  };
+
+  const printFinalPaymentReceipt = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups for this site.');
+      return;
+    }
+
+    const receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Final Payment Receipt - ${receiptData?.receipt_number}</title>
+        <style>
+          @page { 
+            size: 80mm 200mm; 
+            margin: 5mm; 
+          }
+          body { 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px; 
+            line-height: 1.2; 
+            margin: 0; 
+            padding: 0; 
+            width: 70mm;
+          }
+          .header { 
+            text-align: center; 
+            border-bottom: 1px solid #000; 
+            padding-bottom: 8px; 
+            margin-bottom: 8px; 
+          }
+          .header h1 { 
+            font-size: 14px; 
+            margin: 0 0 4px 0; 
+            font-weight: bold;
+          }
+          .header p { 
+            margin: 2px 0; 
+            font-size: 10px; 
+          }
+          .section { 
+            margin-bottom: 8px; 
+          }
+          .section h3 { 
+            font-size: 11px; 
+            margin: 0 0 4px 0; 
+            font-weight: bold;
+            border-bottom: 1px dotted #000;
+            padding-bottom: 2px;
+          }
+          .row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 2px; 
+            font-size: 10px;
+          }
+          .row .label { 
+            flex: 1; 
+          }
+          .row .value { 
+            flex: 1; 
+            text-align: right; 
+            font-weight: bold;
+          }
+          .total { 
+            font-weight: bold; 
+            border-top: 1px solid #000; 
+            padding-top: 4px; 
+            margin-top: 4px;
+          }
+          .total .row { 
+            font-size: 11px; 
+          }
+          .barcode { 
+            text-align: center; 
+            font-family: 'Courier New', monospace; 
+            font-size: 8px; 
+            margin: 4px 0; 
+            padding: 2px; 
+            background: #f0f0f0; 
+            border: 1px solid #000;
+          }
+          .footer { 
+            text-align: center; 
+            font-size: 8px; 
+            margin-top: 8px; 
+            border-top: 1px dotted #000; 
+            padding-top: 4px;
+          }
+          .test-item { 
+            margin-bottom: 1px; 
+            font-size: 9px;
+          }
+          .test-name { 
+            display: inline-block; 
+            width: 60%; 
+          }
+          .test-price { 
+            display: inline-block; 
+            width: 35%; 
+            text-align: right; 
+          }
+          .payment-breakdown { 
+            background: #f8f9fa; 
+            padding: 4px; 
+            margin: 4px 0; 
+            border: 1px solid #ddd;
+          }
+          .credentials { 
+            background: #f0f0f0; 
+            padding: 4px; 
+            margin: 4px 0; 
+            border: 1px solid #ccc;
+            font-size: 9px;
+          }
+          @media print { 
+            body { margin: 0; padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>FINAL PAYMENT RECEIPT</h1>
+          <p>Date: ${receiptData?.date}</p>
+          <p>Receipt #: ${receiptData?.receipt_number}</p>
+        </div>
+        
+        <div class="section">
+          <h3>Patient Information</h3>
+          <div class="row">
+            <span class="label">Name:</span>
+            <span class="value">${receiptData?.patient_name}</span>
+          </div>
+          <div class="row">
+            <span class="label">Age:</span>
+            <span class="value">${receiptData?.patient_age}</span>
+          </div>
+          <div class="row">
+            <span class="label">Phone:</span>
+            <span class="value">${receiptData?.patient_phone}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h3>Tests</h3>
+          ${receiptData?.tests?.map(test => `
+              <div class="test-item">
+                <span class="test-name">${test.name}</span>
+                <span class="test-price">$${test.price}</span>
+              </div>
+            `).join('')}
+        </div>
+        
+        <div class="section total">
+          <div class="row">
+            <span class="label">Total Amount:</span>
+            <span class="value">$${receiptData?.total_amount}</span>
+          </div>
+          <div class="row">
+            <span class="label">Discount:</span>
+            <span class="value">$${receiptData?.discount_amount || 0}</span>
+          </div>
+          <div class="row">
+            <span class="label">Final Amount:</span>
+            <span class="value">$${receiptData?.final_amount}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h3>Payment Breakdown</h3>
+          <div class="payment-breakdown">
+            <div class="row">
+              <span class="label">Paid Before:</span>
+              <span class="value">$${receiptData?.upfront_payment}</span>
+            </div>
+            <div class="row">
+              <span class="label">Paid Now:</span>
+              <span class="value">$${receiptData?.remaining_balance}</span>
+            </div>
+            <div class="row">
+              <span class="label">Remaining:</span>
+              <span class="value">$0</span>
+            </div>
+            <div class="row">
+              <span class="label">Payment Method:</span>
+              <span class="value">${receiptData?.payment_method}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="section">
+          <div class="row">
+            <span class="label">Expected Delivery:</span>
+            <span class="value">${new Date(receiptData?.expected_delivery_date).toLocaleDateString()}</span>
+          </div>
+          <div class="row">
+            <span class="label">Lab #:</span>
+            <span class="value">${receiptData?.lab_number || 'N/A'}</span>
+          </div>
+          <div class="row">
+            <span class="label">Processed by:</span>
+            <span class="value">${receiptData?.check_in_by}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h3>Patient Portal Access</h3>
+          <div class="credentials">
+            <div class="row">
+              <span class="label">Username:</span>
+              <span class="value">${receiptData?.patient_credentials?.username}</span>
+            </div>
+            <div class="row">
+              <span class="label">Password:</span>
+              <span class="value">${receiptData?.patient_credentials?.password}</span>
+            </div>
+            <div style="text-align: center; margin-top: 4px; font-size: 8px;">
+              Access your results at: [Patient Portal URL]
+            </div>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>Thank you for choosing our lab!</p>
+          <p>Visit: ${receiptData?.visit_id}</p>
+        </div>
+      </body>
+    </html>
+    `;
+    
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-        Unpaid Invoices & Patient Balances
+        Unpaid Invoices & Patient Remaining
       </Typography>
 
       {/* Summary Cards */}
@@ -484,16 +847,49 @@ const UnpaidInvoices: React.FC = () => {
                         </TableCell>
                         <TableCell>{getStatusChip(invoice)}</TableCell>
                         <TableCell>
-                          {invoice.remaining_balance > 0 && (
-                            <Button
-                              size="small"
-                              variant="contained"
-                              startIcon={<Payment />}
-                              onClick={() => openPaymentModal(invoice)}
-                            >
-                              Add Payment
-                            </Button>
-                          )}
+                          <Stack direction="row" spacing={1}>
+                            {invoice.remaining_balance > 0 && (
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<Payment />}
+                                onClick={() => openPaymentModal(invoice)}
+                              >
+                                Add Payment
+                              </Button>
+                            )}
+                            <Tooltip title="Print Original Receipt">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handlePrintOriginalReceipt(invoice)}
+                              >
+                                <Receipt />
+                              </IconButton>
+                            </Tooltip>
+                            {invoice.remaining_balance <= 0 && (
+                              <Tooltip title="Print Final Payment Receipt">
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={() => {
+                                    // Fetch final payment receipt data and print
+                                    axios.get(`/api/invoices/${invoice.id}/final-payment-receipt`)
+                                      .then(response => {
+                                        setReceiptData(response.data);
+                                        setShowReceiptModal(true);
+                                      })
+                                      .catch(error => {
+                                        console.error('Error fetching final payment receipt:', error);
+                                        toast.error('Failed to fetch final payment receipt');
+                                      });
+                                  }}
+                                >
+                                  <Print />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     ))}

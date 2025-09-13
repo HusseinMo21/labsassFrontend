@@ -16,22 +16,11 @@ import {
   CircularProgress,
   Grid,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from '@mui/material';
 import {
   Receipt,
   AttachMoney,
-  Payment,
   Download,
-  CreditCard,
   CheckCircle,
   Schedule,
   Error,
@@ -72,13 +61,6 @@ const PatientInvoices: React.FC = () => {
   const [invoices, setInvoices] = useState<PatientInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<PatientInvoice | null>(null);
-  const [paymentForm, setPaymentForm] = useState({
-    amount: 0,
-    payment_method: 'cash',
-    notes: '',
-  });
 
   useEffect(() => {
     fetchPatientInvoices();
@@ -98,38 +80,10 @@ const PatientInvoices: React.FC = () => {
     }
   };
 
-  const handlePayment = (invoice: PatientInvoice) => {
-    setSelectedInvoice(invoice);
-    setPaymentForm({
-      amount: invoice.balance_due,
-      payment_method: 'cash',
-      notes: '',
-    });
-    setPaymentDialogOpen(true);
-  };
-
-  const handlePaymentSubmit = async () => {
-    if (!selectedInvoice) return;
-
-    try {
-      const response = await axios.post(`/api/invoices/${selectedInvoice.id}/payments`, {
-        amount: paymentForm.amount,
-        payment_method: paymentForm.payment_method,
-        notes: paymentForm.notes,
-      });
-
-      toast.success('Payment recorded successfully');
-      setPaymentDialogOpen(false);
-      fetchPatientInvoices(); // Refresh the list
-    } catch (err: any) {
-      console.error('Error recording payment:', err);
-      toast.error('Failed to record payment');
-    }
-  };
 
   const handleDownloadInvoice = async (invoice: PatientInvoice) => {
     try {
-      const response = await axios.get(`/api/invoices/${invoice.id}/pdf`, {
+      const response = await axios.get(`/api/invoices/${invoice.id}/download`, {
         responseType: 'blob',
       });
       
@@ -152,12 +106,12 @@ const PatientInvoices: React.FC = () => {
   const getPaymentStatusChip = (status: string) => {
     const statusConfig = {
       pending: { color: 'warning', label: 'Pending Payment', icon: <Schedule /> },
-      partial: { color: 'info', label: 'Partial Payment', icon: <Payment /> },
+      partial: { color: 'info', label: 'Partial Payment', icon: <AttachMoney /> },
       paid: { color: 'success', label: 'Paid in Full', icon: <CheckCircle /> },
       overdue: { color: 'error', label: 'Overdue', icon: <Error /> },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || { color: 'default', label: status, icon: <Payment /> };
+    const config = statusConfig[status as keyof typeof statusConfig] || { color: 'default', label: status, icon: <AttachMoney /> };
     return <Chip label={config.label} color={config.color as any} size="small" icon={config.icon} />;
   };
 
@@ -197,14 +151,14 @@ const PatientInvoices: React.FC = () => {
             My Invoices
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
-            View and manage your invoices and payments
+            View your invoices and download receipts
           </Typography>
         </Box>
       </Box>
 
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>Payment Information:</strong> You can make payments for your invoices. All payments are recorded and will be reflected in your account.
+          <strong>View Only:</strong> This page displays your invoices for viewing and downloading. For payments, please contact the lab directly.
         </Typography>
       </Alert>
 
@@ -235,9 +189,9 @@ const PatientInvoices: React.FC = () => {
                     <TableCell>Date</TableCell>
                     <TableCell>Total Amount</TableCell>
                     <TableCell>Paid Amount</TableCell>
-                    <TableCell>Balance Due</TableCell>
+                    <TableCell>Remaining Balance</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell align="center">Actions</TableCell>
+                    <TableCell align="center">Download</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -281,26 +235,14 @@ const PatientInvoices: React.FC = () => {
                         {getPaymentStatusChip(invoice.payment_status)}
                       </TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<Download />}
-                            onClick={() => handleDownloadInvoice(invoice)}
-                          >
-                            PDF
-                          </Button>
-                          {invoice.balance_due > 0 && (
-                            <Button
-                              size="small"
-                              variant="contained"
-                              startIcon={<Payment />}
-                              onClick={() => handlePayment(invoice)}
-                            >
-                              Pay
-                            </Button>
-                          )}
-                        </Box>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<Download />}
+                          onClick={() => handleDownloadInvoice(invoice)}
+                        >
+                          Download PDF
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -311,81 +253,6 @@ const PatientInvoices: React.FC = () => {
         </Grid>
       )}
 
-      {/* Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onClose={() => setPaymentDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Payment color="primary" />
-            Record Payment
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {selectedInvoice && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Invoice #{selectedInvoice.invoice_number}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Visit: {selectedInvoice.visit_id}
-              </Typography>
-              <Typography variant="body2" gutterBottom>
-                Total Amount: {formatCurrency(selectedInvoice.final_amount)}
-              </Typography>
-              <Typography variant="body2" gutterBottom>
-                Already Paid: {formatCurrency(getTotalPaid(selectedInvoice))}
-              </Typography>
-              <Typography variant="body2" fontWeight="medium" color="error.main">
-                Balance Due: {formatCurrency(selectedInvoice.balance_due)}
-              </Typography>
-            </Box>
-          )}
-          
-          <TextField
-            fullWidth
-            label="Payment Amount"
-            type="number"
-            value={paymentForm.amount}
-            onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) || 0 })}
-            sx={{ mb: 2 }}
-            inputProps={{ min: 0, max: selectedInvoice?.balance_due || 0 }}
-          />
-          
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Payment Method</InputLabel>
-            <Select
-              value={paymentForm.payment_method}
-              onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
-              label="Payment Method"
-            >
-              <MenuItem value="cash">Cash</MenuItem>
-              <MenuItem value="card">Credit/Debit Card</MenuItem>
-              <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
-              <MenuItem value="check">Check</MenuItem>
-            </Select>
-          </FormControl>
-          
-          <TextField
-            fullWidth
-            label="Notes (Optional)"
-            multiline
-            rows={3}
-            value={paymentForm.notes}
-            onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPaymentDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handlePaymentSubmit} 
-            variant="contained"
-            disabled={paymentForm.amount <= 0 || paymentForm.amount > (selectedInvoice?.balance_due || 0)}
-          >
-            Record Payment
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
