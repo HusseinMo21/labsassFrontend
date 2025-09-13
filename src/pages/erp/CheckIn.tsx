@@ -90,11 +90,22 @@ interface Patient {
   email?: string;
 }
 
-interface Test {
+interface TestCategory {
   id: number;
   name: string;
-  price: number;
-  category: string | { id: number; name: string; description: string; is_active: boolean; created_at: string; updated_at: string };
+  code: string;
+  description: string;
+  is_active: boolean;
+}
+
+interface CustomTest {
+  id: string; // temporary ID for frontend
+  test_category_id: number;
+  category_name: string;
+  custom_test_name: string;
+  custom_price: number;
+  discount_percentage: number;
+  final_price: number;
 }
 
 const CheckIn: React.FC = () => {
@@ -109,8 +120,16 @@ const CheckIn: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   
   // Test state
-  const [availableTests, setAvailableTests] = useState<Test[]>([]);
-  const [selectedTests, setSelectedTests] = useState<Test[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<TestCategory[]>([]);
+  const [selectedTests, setSelectedTests] = useState<CustomTest[]>([]);
+  
+  // Current test form state
+  const [currentTestForm, setCurrentTestForm] = useState({
+    test_category_id: '',
+    custom_test_name: '',
+    custom_price: 0,
+    discount_percentage: 0,
+  });
   
   // Billing state
   const [paymentForm, setPaymentForm] = useState({
@@ -148,7 +167,7 @@ const CheckIn: React.FC = () => {
     };
     
     initializeCSRF();
-    fetchAvailableTests();
+    fetchTestCategories();
   }, []);
 
   useEffect(() => {
@@ -159,21 +178,18 @@ const CheckIn: React.FC = () => {
     }
   }, [patientQuery]);
 
-  const fetchAvailableTests = async () => {
+  const fetchTestCategories = async () => {
     try {
-      const response = await axios.get('/api/check-in/tests');
-      console.log('Tests response:', response.data);
-      const tests = Array.isArray(response.data) ? response.data : [];
-      const validTests = tests.filter(test => 
-        test && 
-        typeof test === 'object' && 
-        test.id && 
-        test.name
-      );
-      setAvailableTests(validTests);
+      const response = await axios.get('/api/check-in/test-categories');
+      console.log('Categories response:', response.data);
+      if (response.data.success && response.data.data) {
+        setAvailableCategories(response.data.data);
+      } else {
+        setAvailableCategories([]);
+      }
     } catch (error) {
-      console.error('Failed to fetch tests:', error);
-      setAvailableTests([]);
+      console.error('Failed to fetch test categories:', error);
+      setAvailableCategories([]);
     }
   };
 
@@ -195,20 +211,51 @@ const CheckIn: React.FC = () => {
     }
   };
 
+  const handleAddTest = () => {
+    if (!currentTestForm.test_category_id || !currentTestForm.custom_test_name || currentTestForm.custom_price <= 0) {
+      toast.error('Please fill in all test details');
+      return;
+    }
 
-  const handleTestToggle = (test: Test) => {
-    setSelectedTests(prev => {
-      const exists = prev.find(t => t.id === test.id);
-      if (exists) {
-        return prev.filter(t => t.id !== test.id);
-      } else {
-        return [...prev, test];
-      }
+    const selectedCategory = availableCategories.find(cat => cat.id.toString() === currentTestForm.test_category_id);
+    if (!selectedCategory) {
+      toast.error('Please select a valid category');
+      return;
+    }
+
+    const finalPrice = currentTestForm.custom_price - (currentTestForm.custom_price * currentTestForm.discount_percentage / 100);
+
+    const newTest: CustomTest = {
+      id: `temp_${Date.now()}_${Math.random()}`,
+      test_category_id: parseInt(currentTestForm.test_category_id),
+      category_name: selectedCategory.name,
+      custom_test_name: currentTestForm.custom_test_name,
+      custom_price: currentTestForm.custom_price,
+      discount_percentage: currentTestForm.discount_percentage,
+      final_price: finalPrice,
+    };
+
+    setSelectedTests([...selectedTests, newTest]);
+    
+    // Reset form
+    setCurrentTestForm({
+      test_category_id: '',
+      custom_test_name: '',
+      custom_price: 0,
+      discount_percentage: 0,
     });
+
+    toast.success('Test added successfully');
   };
 
+  const handleRemoveTest = (testId: string) => {
+    setSelectedTests(selectedTests.filter(test => test.id !== testId));
+  };
+
+
+
   const calculateTotal = () => {
-    return selectedTests.reduce((sum, test) => sum + (Number(test.price) || 0), 0);
+    return selectedTests.reduce((sum, test) => sum + test.final_price, 0);
   };
 
   const calculateFinalAmount = () => {
@@ -560,15 +607,6 @@ const CheckIn: React.FC = () => {
     printWindow.close();
   };
 
-  const getCategoryName = (category: string | { id: number; name: string; description: string; is_active: boolean; created_at: string; updated_at: string }) => {
-    if (typeof category === 'string') {
-      return category;
-    }
-    if (category && typeof category === 'object' && category.name) {
-      return category.name;
-    }
-    return 'Unknown';
-  };
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -593,13 +631,14 @@ const CheckIn: React.FC = () => {
       const visitData = {
         patient_id: selectedPatient.id,
         tests: selectedTests.map(test => ({
-          lab_test_id: test.id
+          test_category_id: test.test_category_id,
+          custom_test_name: test.custom_test_name,
+          custom_price: test.custom_price,
+          discount_percentage: test.discount_percentage
         })),
         upfront_payment: paymentForm.upfront_payment,
         payment_method: paymentForm.payment_method,
         notes: paymentForm.notes,
-        discount_amount: paymentForm.discount_amount,
-        discount_percentage: paymentForm.discount_percentage,
         insurance_provider: paymentForm.insurance_provider,
         insurance_policy_number: paymentForm.insurance_policy_number,
         insurance_claim_number: paymentForm.insurance_claim_number,
@@ -854,60 +893,93 @@ const CheckIn: React.FC = () => {
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                   <Science sx={{ mr: 1 }} />
-                  Available Tests
+                  Add New Test
                 </Typography>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Test Name</TableCell>
-                        <TableCell>Category</TableCell>
-                        <TableCell>Price</TableCell>
-                        <TableCell align="center">Action</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {availableTests.map((test) => {
-                        const isSelected = selectedTests.find(t => t.id === test.id);
-                        return (
-                          <TableRow key={test.id} hover>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Science color="primary" sx={{ mr: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {String(test.name || 'Unknown Test')}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={getCategoryName(test.category)} 
-                                size="small" 
-                                variant="outlined"
-                                color="primary"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {formatCurrency(Number(test.price) || 0)}
+                
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth>
+                      <InputLabel>Test Category</InputLabel>
+                      <Select
+                        value={currentTestForm.test_category_id}
+                        onChange={(e) => setCurrentTestForm({...currentTestForm, test_category_id: e.target.value})}
+                        label="Test Category"
+                      >
+                        {availableCategories.map((category) => (
+                          <MenuItem key={category.id} value={category.id.toString()}>
+                            <Box>
+                              <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                {category.name}
                               </Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Button
-                                variant={isSelected ? "contained" : "outlined"}
-                                size="small"
-                                onClick={() => handleTestToggle(test)}
-                                startIcon={isSelected ? <Remove /> : <Add />}
-                              >
-                                {isSelected ? 'Remove' : 'Add'}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                              <Typography variant="caption" color="text.secondary">
+                                {category.description}
+                              </Typography>
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Test Name"
+                      value={currentTestForm.custom_test_name}
+                      onChange={(e) => setCurrentTestForm({...currentTestForm, custom_test_name: e.target.value})}
+                      placeholder="e.g., Breast Biopsy, Pap Smear"
+                    />
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Test Price"
+                      type="number"
+                      value={currentTestForm.custom_price}
+                      onChange={(e) => setCurrentTestForm({...currentTestForm, custom_price: parseFloat(e.target.value) || 0})}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      fullWidth
+                      label="Discount %"
+                      type="number"
+                      value={currentTestForm.discount_percentage}
+                      onChange={(e) => setCurrentTestForm({...currentTestForm, discount_percentage: parseFloat(e.target.value) || 0})}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={handleAddTest}
+                        startIcon={<Add />}
+                        fullWidth
+                        sx={{ height: '56px' }}
+                      >
+                        Add Test
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+                
+                {currentTestForm.custom_price > 0 && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Final Price: {formatCurrency(currentTestForm.custom_price - (currentTestForm.custom_price * currentTestForm.discount_percentage / 100))}
+                    </Typography>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -935,19 +1007,19 @@ const CheckIn: React.FC = () => {
                         <ListItemText
                           primary={
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {String(test.name || 'Unknown Test')}
+                              {test.custom_test_name}
                             </Typography>
                           }
                           secondary={
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Chip 
-                                label={getCategoryName(test.category)} 
+                                label={test.category_name} 
                                 size="small" 
                                 variant="outlined"
                                 sx={{ fontSize: '0.7rem' }}
                               />
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {formatCurrency(Number(test.price) || 0)}
+                                {formatCurrency(test.final_price)}
                               </Typography>
                             </Box>
                           }
@@ -956,7 +1028,7 @@ const CheckIn: React.FC = () => {
                           <Tooltip title="Remove test">
                             <IconButton
                               size="small"
-                              onClick={() => handleTestToggle(test)}
+                              onClick={() => handleRemoveTest(test.id)}
                               color="error"
                             >
                               <Remove />
@@ -1264,13 +1336,28 @@ const CheckIn: React.FC = () => {
                       }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                           <Science color="primary" sx={{ mr: 1, fontSize: 20 }} />
-                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                            {String(test.name || 'Unknown Test')}
-                          </Typography>
+                          <Box>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {test.custom_test_name}
+                            </Typography>
+                            <Chip 
+                              label={test.category_name} 
+                              size="small" 
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem', mt: 0.5 }}
+                            />
+                          </Box>
                         </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                          {formatCurrency(Number(test.price) || 0)}
-                        </Typography>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                            {formatCurrency(test.final_price)}
+                          </Typography>
+                          {test.discount_percentage > 0 && (
+                            <Typography variant="caption" color="text.secondary">
+                              {test.discount_percentage}% off
+                            </Typography>
+                          )}
+                        </Box>
                       </Box>
                     ))}
                   </Box>
@@ -1362,9 +1449,9 @@ const CheckIn: React.FC = () => {
       patient_name: selectedPatient?.name || 'N/A',
       patient_phone: selectedPatient?.phone || 'N/A',
       tests: selectedTests.map(test => ({
-        name: test.name,
-        category: getCategoryName(test.category),
-        price: test.price
+        name: test.custom_test_name,
+        category: test.category_name,
+        price: test.final_price
       })),
       total_amount: calculateTotal(),
       final_amount: calculateTotal(),
@@ -1447,7 +1534,7 @@ const CheckIn: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Chip 
-                            label={getCategoryName(test.category)} 
+                            label={test.category} 
                             size="small" 
                             variant="outlined" 
                             color="primary"
@@ -1701,18 +1788,11 @@ const CheckIn: React.FC = () => {
                         <Typography variant="body2" gutterBottom>
                           <strong>Time:</strong> {testLabel.sample_time}
                         </Typography>
-                        <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              fontFamily: 'monospace', 
-                              fontSize: '14px', 
-                              fontWeight: 'bold',
-                              textAlign: 'center'
-                            }}
-                          >
-                            {testLabel.barcode}
-                          </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Sample ID:</strong> {testLabel.sample_id}
+                        </Typography>
+                        <Box sx={{ mt: 2, p: 1, bgcolor: 'white', borderRadius: 1, border: '1px solid #ccc' }}>
+                          <div dangerouslySetInnerHTML={{ __html: testLabel.barcode }} />
                         </Box>
                       </Box>
                     </Card>

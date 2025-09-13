@@ -21,6 +21,9 @@ import PatientDashboard from './pages/erp/PatientDashboard';
 import BarcodeDemo from './pages/BarcodeDemo';
 import LabInsightsDashboard from './pages/erp/LabInsightsDashboard';
 import PatientTestSearch from './pages/erp/PatientTestSearch';
+import QualityControl from './pages/erp/QualityControl';
+import TestValidation from './pages/erp/TestValidation';
+import EnhancedReports from './pages/erp/EnhancedReports';
 import SampleTracking from './pages/erp/SampleTracking';
 import Notifications from './pages/erp/Notifications';
 import CheckIn from './pages/erp/CheckIn';
@@ -254,6 +257,39 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <LabInsightsDashboard />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Quality Control
+  {
+    path: '/quality-control',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <QualityControl />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Test Validation
+  {
+    path: '/test-validation',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <TestValidation />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Enhanced Reports
+  {
+    path: '/enhanced-reports',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <EnhancedReports />
         </ERPLayout>
       </ProtectedRoute>
     ),

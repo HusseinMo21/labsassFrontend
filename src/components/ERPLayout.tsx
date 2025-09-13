@@ -73,6 +73,9 @@ const navigationItems: NavigationItem[] = [
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['admin'] },
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
   { path: '/patient-test-search', label: 'Patient Test Search', icon: <Search />, roles: ['admin'] },
+  { path: '/quality-control', label: 'Quality Control', icon: <Science />, roles: ['admin'] },
+  { path: '/test-validation', label: 'Test Validation', icon: <Assessment />, roles: ['admin'] },
+  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['admin'] },
 
   // Staff - Limited access (including Check-In & Billing and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
@@ -89,11 +92,16 @@ const navigationItems: NavigationItem[] = [
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['staff'] },
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['staff'] },
+  { path: '/quality-control', label: 'Quality Control', icon: <Science />, roles: ['staff'] },
+  { path: '/test-validation', label: 'Test Validation', icon: <Assessment />, roles: ['staff'] },
+  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['staff'] },
 
   // Doctor - Can view and approve reports
   { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },
   { path: '/doctor/reports', label: 'Reports', icon: <Assessment />, roles: ['doctor'] },
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['doctor'] },
+  { path: '/test-validation', label: 'Test Validation', icon: <Assessment />, roles: ['doctor'] },
+  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['doctor'] },
 
   // Patient - Can view their own reports after payment
   { path: '/patient/dashboard', label: 'My Dashboard', icon: <Dashboard />, roles: ['patient'] },
