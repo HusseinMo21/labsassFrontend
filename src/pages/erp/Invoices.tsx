@@ -40,7 +40,6 @@ import {
   PictureAsPdf,
   Print,
   Edit,
-  Payment,
   Download,
   Refresh,
   Search,
@@ -88,9 +87,6 @@ const Invoices: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editPrice, setEditPrice] = useState<number>(0);
   const [savingPrice, setSavingPrice] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [addingPayment, setAddingPayment] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -159,8 +155,6 @@ const Invoices: React.FC = () => {
     setSelectedInvoice(invoice);
     setEditPrice(invoice.total_amount);
     setShowModal(true);
-    setPaymentAmount('');
-    setPaymentMethod('cash');
   };
 
   const handleOpenInvoicePreview = async (invoiceId: number) => {
@@ -240,29 +234,6 @@ const Invoices: React.FC = () => {
     }
   };
 
-  const handleAddPayment = async () => {
-    if (!selectedInvoice || !paymentAmount) return;
-    
-    setAddingPayment(true);
-    try {
-      const response = await axios.post(`/api/invoices/${selectedInvoice.id}/payments`, {
-        amount: Number(paymentAmount),
-        payment_method: paymentMethod,
-        notes: '',
-      });
-      setSelectedInvoice(response.data.invoice);
-      setInvoices(invoices.map(inv => 
-        inv.id === response.data.invoice.id ? response.data.invoice : inv
-      ));
-      setPaymentAmount('');
-      toast.success('Payment added successfully');
-    } catch (error) {
-      console.error('Failed to add payment:', error);
-      toast.error('Failed to add payment');
-    } finally {
-      setAddingPayment(false);
-    }
-  };
 
   const getAmountPaid = (invoice: Invoice): number => {
     // Use the amount_paid field from the invoice if available, otherwise calculate from payments
@@ -311,7 +282,7 @@ const Invoices: React.FC = () => {
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(amount);
   };
 
@@ -415,7 +386,7 @@ const Invoices: React.FC = () => {
                     <TableCell>Visit #</TableCell>
                     <TableCell align="right">Amount</TableCell>
                     <TableCell align="right">Paid</TableCell>
-                    <TableCell align="right">Balance</TableCell>
+                    <TableCell align="right">Remaining</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Date</TableCell>
                     <TableCell align="center">Actions</TableCell>
@@ -612,7 +583,7 @@ const Invoices: React.FC = () => {
                   </ListItem>
                   <ListItem>
                     <ListItemText
-                      primary="Balance"
+                      primary="Remaining"
                       secondary={
                         <Typography 
                           color={getBalance(selectedInvoice) > 0 ? 'error.main' : 'success.main'}
@@ -680,44 +651,6 @@ const Invoices: React.FC = () => {
                 )}
               </Grid>
 
-              <Grid size={{ xs: 12 }}>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  Add Payment
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <TextField
-                    type="number"
-                    label="Amount"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    size="small"
-                    sx={{ width: 120 }}
-                    inputProps={{ min: 0.01, step: 0.01 }}
-                  />
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
-                    <InputLabel>Method</InputLabel>
-                    <Select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      label="Method"
-                    >
-                      <MenuItem value="cash">Cash</MenuItem>
-                      <MenuItem value="card">Card</MenuItem>
-                      <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
-                      <MenuItem value="check">Check</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <Button
-                    variant="contained"
-                    startIcon={<Payment />}
-                    onClick={handleAddPayment}
-                    disabled={addingPayment || !paymentAmount || getAmountPaid(selectedInvoice) >= Number(selectedInvoice.total_amount || 0)}
-                  >
-                    {addingPayment ? 'Adding...' : 'Add Payment'}
-                  </Button>
-                </Box>
-              </Grid>
             </Grid>
           )}
         </DialogContent>

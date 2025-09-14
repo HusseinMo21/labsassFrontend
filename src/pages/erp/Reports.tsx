@@ -36,6 +36,7 @@ import {
   ListItemSecondaryAction,
   Divider,
   LinearProgress,
+  Pagination,
 } from '@mui/material';
 import {
   Download,
@@ -49,6 +50,7 @@ import {
   PictureAsPdf,
   Refresh,
   DateRange,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -171,6 +173,15 @@ const Reports: React.FC = () => {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Reset pagination when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
   const [testFormData, setTestFormData] = useState({
     clinical_data: '',
     microscopic_description: '',
@@ -201,12 +212,13 @@ const Reports: React.FC = () => {
     initializeCSRF();
     fetchReportData();
     fetchVisits();
-  }, [activeTab, dateRange]);
+  }, [activeTab, dateRange, currentPage, searchTerm, statusFilter]);
 
   const fetchVisits = async () => {
     try {
       let params: any = {
-        per_page: 1000,
+        page: currentPage,
+        per_page: 15,
       };
 
       // Role-based filtering
@@ -227,8 +239,25 @@ const Reports: React.FC = () => {
         params.sample_completed = 'true'; // Only show visits with completed samples
       }
 
+      // Add search functionality
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+
+      // Add status filter
+      if (statusFilter !== 'all') {
+        params.test_status = statusFilter;
+      }
+
+      // Add date range
+      if (dateRange.start_date && dateRange.end_date) {
+        params.start_date = dateRange.start_date;
+        params.end_date = dateRange.end_date;
+      }
+
       const response = await axios.get('/api/visits', { params });
-      setVisits(response.data.data);
+      setVisits(response.data.data || []);
+      setTotalPages(response.data.last_page || 1);
     } catch (error) {
       console.error('Failed to fetch visits:', error);
     }
@@ -510,7 +539,7 @@ const Reports: React.FC = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(amount);
   };
 
@@ -554,6 +583,52 @@ const Reports: React.FC = () => {
           Export CSV
         </Button>
       </Box>
+
+      {/* Search and Filter Controls */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                placeholder="Search by visit number, patient name, phone, or patient ID"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 3 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status Filter</InputLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  label="Status Filter"
+                >
+                  <MenuItem value="all">All Status</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="under_review">Under Review</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, md: 3 }}>
+              <Button
+                variant="contained"
+                onClick={fetchVisits}
+                fullWidth
+                disabled={loading}
+                startIcon={<Refresh />}
+              >
+                {loading ? <CircularProgress size={20} /> : 'Refresh'}
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent>
@@ -671,6 +746,20 @@ const Reports: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(event, page) => setCurrentPage(page)}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
+      )}
     </Box>
   );
 

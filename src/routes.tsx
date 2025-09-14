@@ -10,7 +10,6 @@ import Dashboard from './pages/erp/Dashboard';
 import Patients from './pages/erp/Patients';
 import Doctors from './pages/erp/Doctors';
 import Organizations from './pages/erp/Organizations';
-import LabTests from './pages/erp/LabTests';
 import Visits from './pages/erp/Visits';
 import Invoices from './pages/erp/Invoices';
 import Users from './pages/erp/Users';
@@ -21,9 +20,8 @@ import PatientDashboard from './pages/erp/PatientDashboard';
 import BarcodeDemo from './pages/BarcodeDemo';
 import LabInsightsDashboard from './pages/erp/LabInsightsDashboard';
 import PatientTestSearch from './pages/erp/PatientTestSearch';
-import QualityControl from './pages/erp/QualityControl';
-import TestValidation from './pages/erp/TestValidation';
 import EnhancedReports from './pages/erp/EnhancedReports';
+import ReviewReports from './pages/erp/ReviewReports';
 import SampleTracking from './pages/erp/SampleTracking';
 import Notifications from './pages/erp/Notifications';
 import CheckIn from './pages/erp/CheckIn';
@@ -172,16 +170,6 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: '/tests',
-    element: (
-      <ProtectedRoute>
-        <ERPLayout>
-          <LabTests />
-        </ERPLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: '/visits',
     element: (
       <ProtectedRoute>
@@ -261,28 +249,6 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-  // Quality Control
-  {
-    path: '/quality-control',
-    element: (
-      <ProtectedRoute>
-        <ERPLayout>
-          <QualityControl />
-        </ERPLayout>
-      </ProtectedRoute>
-    ),
-  },
-  // Test Validation
-  {
-    path: '/test-validation',
-    element: (
-      <ProtectedRoute>
-        <ERPLayout>
-          <TestValidation />
-        </ERPLayout>
-      </ProtectedRoute>
-    ),
-  },
   // Enhanced Reports
   {
     path: '/enhanced-reports',
@@ -290,6 +256,17 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <EnhancedReports />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Review Reports (Admin Only)
+  {
+    path: '/review-reports',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <ReviewReports />
         </ERPLayout>
       </ProtectedRoute>
     ),

@@ -90,7 +90,7 @@ const Receipts: React.FC = () => {
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(amount);
   };
 
@@ -353,8 +353,8 @@ const Receipts: React.FC = () => {
           <h3>TESTS (${receipt.visitTests?.length || 0})</h3>
           ${(receipt.visitTests || []).map((test) => `
             <div class="test-item">
-              <span class="test-name">${(test.labTest || test.lab_test)?.name || 'Unknown Test'}</span>
-              <span class="test-price">${formatCurrency((test.labTest || test.lab_test)?.price || 0)}</span>
+              <span class="test-name">${test.custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</span>
+              <span class="test-price">${formatCurrency(test.final_price || (test.labTest || test.lab_test)?.price || 0)}</span>
             </div>
           `).join('')}
         </div>
@@ -468,7 +468,7 @@ const Receipts: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               fullWidth
-              placeholder="Search by receipt number (e.g., RCP202509110003), visit number, patient name, or phone"
+              placeholder="Search by receipt number, visit number, patient name, phone, or patient ID"
               value={searchTerm}
               onChange={(e) => handleSearchInputChange(e.target.value)}
               InputProps={{
@@ -552,6 +552,9 @@ const Receipts: React.FC = () => {
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {receipt.patient.phone}
+                      </Typography>
+                      <Typography variant="caption" color="primary.main" sx={{ fontWeight: 'bold' }}>
+                        ID: {receipt.patient.id}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -666,8 +669,8 @@ const Receipts: React.FC = () => {
                     <TableBody>
                       {(selectedReceipt.visitTests || []).map((test) => (
                         <TableRow key={test.id}>
-                          <TableCell>{(test.labTest || test.lab_test)?.name || 'Unknown Test'}</TableCell>
-                          <TableCell>{formatCurrency((test.labTest || test.lab_test)?.price || 0)}</TableCell>
+                          <TableCell>{test.custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</TableCell>
+                          <TableCell>{formatCurrency(test.final_price || (test.labTest || test.lab_test)?.price || 0)}</TableCell>
                           <TableCell>{getStatusChip(test.status)}</TableCell>
                         </TableRow>
                       ))}

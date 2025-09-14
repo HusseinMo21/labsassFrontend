@@ -461,7 +461,7 @@ const SampleTracking: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {sample.visit_test?.lab_test?.name || 'Unknown'}
+                          {sample.visit_test?.custom_test_name || sample.visit_test?.lab_test?.name || 'Unknown'}
                         </Typography>
                       </TableCell>
                       <TableCell>{getStatusChip(sample.status)}</TableCell>
@@ -529,7 +529,7 @@ const SampleTracking: React.FC = () => {
                 <strong>Patient:</strong> {selectedSample.visit_test?.visit?.patient?.name || 'Unknown'}
               </Typography>
               <Typography variant="body2">
-                <strong>Test:</strong> {selectedSample.visit_test?.lab_test?.name || 'Unknown'}
+                <strong>Test:</strong> {selectedSample.visit_test?.custom_test_name || selectedSample.visit_test?.lab_test?.name || 'Unknown'}
               </Typography>
             </Box>
           )}

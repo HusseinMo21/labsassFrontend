@@ -275,7 +275,7 @@ const CheckIn: React.FC = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'EGP'
     }).format(amount);
   };
 
@@ -1240,7 +1240,7 @@ const CheckIn: React.FC = () => {
                       InputProps={{
                         endAdornment: <InputAdornment position="end">%</InputAdornment>,
                       }}
-                      helperText={`$${paymentForm.discount_amount.toFixed(2)} off`}
+                      helperText={`EGP ${paymentForm.discount_amount.toFixed(2)} off`}
                       sx={{ '& .MuiInputBase-root': { height: 56 } }}
                     />
                   </Grid>

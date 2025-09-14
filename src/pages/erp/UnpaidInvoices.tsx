@@ -217,9 +217,9 @@ const UnpaidInvoices: React.FC = () => {
 
   const formatCurrency = (amount: number) => {
     if (amount === null || amount === undefined || isNaN(amount)) {
-      return '$0.00';
+      return 'EGP 0.00';
     }
-    return `$${parseFloat(amount.toString()).toFixed(2)}`;
+    return `EGP ${parseFloat(amount.toString()).toFixed(2)}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -375,7 +375,7 @@ const UnpaidInvoices: React.FC = () => {
             ${(receiptData.tests || []).map(test => `
                 <div class="test-item">
                   <span class="test-name">${test.name}</span>
-                  <span class="test-price">$${test.price}</span>
+                  <span class="test-price">EGP ${test.price}</span>
                 </div>
               `).join('')}
           </div>
@@ -383,23 +383,23 @@ const UnpaidInvoices: React.FC = () => {
           <div class="section total">
             <div class="row">
               <span class="label">Total:</span>
-              <span class="value">$${receiptData.total_amount}</span>
+              <span class="value">EGP ${receiptData.total_amount}</span>
             </div>
             <div class="row">
               <span class="label">Discount:</span>
-              <span class="value">$${receiptData.discount_amount || 0}</span>
+              <span class="value">EGP ${receiptData.discount_amount || 0}</span>
             </div>
             <div class="row">
               <span class="label">Final:</span>
-              <span class="value">$${receiptData.final_amount}</span>
+              <span class="value">EGP ${receiptData.final_amount}</span>
             </div>
             <div class="row">
               <span class="label">Paid:</span>
-              <span class="value">$${receiptData.upfront_payment}</span>
+              <span class="value">EGP ${receiptData.upfront_payment}</span>
             </div>
             <div class="row">
               <span class="label">Remaining:</span>
-              <span class="value">$${receiptData.remaining_balance}</span>
+              <span class="value">EGP ${receiptData.remaining_balance}</span>
             </div>
             <div class="row">
               <span class="label">Method:</span>
@@ -584,7 +584,7 @@ const UnpaidInvoices: React.FC = () => {
           ${receiptData?.tests?.map(test => `
               <div class="test-item">
                 <span class="test-name">${test.name}</span>
-                <span class="test-price">$${test.price}</span>
+                <span class="test-price">EGP ${test.price}</span>
               </div>
             `).join('')}
         </div>
@@ -592,15 +592,15 @@ const UnpaidInvoices: React.FC = () => {
         <div class="section total">
           <div class="row">
             <span class="label">Total Amount:</span>
-            <span class="value">$${receiptData?.total_amount}</span>
+            <span class="value">EGP ${receiptData?.total_amount}</span>
           </div>
           <div class="row">
             <span class="label">Discount:</span>
-            <span class="value">$${receiptData?.discount_amount || 0}</span>
+            <span class="value">EGP ${receiptData?.discount_amount || 0}</span>
           </div>
           <div class="row">
             <span class="label">Final Amount:</span>
-            <span class="value">$${receiptData?.final_amount}</span>
+            <span class="value">EGP ${receiptData?.final_amount}</span>
           </div>
         </div>
         
@@ -609,15 +609,15 @@ const UnpaidInvoices: React.FC = () => {
           <div class="payment-breakdown">
             <div class="row">
               <span class="label">Paid Before:</span>
-              <span class="value">$${receiptData?.upfront_payment}</span>
+              <span class="value">EGP ${receiptData?.upfront_payment}</span>
             </div>
             <div class="row">
               <span class="label">Paid Now:</span>
-              <span class="value">$${receiptData?.remaining_balance}</span>
+              <span class="value">EGP ${receiptData?.remaining_balance}</span>
             </div>
             <div class="row">
               <span class="label">Remaining:</span>
-              <span class="value">$0</span>
+              <span class="value">EGP 0</span>
             </div>
             <div class="row">
               <span class="label">Payment Method:</span>

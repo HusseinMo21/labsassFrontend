@@ -97,6 +97,9 @@ const Doctors: React.FC = () => {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalDoctors, setTotalDoctors] = useState(0);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const itemsPerPage = 15;
   const [formData, setFormData] = useState({
     name: '',
   });
@@ -120,17 +123,51 @@ const Doctors: React.FC = () => {
     fetchDoctors();
   }, [currentPage, search]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
+
   const fetchDoctors = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/doctors?page=${currentPage}&search=${search}`);
+      const params = new URLSearchParams();
+      params.append('page', currentPage.toString());
+      if (search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const response = await axios.get(`/api/doctors?${params.toString()}`);
       setDoctors(response.data.data);
       setTotalPages(response.data.last_page);
+      setTotalDoctors(response.data.total);
     } catch (error) {
       toast.error('Failed to fetch doctors');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSearch(value);
+    setCurrentPage(1);
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      // The useEffect will trigger fetchDoctors when search changes
+    }, 500); // Wait 500ms after user stops typing
+    
+    setSearchTimeout(timeout);
   };
 
   const fetchDoctorPatients = async (doctorId: number) => {
@@ -345,7 +382,7 @@ const Doctors: React.FC = () => {
               fullWidth
               placeholder="Search doctors..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={handleSearch}
               InputProps={{
                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
               }}
@@ -418,7 +455,6 @@ const Doctors: React.FC = () => {
                             <IconButton
                               color="error"
                               onClick={() => handleDelete(doctor)}
-                              disabled={doctor.patients_count > 0}
                             >
                               <Delete />
                             </IconButton>
@@ -434,12 +470,17 @@ const Doctors: React.FC = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalDoctors)} of {totalDoctors} doctors
+              </Typography>
               <Pagination
                 count={totalPages}
                 page={currentPage}
                 onChange={(event, page) => setCurrentPage(page)}
                 color="primary"
+                showFirstButton
+                showLastButton
               />
             </Box>
           )}
@@ -545,7 +586,7 @@ const Doctors: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip 
-                          label={`$${(Number(patient.total_paid) || 0).toFixed(2)}`}
+                          label={`EGP ${(Number(patient.total_paid) || 0).toFixed(2)}`}
                           color="success"
                           variant="outlined"
                           size="small"

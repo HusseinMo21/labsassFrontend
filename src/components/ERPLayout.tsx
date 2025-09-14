@@ -55,27 +55,20 @@ interface NavigationItem {
 }
 
 const navigationItems: NavigationItem[] = [
-  // Admin - Can see everything (except Check-In & Billing and Unpaid Invoices)
+  // Admin - Only specified tabs
   { path: '/admin/dashboard', label: 'Admin Dashboard', icon: <Dashboard />, roles: ['admin'] },
   { path: '/patients', label: 'Patients', icon: <People />, roles: ['admin'] },
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['admin'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['admin'] },
   { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['admin'] },
-  { path: '/tests', label: 'Lab Tests', icon: <Science />, roles: ['admin'] },
   { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['admin'] },
-  { path: '/sample-tracking', label: 'Sample Tracking', icon: <LocalShipping />, roles: ['admin'] },
-  { path: '/notifications', label: 'Notifications', icon: <Notifications />, roles: ['admin'] },
   { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['admin'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['admin'] },
   { path: '/users', label: 'Users', icon: <Person />, roles: ['admin'] },
   { path: '/inventory', label: 'Inventory', icon: <Inventory />, roles: ['admin'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['admin'] },
-  { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['admin'] },
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
   { path: '/patient-test-search', label: 'Patient Test Search', icon: <Search />, roles: ['admin'] },
-  { path: '/quality-control', label: 'Quality Control', icon: <Science />, roles: ['admin'] },
-  { path: '/test-validation', label: 'Test Validation', icon: <Assessment />, roles: ['admin'] },
-  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['admin'] },
 
   // Staff - Limited access (including Check-In & Billing and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
@@ -92,15 +85,12 @@ const navigationItems: NavigationItem[] = [
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['staff'] },
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['staff'] },
-  { path: '/quality-control', label: 'Quality Control', icon: <Science />, roles: ['staff'] },
-  { path: '/test-validation', label: 'Test Validation', icon: <Assessment />, roles: ['staff'] },
   { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['staff'] },
 
   // Doctor - Can view and approve reports
   { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },
   { path: '/doctor/reports', label: 'Reports', icon: <Assessment />, roles: ['doctor'] },
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['doctor'] },
-  { path: '/test-validation', label: 'Test Validation', icon: <Assessment />, roles: ['doctor'] },
   { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['doctor'] },
 
   // Patient - Can view their own reports after payment

@@ -111,6 +111,7 @@ const Visits: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalVisits, setTotalVisits] = useState(0);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -126,15 +127,33 @@ const Visits: React.FC = () => {
     
     initializeCSRF();
     fetchVisits();
-  }, [page, statusFilter]);
+  }, [page, statusFilter, searchTerm]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   const fetchVisits = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      
+      // Add search parameter
+      if (searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
+      }
+      
+      // Add status filter
       if (statusFilter !== 'all') {
         params.append('status', statusFilter);
       }
+      
+      // Add pagination parameters
       params.append('page', page.toString());
       params.append('per_page', itemsPerPage.toString());
       
@@ -187,13 +206,32 @@ const Visits: React.FC = () => {
   };
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
+    const value = event.target.value;
+    setSearchTerm(value);
     setPage(1); // Reset to first page when searching
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      // The useEffect will trigger fetchVisits when searchTerm changes
+    }, 500); // Wait 500ms after user stops typing
+    
+    setSearchTimeout(timeout);
   };
 
   const handleClearSearch = () => {
     setSearchTerm('');
     setPage(1);
+    
+    // Clear search timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      setSearchTimeout(null);
+    }
   };
 
   const handleStatusFilter = (event: any) => {
@@ -201,23 +239,9 @@ const Visits: React.FC = () => {
     setPage(1); // Reset to first page when filtering
   };
 
-  const filteredVisits = visits.filter(visit => {
-    const matchesSearch = 
-      (visit.visit_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (visit.patient?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (visit.patient?.phone || '').includes(searchTerm) ||
-      (visit.patient?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || visit.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  // Pagination logic
-  const startIndex = (page - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedVisits = filteredVisits.slice(startIndex, endIndex);
-  const totalFilteredPages = Math.ceil(filteredVisits.length / itemsPerPage);
+  // Use server-side paginated data directly
+  const paginatedVisits = visits;
+  const totalFilteredPages = totalPages;
 
   const getStatusChip = (status: string) => {
     const statusConfig = {
@@ -254,7 +278,7 @@ const Visits: React.FC = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(amount);
   };
 
@@ -649,7 +673,7 @@ const Visits: React.FC = () => {
           {totalFilteredPages > 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
               <Typography variant="body2" color="text.secondary">
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredVisits.length)} of {filteredVisits.length} visits
+                Showing {((page - 1) * itemsPerPage) + 1}-{Math.min(page * itemsPerPage, totalVisits)} of {totalVisits} visits
               </Typography>
               <Pagination
                 count={totalFilteredPages}
@@ -773,11 +797,11 @@ const Visits: React.FC = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
                       <Science />
                       <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                        {(test.labTest || test.lab_test)?.name || 'Unknown Test'}
+                        {test.custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}
                       </Typography>
                       {getStatusChip(test.status || 'pending')}
                       <Typography variant="body2" color="text.secondary">
-                        {formatCurrency((test.labTest || test.lab_test)?.price || 0)}
+                        {formatCurrency(test.final_price || (test.labTest || test.lab_test)?.price || 0)}
                       </Typography>
                     </Box>
                   </AccordionSummary>

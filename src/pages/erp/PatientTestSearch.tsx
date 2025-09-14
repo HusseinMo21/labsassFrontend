@@ -405,7 +405,7 @@ const PatientTestSearch: React.FC = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(amount);
   };
 
@@ -651,7 +651,7 @@ const PatientTestSearch: React.FC = () => {
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                   <Science fontSize="small" />
                                   <Typography variant="body2">
-                                    {test.lab_test?.name || test.labTest?.name}
+                                    {test.custom_test_name || test.lab_test?.name || test.labTest?.name}
                                   </Typography>
                                 </Box>
                               }

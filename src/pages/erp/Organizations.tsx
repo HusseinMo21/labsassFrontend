@@ -97,6 +97,9 @@ const Organizations: React.FC = () => {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalOrganizations, setTotalOrganizations] = useState(0);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const itemsPerPage = 15;
   const [formData, setFormData] = useState({
     name: '',
   });
@@ -120,17 +123,51 @@ const Organizations: React.FC = () => {
     fetchOrganizations();
   }, [currentPage, search]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
+
   const fetchOrganizations = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/organizations?page=${currentPage}&search=${search}`);
+      const params = new URLSearchParams();
+      params.append('page', currentPage.toString());
+      if (search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const response = await axios.get(`/api/organizations?${params.toString()}`);
       setOrganizations(response.data.data);
       setTotalPages(response.data.last_page);
+      setTotalOrganizations(response.data.total);
     } catch (error) {
       toast.error('Failed to fetch organizations');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSearch(value);
+    setCurrentPage(1);
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      // The useEffect will trigger fetchOrganizations when search changes
+    }, 500); // Wait 500ms after user stops typing
+    
+    setSearchTimeout(timeout);
   };
 
   const fetchOrganizationPatients = async (organizationId: number) => {
@@ -331,7 +368,7 @@ const Organizations: React.FC = () => {
               fullWidth
               placeholder="Search organizations..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={handleSearch}
               InputProps={{
                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
               }}
@@ -404,7 +441,6 @@ const Organizations: React.FC = () => {
                             <IconButton
                               color="error"
                               onClick={() => handleDelete(organization)}
-                              disabled={organization.patients_count > 0}
                             >
                               <Delete />
                             </IconButton>
@@ -420,12 +456,17 @@ const Organizations: React.FC = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalOrganizations)} of {totalOrganizations} organizations
+              </Typography>
               <Pagination
                 count={totalPages}
                 page={currentPage}
                 onChange={(event, page) => setCurrentPage(page)}
                 color="primary"
+                showFirstButton
+                showLastButton
               />
             </Box>
           )}
@@ -531,7 +572,7 @@ const Organizations: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip 
-                          label={`$${(Number(patient.total_paid) || 0).toFixed(2)}`}
+                          label={`EGP ${(Number(patient.total_paid) || 0).toFixed(2)}`}
                           color="success"
                           variant="outlined"
                           size="small"
