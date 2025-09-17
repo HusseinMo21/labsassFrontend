@@ -34,6 +34,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Set up axios defaults for cookie-based authentication
   useEffect(() => {
@@ -51,6 +52,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check if we have a stored token
+        const storedToken = localStorage.getItem('access_token');
+        if (storedToken) {
+          setAccessToken(storedToken);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        }
+        
         // First, get CSRF cookie
         await axios.get('http://localhost:8000/sanctum/csrf-cookie');
         
@@ -61,6 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Backend not available or auth check failed:', error);
         // Don't show error to user, just set user as null
         setUser(null);
+        setAccessToken(null);
+        localStorage.removeItem('access_token');
+        delete axios.defaults.headers.common['Authorization'];
       } finally {
         setLoading(false);
       }
@@ -80,8 +91,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      const { user: userData } = response.data;
+      const { user: userData, access_token } = response.data;
       setUser(userData);
+      setAccessToken(access_token);
+      
+      // Store token in localStorage for persistence
+      localStorage.setItem('access_token', access_token);
+      
+      // Set axios default authorization header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      
       toast.success('Login successful!');
       return { success: true, user: userData };
     } catch (error: any) {
@@ -98,6 +117,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      setAccessToken(null);
+      
+      // Clear token from localStorage
+      localStorage.removeItem('access_token');
+      
+      // Remove authorization header
+      delete axios.defaults.headers.common['Authorization'];
+      
       toast.info('Logged out successfully');
     }
   };

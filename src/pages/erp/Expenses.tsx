@@ -45,7 +45,7 @@ interface Expense {
   name: string;
   amount: number;
   date: string;
-  author: number;
+  author: number | { id: number; name: string; email: string; role: string };
   author_name?: string;
   created_at?: string;
   updated_at?: string;
@@ -422,7 +422,9 @@ const Expenses: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Person sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2">
-                            {expense.author_name || `User ${expense.author}`}
+                            {typeof expense.author === 'object' && expense.author?.name 
+                              ? expense.author.name 
+                              : expense.author_name || `User ${expense.author}`}
                           </Typography>
                         </Box>
                       </TableCell>

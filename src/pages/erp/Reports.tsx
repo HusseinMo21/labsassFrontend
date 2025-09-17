@@ -48,6 +48,8 @@ import {
   Edit,
   Visibility,
   PictureAsPdf,
+  Image,
+  CloudUpload,
   Refresh,
   DateRange,
   Search as SearchIcon,
@@ -62,10 +64,18 @@ interface Visit {
   test_status: string;
   diagnosis?: string;
   clinical_data?: string;
+  specimen_information?: string;
+  gross_examination?: string;
   microscopic_description?: string;
   recommendations?: string;
   referred_doctor?: string;
   notes?: string;
+  image_path?: string;
+  image_filename?: string;
+  image_mime_type?: string;
+  image_size?: number;
+  image_uploaded_at?: string;
+  image_uploaded_by?: number;
   patient: {
     id: number;
     name: string;
@@ -173,6 +183,10 @@ const Reports: React.FC = () => {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImageVisit, setSelectedImageVisit] = useState<Visit | null>(null);
+  const [showReplaceImageModal, setShowReplaceImageModal] = useState(false);
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -184,11 +198,14 @@ const Reports: React.FC = () => {
   }, [searchTerm, statusFilter]);
   const [testFormData, setTestFormData] = useState({
     clinical_data: '',
+    specimen_information: '',
+    gross_examination: '',
     microscopic_description: '',
     diagnosis: '',
     recommendations: '',
     referred_doctor: '',
     test_status: 'pending',
+    image: null as File | null,
   });
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -302,6 +319,8 @@ const Reports: React.FC = () => {
     setSelectedVisit(visit);
     setTestFormData({
       clinical_data: visit.clinical_data || '',
+      specimen_information: visit.specimen_information || '',
+      gross_examination: visit.gross_examination || '',
       microscopic_description: visit.microscopic_description || '',
       diagnosis: visit.diagnosis || '',
       recommendations: visit.recommendations || visit.notes || '',
@@ -310,6 +329,76 @@ const Reports: React.FC = () => {
     });
     setSelectedTemplate(''); // Reset template selection
     setShowTestModal(true);
+  };
+
+  const handleViewImage = (visit: Visit) => {
+    setSelectedImageVisit(visit);
+    setShowImageModal(true);
+  };
+
+  const handleReplaceImage = (visit: Visit) => {
+    setSelectedImageVisit(visit);
+    setShowReplaceImageModal(true);
+  };
+
+  const handleRemoveImage = async (visit: Visit) => {
+    if (!window.confirm('Are you sure you want to remove this image? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      if (!csrfToken) {
+        toast.error('CSRF token not found');
+        return;
+      }
+
+      await axios.delete(`/api/visits/${visit.id}/remove-image`, {
+        headers: {
+          'X-CSRF-TOKEN': csrfToken
+        }
+      });
+
+      toast.success('Image removed successfully');
+      setShowImageModal(false);
+      fetchVisits(); // Refresh the visits list
+    } catch (error) {
+      console.error('Remove image error:', error);
+      toast.error('Failed to remove image');
+    }
+  };
+
+  const handleReplaceImageSubmit = async () => {
+    if (!selectedImageVisit || !newImageFile) {
+      toast.error('Please select a new image file');
+      return;
+    }
+
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      if (!csrfToken) {
+        toast.error('CSRF token not found');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('image', newImageFile);
+
+      await axios.post(`/api/visits/${selectedImageVisit.id}/upload-image`, formData, {
+        headers: {
+          'X-CSRF-TOKEN': csrfToken
+        }
+      });
+
+      toast.success('Image replaced successfully');
+      setShowReplaceImageModal(false);
+      setNewImageFile(null);
+      setShowImageModal(false);
+      fetchVisits(); // Refresh the visits list
+    } catch (error) {
+      console.error('Replace image error:', error);
+      toast.error('Failed to replace image');
+    }
   };
 
   const handleTestResults = (visit: Visit) => {
@@ -338,14 +427,37 @@ const Reports: React.FC = () => {
       const csrfToken = csrfResponse.data.csrf_token;
       console.log('CSRF token received:', csrfToken);
       
+      // Prepare form data
+      let requestData;
+      let headers: any = {
+        'X-CSRF-TOKEN': csrfToken
+      };
+      
+      if (testFormData.image) {
+        // Use FormData for image upload
+        const formData = new FormData();
+        formData.append('clinical_data', testFormData.clinical_data);
+        formData.append('microscopic_description', testFormData.microscopic_description);
+        formData.append('diagnosis', testFormData.diagnosis);
+        formData.append('recommendations', testFormData.recommendations);
+        formData.append('referred_doctor', testFormData.referred_doctor);
+        formData.append('test_status', testFormData.test_status);
+        formData.append('image', testFormData.image);
+        
+        requestData = formData;
+        // Don't set Content-Type for FormData, let browser set it with boundary
+      } else {
+        // Use regular JSON for non-image requests
+        requestData = testFormData;
+        headers['Content-Type'] = 'application/json';
+      }
+      
       // Make the PUT request with CSRF token
-      await axios.put(`/api/visits/${selectedVisit?.id}`, testFormData, {
-        headers: {
-          'X-CSRF-TOKEN': csrfToken
-        }
+      await axios.put(`/api/visits/${selectedVisit?.id}`, requestData, {
+        headers
       });
       
-      toast.success('Test report updated successfully');
+      toast.success('Test report updated successfully' + (testFormData.image ? ' with image' : ''));
       setShowTestModal(false);
       fetchVisits();
     } catch (error) {
@@ -503,22 +615,18 @@ const Reports: React.FC = () => {
     try {
       console.log('Starting PDF generation for visit:', visit);
       
-      // Get the first completed test for this visit
-      const completedTest = visit.visit_tests?.find(test => test.status === 'completed');
-      console.log('Completed test found:', completedTest);
-      
-      if (!completedTest) {
-        toast.error('No completed tests found for this visit');
+      if (!visit.diagnosis) {
+        toast.error('Report must be completed before generating PDF');
         return;
       }
 
-      console.log('Making request to:', `/api/reports/${completedTest.id}/print`);
+      console.log('Making request to:', `/api/visits/${visit.id}/report-pdf`);
       
       // Show loading toast
       const loadingToast = toast.loading('Generating PDF report...');
       
       // Generate PDF using the backend endpoint
-      const response = await axios.get(`/api/reports/${completedTest.id}/print`, {
+      const response = await axios.get(`/api/visits/${visit.id}/report-pdf`, {
         responseType: 'blob',
         timeout: 30000, // 30 second timeout for PDF generation
       });
@@ -720,6 +828,7 @@ const Reports: React.FC = () => {
                     <TableCell><strong>Tests</strong></TableCell>
                     <TableCell><strong>Test Status</strong></TableCell>
                     <TableCell><strong>Report Status</strong></TableCell>
+                    <TableCell align="center"><strong>Image</strong></TableCell>
                     <TableCell align="center"><strong>Actions</strong></TableCell>
                   </TableRow>
                 </TableHead>
@@ -763,6 +872,35 @@ const Reports: React.FC = () => {
                           size="small"
                           variant="outlined"
                         />
+                      </TableCell>
+                      <TableCell align="center">
+                        {visit.image_path ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                            <Chip
+                              icon={<Image />}
+                              label="Has Image"
+                              color="success"
+                              size="small"
+                              variant="outlined"
+                            />
+                            <Button
+                              size="small"
+                              variant="text"
+                              startIcon={<Visibility />}
+                              onClick={() => handleViewImage(visit)}
+                              sx={{ minWidth: 'auto', p: 0.5 }}
+                            >
+                              View
+                            </Button>
+                          </Box>
+                        ) : (
+                          <Chip
+                            label="No Image"
+                            color="default"
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
@@ -1523,6 +1661,28 @@ const Reports: React.FC = () => {
             />
             <TextField
               fullWidth
+              label="SPECIMEN INFORMATION"
+              multiline
+              rows={3}
+              name="specimen_information"
+              value={testFormData.specimen_information}
+              onChange={handleInputChange}
+              placeholder="Enter specimen information..."
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
+              label="GROSS EXAMINATION"
+              multiline
+              rows={3}
+              name="gross_examination"
+              value={testFormData.gross_examination}
+              onChange={handleInputChange}
+              placeholder="Enter gross examination details..."
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
               label="Microscopic Description"
               multiline
               rows={3}
@@ -1552,7 +1712,68 @@ const Reports: React.FC = () => {
               value={testFormData.recommendations}
               onChange={handleInputChange}
               placeholder="Enter recommendations..."
+              sx={{ mb: 2 }}
             />
+            
+            {/* Image Upload Section */}
+            <Box sx={{ mb: 2, p: 2, border: '2px dashed #ccc', borderRadius: 2, textAlign: 'center' }}>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                <Image color="primary" />
+                Lab Result Image (Optional)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Upload a lab result image to include in the report. Reports with images will be 2-page PDFs.
+              </Typography>
+              
+              <input
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="image-upload"
+                type="file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // Validate file size (20MB limit)
+                    if (file.size > 20 * 1024 * 1024) {
+                      alert('File size must be less than 20MB');
+                      return;
+                    }
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                      alert('Please select an image file');
+                      return;
+                    }
+                    setTestFormData({ ...testFormData, image: file });
+                  }
+                }}
+              />
+              <label htmlFor="image-upload">
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={<CloudUpload />}
+                  sx={{ mb: 1 }}
+                >
+                  Choose Image File
+                </Button>
+              </label>
+              
+              {testFormData.image && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" color="success.main">
+                    ✓ Selected: {testFormData.image.name} ({(testFormData.image.size / 1024 / 1024).toFixed(2)} MB)
+                  </Typography>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() => setTestFormData({ ...testFormData, image: null })}
+                    sx={{ mt: 1 }}
+                  >
+                    Remove Image
+                  </Button>
+                </Box>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1583,6 +1804,214 @@ const Reports: React.FC = () => {
           <Button onClick={() => setShowSaveTemplateModal(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleSaveAsTemplate}>
             Save Template
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Image Viewing Modal */}
+      <Dialog open={showImageModal} onClose={() => setShowImageModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Image color="primary" />
+            Lab Result Image - Visit #{selectedImageVisit?.visit_number}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedImageVisit && (
+            <Box>
+              {/* Patient Information */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="h6" gutterBottom>Patient Information</Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2"><strong>Name:</strong> {selectedImageVisit.patient?.name}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2"><strong>Visit Date:</strong> {formatDate(selectedImageVisit.visit_date)}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2"><strong>Referred Doctor:</strong> {selectedImageVisit.referred_doctor || 'N/A'}</Typography>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2"><strong>Test Status:</strong> {selectedImageVisit.test_status}</Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              {/* Image Display */}
+              {selectedImageVisit.image_path ? (
+                <Box sx={{ textAlign: 'center' }}>
+                  <Box sx={{ border: '2px solid #e0e0e0', borderRadius: 2, p: 2, mb: 2 }}>
+                    <img
+                      src={`http://localhost:8000/storage/${selectedImageVisit.image_path}`}
+                      alt="Lab Result Image"
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '500px',
+                        objectFit: 'contain',
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </Box>
+                  
+                  {/* Image Information */}
+                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Filename:</strong> {selectedImageVisit.image_filename}<br/>
+                      <strong>File Size:</strong> {selectedImageVisit.image_size ? (selectedImageVisit.image_size / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}<br/>
+                      <strong>Upload Date:</strong> {selectedImageVisit.image_uploaded_at ? new Date(selectedImageVisit.image_uploaded_at).toLocaleString() : 'N/A'}
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="h6" color="text.secondary">
+                    No image available for this visit
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowImageModal(false)}>Close</Button>
+          {selectedImageVisit?.image_path && (
+            <>
+              <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = `http://localhost:8000/storage/${selectedImageVisit.image_path}`;
+                  link.download = selectedImageVisit.image_filename || 'lab_result_image';
+                  link.click();
+                }}
+              >
+                Download
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<CloudUpload />}
+                onClick={() => handleReplaceImage(selectedImageVisit)}
+              >
+                Replace
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<Delete />}
+                onClick={() => handleRemoveImage(selectedImageVisit)}
+              >
+                Remove
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Replace Image Modal */}
+      <Dialog open={showReplaceImageModal} onClose={() => setShowReplaceImageModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CloudUpload color="warning" />
+            Replace Lab Result Image - Visit #{selectedImageVisit?.visit_number}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedImageVisit && (
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Select a new image to replace the current lab result image for this visit.
+              </Typography>
+              
+              <Box sx={{ mb: 2, p: 2, border: '2px dashed #ccc', borderRadius: 2, textAlign: 'center' }}>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                  <Image color="primary" />
+                  New Lab Result Image
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Upload a new lab result image to replace the existing one.
+                </Typography>
+                
+                <input
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="replace-image-upload"
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      // Validate file size (20MB limit)
+                      if (file.size > 20 * 1024 * 1024) {
+                        alert('File size must be less than 20MB');
+                        return;
+                      }
+                      // Validate file type
+                      if (!file.type.startsWith('image/')) {
+                        alert('Please select an image file');
+                        return;
+                      }
+                      setNewImageFile(file);
+                    }
+                  }}
+                />
+                <label htmlFor="replace-image-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<CloudUpload />}
+                    sx={{ mb: 1 }}
+                  >
+                    Choose New Image File
+                  </Button>
+                </label>
+                
+                {newImageFile && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="success.main">
+                      ✓ Selected: {newImageFile.name} ({(newImageFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </Typography>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => setNewImageFile(null)}
+                      sx={{ mt: 1 }}
+                    >
+                      Remove Selection
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Current Image Info */}
+              {selectedImageVisit.image_path && (
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Current Image:</strong> {selectedImageVisit.image_filename}<br/>
+                    <strong>File Size:</strong> {selectedImageVisit.image_size ? (selectedImageVisit.image_size / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}<br/>
+                    <strong>Upload Date:</strong> {selectedImageVisit.image_uploaded_at ? new Date(selectedImageVisit.image_uploaded_at).toLocaleString() : 'N/A'}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setShowReplaceImageModal(false);
+            setNewImageFile(null);
+          }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            startIcon={<CloudUpload />}
+            onClick={handleReplaceImageSubmit}
+            disabled={!newImageFile}
+          >
+            Replace Image
           </Button>
         </DialogActions>
       </Dialog>
