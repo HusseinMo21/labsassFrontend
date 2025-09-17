@@ -28,6 +28,8 @@ import {
   CircularProgress,
   Fab,
   Tooltip,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -175,6 +177,12 @@ const LabRequests: React.FC = () => {
   const [patientDetailsOpen, setPatientDetailsOpen] = useState(false);
   const [patientDetails, setPatientDetails] = useState<PatientDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [itemsPerPage] = useState(15);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -222,11 +230,54 @@ const LabRequests: React.FC = () => {
     });
   }, []);
 
-  const fetchLabRequests = async () => {
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (currentPage === 1) {
+        fetchLabRequests(1);
+      } else {
+        setCurrentPage(1);
+      }
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, statusFilter]);
+
+  const fetchLabRequests = async (page: number = currentPage) => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/lab-requests');
-      setLabRequests(response.data.data || response.data);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        per_page: itemsPerPage.toString(),
+      });
+      
+      // Add search and filter parameters if they exist
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+      
+      console.log('Fetching lab requests with params:', params.toString());
+      const response = await axios.get(`/api/lab-requests?${params.toString()}`);
+      console.log('Lab requests response:', response.data);
+      
+      // Handle paginated response
+      if (response.data.data) {
+        setLabRequests(response.data.data);
+        setTotalPages(response.data.last_page || 1);
+        setTotalItems(response.data.total || 0);
+        setCurrentPage(response.data.current_page || 1);
+        console.log(`Loaded ${response.data.data.length} lab requests, total: ${response.data.total}`);
+      } else {
+        // Fallback for non-paginated response
+        setLabRequests(response.data);
+        setTotalPages(1);
+        setTotalItems(response.data.length || 0);
+        setCurrentPage(1);
+        console.log(`Loaded ${response.data.length} lab requests (non-paginated)`);
+      }
     } catch (error) {
       console.error('Error fetching lab requests:', error);
       toast.error('Failed to fetch lab requests');
@@ -264,7 +315,8 @@ const LabRequests: React.FC = () => {
       toast.success('Lab request created successfully');
       setOpenDialog(false);
       resetForm();
-      fetchLabRequests();
+      setCurrentPage(1);
+      fetchLabRequests(1);
     } catch (error: any) {
       console.error('Error creating lab request:', error);
       toast.error(error.response?.data?.message || 'Failed to create lab request');
@@ -275,7 +327,7 @@ const LabRequests: React.FC = () => {
     try {
       await axios.put(`/api/lab-requests/${id}`, { status });
       toast.success('Status updated successfully');
-      fetchLabRequests();
+      fetchLabRequests(currentPage);
     } catch (error: any) {
       console.error('Error updating status:', error);
       toast.error(error.response?.data?.message || 'Failed to update status');
@@ -293,7 +345,7 @@ const LabRequests: React.FC = () => {
       setSuffixDialogOpen(false);
       setSelectedLabRequest(null);
       setSelectedSuffix('');
-      fetchLabRequests();
+      fetchLabRequests(currentPage);
     } catch (error: any) {
       console.error('Error updating suffix:', error);
       toast.error(error.response?.data?.message || 'Failed to update suffix');
@@ -306,7 +358,7 @@ const LabRequests: React.FC = () => {
     try {
       await axios.delete(`/api/lab-requests/${id}`);
       toast.success('Lab request deleted successfully');
-      fetchLabRequests();
+      fetchLabRequests(currentPage);
     } catch (error: any) {
       console.error('Error deleting lab request:', error);
       toast.error(error.response?.data?.message || 'Failed to delete lab request');
@@ -350,16 +402,13 @@ const LabRequests: React.FC = () => {
     setSuffixDialogOpen(true);
   };
 
-  const filteredLabRequests = labRequests.filter((labRequest) => {
-    const matchesSearch = 
-      (labRequest.full_lab_no || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (labRequest.patient?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (labRequest.patient?.phone || '').includes(searchTerm);
-    
-    const matchesStatus = !statusFilter || labRequest.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  // Pagination handlers
+  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
+    fetchLabRequests(page);
+  };
+
+  // No need for client-side filtering since we're using server-side search
 
   if (loading) {
     return (
@@ -383,7 +432,7 @@ const LabRequests: React.FC = () => {
         <Box display="flex" gap={2}>
           <Tooltip title="Refresh Data">
             <IconButton 
-              onClick={fetchLabRequests}
+              onClick={() => fetchLabRequests(currentPage)}
               color="primary"
               disabled={loading}
             >
@@ -409,7 +458,10 @@ const LabRequests: React.FC = () => {
                 fullWidth
                 label="Search by Lab No, Patient Name, or Phone"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  console.log('Search term changed to:', e.target.value);
+                  setSearchTerm(e.target.value);
+                }}
                 InputProps={{
                   startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
@@ -464,7 +516,7 @@ const LabRequests: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredLabRequests.map((labRequest) => (
+              {labRequests.map((labRequest) => (
                 <TableRow 
                   key={labRequest.id}
                   onClick={() => fetchPatientDetails(labRequest.lab_no)}
@@ -563,6 +615,24 @@ const LabRequests: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
+          </Typography>
+          <Stack spacing={2}>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              size="large"
+              showFirstButton
+              showLastButton
+            />
+          </Stack>
+        </Box>
       </Card>
 
       {/* Create/Edit Dialog */}

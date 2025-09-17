@@ -53,6 +53,9 @@ interface User {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  display_name?: string;
+  real_name?: string;
+  patient_id?: number;
   patient?: {
     id: number;
     name: string;
@@ -68,6 +71,17 @@ const Users: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [deleteErrorDialog, setDeleteErrorDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    relatedData: string[];
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    relatedData: []
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -227,14 +241,41 @@ const Users: React.FC = () => {
   };
 
   const handleDelete = async (userId: number) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
+    const user = users.find(u => u.id === userId);
+    const userName = user?.display_name || user?.name || 'this user';
+    const userRole = user?.role || 'unknown role';
+    
+    if (window.confirm(`Are you sure you want to delete ${userName} (${userRole})?\n\nThis action cannot be undone.`)) {
       try {
         await axios.delete(`/api/users/${userId}`);
         toast.success('User deleted successfully');
         fetchUsers();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error deleting user:', err);
-        toast.error('Failed to delete user');
+        
+        // Handle 422 response (deletion prevented due to related data)
+        if (err.response?.status === 422) {
+          console.log('422 Response data:', err.response.data);
+          const message = err.response.data?.message || 'Cannot delete user';
+          const relatedData = err.response.data?.related_data || [];
+          
+          console.log('Setting delete error dialog with:', { message, relatedData });
+          
+          setDeleteErrorDialog({
+            open: true,
+            title: 'Cannot Delete User',
+            message: message,
+            relatedData: relatedData
+          });
+          
+          // Fallback toast in case dialog doesn't show
+          setTimeout(() => {
+            toast.warning(message, { autoClose: 5000 });
+          }, 100);
+        } else {
+          // Handle other errors (500, network issues, etc.)
+          toast.error('Failed to delete user');
+        }
       }
     }
   };
@@ -276,6 +317,17 @@ const Users: React.FC = () => {
           sx={{ borderRadius: 2 }}
         >
           Add User
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => setDeleteErrorDialog({
+            open: true,
+            title: 'Test Dialog',
+            message: 'This is a test message',
+            relatedData: ['Test item 1', 'Test item 2']
+          })}
+        >
+          Test Dialog
         </Button>
       </Box>
 
@@ -327,12 +379,15 @@ const Users: React.FC = () => {
                           </Avatar>
                           <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              {user.role === 'patient' && user.patient ? user.patient.name : user.name}
+                              {user.display_name || user.name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               ID: {user.id}
-                              {user.role === 'patient' && user.patient && (
-                                <span> • Patient ID: {user.patient.id}</span>
+                              {user.role === 'patient' && user.patient_id && (
+                                <span> • Patient ID: {user.patient_id}</span>
+                              )}
+                              {user.role === 'patient' && user.real_name && (
+                                <span> • Real Name: {user.real_name}</span>
                               )}
                             </Typography>
                           </Box>
@@ -486,6 +541,54 @@ const Users: React.FC = () => {
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">
             {editingUser ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Error Dialog */}
+      {console.log('Rendering dialog with state:', deleteErrorDialog)}
+      <Dialog 
+        open={deleteErrorDialog.open} 
+        onClose={() => setDeleteErrorDialog({ ...deleteErrorDialog, open: false })}
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Delete color="error" />
+            {deleteErrorDialog.title}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body1" sx={{ mb: 1 }}>
+              {deleteErrorDialog.message}
+            </Typography>
+            {deleteErrorDialog.relatedData.length > 0 && (
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  Related data found:
+                </Typography>
+                <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                  {deleteErrorDialog.relatedData.map((item, index) => (
+                    <Typography key={index} component="li" variant="body2">
+                      {item}
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            Consider deactivating the user instead of deleting them to preserve data integrity.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setDeleteErrorDialog({ ...deleteErrorDialog, open: false })}
+            variant="contained"
+          >
+            OK
           </Button>
         </DialogActions>
       </Dialog>

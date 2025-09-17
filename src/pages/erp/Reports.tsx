@@ -190,6 +190,10 @@ const Reports: React.FC = () => {
     referred_doctor: '',
     test_status: 'pending',
   });
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
   const [resultsData, setResultsData] = useState<{ [key: number]: { result_value: string; result_status: string; result_notes: string } }>({});
   const [dateRange, setDateRange] = useState({
     start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -212,6 +216,7 @@ const Reports: React.FC = () => {
     initializeCSRF();
     fetchReportData();
     fetchVisits();
+    fetchTemplates();
   }, [activeTab, dateRange, currentPage, searchTerm, statusFilter]);
 
   const fetchVisits = async () => {
@@ -303,6 +308,7 @@ const Reports: React.FC = () => {
       referred_doctor: visit.referred_doctor || '',
       test_status: visit.test_status || 'pending',
     });
+    setSelectedTemplate(''); // Reset template selection
     setShowTestModal(true);
   };
 
@@ -403,6 +409,69 @@ const Reports: React.FC = () => {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Template-related functions
+  const fetchTemplates = async () => {
+    try {
+      const response = await axios.get('/api/templates');
+      if (response.data.success) {
+        setTemplates(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+    }
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    if (templateId) {
+      const template = templates.find(t => t.id.toString() === templateId);
+      if (template) {
+        setTestFormData(prev => ({
+          ...prev,
+          clinical_data: template.clinical_data || '',
+          microscopic_description: template.microscopic || '',
+          diagnosis: template.diagnosis || '',
+          recommendations: template.recommendations || '',
+        }));
+      }
+    }
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+
+    try {
+      await axios.get('/sanctum/csrf-cookie');
+      const csrfResponse = await axios.get('/api/auth/csrf-token');
+      const csrfToken = csrfResponse.data.csrf_token;
+
+      const response = await axios.post('/api/templates/from-report', {
+        name: templateName,
+        clinical_data: testFormData.clinical_data,
+        microscopic: testFormData.microscopic_description,
+        diagnosis: testFormData.diagnosis,
+        recommendations: testFormData.recommendations,
+      }, {
+        headers: {
+          'X-CSRF-TOKEN': csrfToken
+        }
+      });
+
+      if (response.data.success) {
+        toast.success('Template saved successfully');
+        setShowSaveTemplateModal(false);
+        setTemplateName('');
+        fetchTemplates(); // Refresh templates list
+      }
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      toast.error('Failed to save template');
+    }
   };
 
   const handleExport = async (type: string) => {
@@ -1381,6 +1450,37 @@ const Reports: React.FC = () => {
         <DialogTitle>Add Test Report for Visit #{selectedVisit?.visit_number}</DialogTitle>
         <DialogContent>
           <Box component="form" onSubmit={handleTestSubmit} sx={{ mt: 2 }}>
+            {/* Template Selection */}
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>Choose Template</InputLabel>
+                  <Select
+                    value={selectedTemplate}
+                    onChange={(e) => handleTemplateSelect(e.target.value)}
+                    label="Choose Template"
+                  >
+                    <MenuItem value="">No Template</MenuItem>
+                    {templates.map((template) => (
+                      <MenuItem key={template.id} value={template.id.toString()}>
+                        {template.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => setShowSaveTemplateModal(true)}
+                  sx={{ mb: 2, height: '56px' }}
+                  fullWidth
+                >
+                  Save as Template
+                </Button>
+              </Grid>
+            </Grid>
+
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth sx={{ mb: 2 }}>
@@ -1459,6 +1559,30 @@ const Reports: React.FC = () => {
           <Button onClick={() => setShowTestModal(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleTestSubmit}>
             Save Test Report
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Save as Template Modal */}
+      <Dialog open={showSaveTemplateModal} onClose={() => setShowSaveTemplateModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Save as Template</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Template Name"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Enter template name (e.g., Gastrointestinal – Colon Resection)"
+            sx={{ mt: 2 }}
+          />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            This will save the current report fields as a reusable template for future reports.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSaveTemplateModal(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveAsTemplate}>
+            Save Template
           </Button>
         </DialogActions>
       </Dialog>

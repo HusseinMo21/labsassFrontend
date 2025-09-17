@@ -87,3 +87,7 @@ export const useBarcodeScanner = (): UseBarcodeScannerReturn => {
 
 export default useBarcodeScanner;
 
+
+
+
+

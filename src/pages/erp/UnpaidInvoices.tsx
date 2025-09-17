@@ -609,11 +609,11 @@ const UnpaidInvoices: React.FC = () => {
           <div class="payment-breakdown">
             <div class="row">
               <span class="label">Paid Before:</span>
-              <span class="value">EGP ${receiptData?.upfront_payment}</span>
+              <span class="value">EGP ${receiptData?.paid_before}</span>
             </div>
             <div class="row">
               <span class="label">Paid Now:</span>
-              <span class="value">EGP ${receiptData?.remaining_balance}</span>
+              <span class="value">EGP ${receiptData?.paid_now}</span>
             </div>
             <div class="row">
               <span class="label">Remaining:</span>
@@ -629,7 +629,7 @@ const UnpaidInvoices: React.FC = () => {
         <div class="section">
           <div class="row">
             <span class="label">Expected Delivery:</span>
-            <span class="value">${new Date(receiptData?.expected_delivery_date).toLocaleDateString()}</span>
+            <span class="value">${receiptData?.expected_delivery_date ? new Date(receiptData.expected_delivery_date).toLocaleDateString() : 'N/A'}</span>
           </div>
           <div class="row">
             <span class="label">Lab #:</span>
@@ -637,7 +637,7 @@ const UnpaidInvoices: React.FC = () => {
           </div>
           <div class="row">
             <span class="label">Processed by:</span>
-            <span class="value">${receiptData?.check_in_by}</span>
+            <span class="value">${receiptData?.processed_by || 'N/A'}</span>
           </div>
         </div>
         

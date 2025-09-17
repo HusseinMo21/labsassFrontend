@@ -40,6 +40,7 @@ import {
   Business,
   Assignment,
   QrCodeScanner,
+  AttachMoney,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,9 +65,11 @@ const navigationItems: NavigationItem[] = [
   { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['admin'] },
   { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['admin'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['admin'] },
+  { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['admin'] },
   { path: '/users', label: 'Users', icon: <Person />, roles: ['admin'] },
   { path: '/inventory', label: 'Inventory', icon: <Inventory />, roles: ['admin'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['admin'] },
+  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['admin'] },
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
   { path: '/patient-test-search', label: 'Patient Test Search', icon: <Search />, roles: ['admin'] },
 
@@ -83,6 +86,7 @@ const navigationItems: NavigationItem[] = [
   { path: '/notifications', label: 'Notifications', icon: <Notifications />, roles: ['staff'] },
   { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['staff'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
+  { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['staff'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['staff'] },
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['staff'] },
   { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['staff'] },

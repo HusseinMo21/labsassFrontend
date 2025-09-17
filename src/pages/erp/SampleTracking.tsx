@@ -46,27 +46,26 @@ import { toast } from 'react-toastify';
 interface SampleTracking {
   id: number;
   sample_id: string;
+  sample_type: string;
   status: string;
   location?: string;
   notes?: string;
-  collected_at: string;
-  received_at?: string;
+  collection_date?: string;
+  received_date?: string;
   processing_started_at?: string;
   analysis_started_at?: string;
   completed_at?: string;
   disposed_at?: string;
-  visit_test: {
+  lab_request_id: number;
+  lab_request: {
     id: number;
-    lab_test: {
+    lab_no: string;
+    patient_id: number;
+    patient: {
       id: number;
       name: string;
-    };
-    visit: {
-      id: number;
-      patient: {
-        id: number;
-        name: string;
-      };
+      phone?: string;
+      gender?: string;
     };
   };
   collected_by?: {
@@ -455,13 +454,13 @@ const SampleTracking: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Person color="primary" />
                           <Typography variant="body2">
-                            {sample.visit_test?.visit?.patient?.name || 'Unknown'}
+                            {sample.lab_request?.patient?.name || 'Unknown'}
                           </Typography>
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {sample.visit_test?.custom_test_name || sample.visit_test?.lab_test?.name || 'Unknown'}
+                          {sample.sample_type || 'Unknown'}
                         </Typography>
                       </TableCell>
                       <TableCell>{getStatusChip(sample.status)}</TableCell>
@@ -477,8 +476,8 @@ const SampleTracking: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Schedule fontSize="small" color="action" />
                           <Typography variant="body2">
-                            {sample.collected_at
-                              ? new Date(sample.collected_at).toLocaleDateString()
+                            {sample.collection_date
+                              ? new Date(sample.collection_date).toLocaleDateString()
                               : '-'}
                           </Typography>
                         </Box>
@@ -526,10 +525,10 @@ const SampleTracking: React.FC = () => {
                 <strong>Sample ID:</strong> {selectedSample.sample_id}
               </Typography>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Patient:</strong> {selectedSample.visit_test?.visit?.patient?.name || 'Unknown'}
+                <strong>Patient:</strong> {selectedSample.lab_request?.patient?.name || 'Unknown'}
               </Typography>
               <Typography variant="body2">
-                <strong>Test:</strong> {selectedSample.visit_test?.custom_test_name || selectedSample.visit_test?.lab_test?.name || 'Unknown'}
+                <strong>Test:</strong> {selectedSample.sample_type || 'Unknown'}
               </Typography>
             </Box>
           )}

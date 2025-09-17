@@ -143,7 +143,7 @@ const BarcodeDemo: React.FC = () => {
           timestamp: new Date(item.timestamp)
         })));
       } catch (error) {
-        console.error('Error loading scan history:', error);
+        // Error loading scan history
       }
     }
   }, []);
@@ -733,58 +733,6 @@ const BarcodeDemo: React.FC = () => {
         </TabPanel>
       </Paper>
 
-      {/* Sample Barcodes for Testing */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Sample Barcodes for Testing
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Click on any barcode below to test the scanning functionality:
-        </Typography>
-
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          <Chip 
-            label="2025-13-S1 (Creatinine)" 
-            onClick={() => handleBarcodeInput('2025-13-S1')}
-            clickable
-            color="primary"
-            variant="outlined"
-            icon={<Science />}
-          />
-          <Chip 
-            label="2025-13-S2 (Glucose)" 
-            onClick={() => handleBarcodeInput('2025-13-S2')}
-            clickable
-            color="primary"
-            variant="outlined"
-            icon={<Science />}
-          />
-          <Chip 
-            label="2025-12-S1 (CBC)" 
-            onClick={() => handleBarcodeInput('2025-12-S1')}
-            clickable
-            color="primary"
-            variant="outlined"
-            icon={<Science />}
-          />
-          <Chip 
-            label="2025-12-S2 (HbA1c)" 
-            onClick={() => handleBarcodeInput('2025-12-S2')}
-            clickable
-            color="primary"
-            variant="outlined"
-            icon={<Science />}
-          />
-          <Chip 
-            label="invalid-barcode" 
-            onClick={() => handleBarcodeInput('invalid-barcode')}
-            clickable
-            color="error"
-            variant="outlined"
-            icon={<Error />}
-          />
-        </Box>
-      </Paper>
 
       {/* History Dialog */}
       <Dialog 
@@ -1240,8 +1188,10 @@ const BarcodeDemo: React.FC = () => {
                         <Typography variant="h6" gutterBottom>
                           Metadata
                         </Typography>
-                        <Typography variant="body2">
-                          {JSON.stringify(selectedLabRequest.metadata, null, 2)}
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                          {typeof selectedLabRequest.metadata === 'string' 
+                            ? selectedLabRequest.metadata 
+                            : JSON.stringify(selectedLabRequest.metadata, null, 2)}
                         </Typography>
                       </CardContent>
                     </Card>

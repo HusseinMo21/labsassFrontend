@@ -6,7 +6,7 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'lab_tech' | 'accountant' | 'patient';
+  role: 'admin' | 'staff' | 'doctor' | 'patient';
 }
 
 interface AuthContextType {
@@ -17,8 +17,8 @@ interface AuthContextType {
   hasRole: (role: string) => boolean;
   hasAnyRole: (roles: string[]) => boolean;
   isAdmin: () => boolean;
-  isLabTech: () => boolean;
-  isAccountant: () => boolean;
+  isStaff: () => boolean;
+  isDoctor: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,8 +111,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAdmin = () => hasRole('admin');
-  const isLabTech = () => hasRole('lab_tech');
-  const isAccountant = () => hasRole('accountant');
+  const isStaff = () => hasRole('staff');
+  const isDoctor = () => hasRole('doctor');
 
   const value: AuthContextType = {
     user,
@@ -122,8 +122,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRole,
     hasAnyRole,
     isAdmin,
-    isLabTech,
-    isAccountant,
+    isStaff,
+    isDoctor,
   };
 
   return (

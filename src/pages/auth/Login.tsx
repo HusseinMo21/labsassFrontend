@@ -176,16 +176,19 @@ const Login: React.FC = () => {
                 <strong>Demo Credentials:</strong>
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Admin: admin@lab.com / password
+                <strong>Admin:</strong> admin@dryasserlab.com / DrYasserLab123456790@
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Staff: staff@lab.com / password
+                <strong>Staff:</strong> zeinab@dryasserlab.com / Zeinab12345678
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Doctor: doctor@lab.com / password
+                <strong>Staff:</strong> menna@dryasserlab.com / Menna12345678
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Patient: patient@lab.com / password
+                <strong>Doctor:</strong> doctor1@dryasserlab.com / Doctor123456
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Doctor:</strong> doctor2@dryasserlab.com / Doctor123456
               </Typography>
             </Box>
 

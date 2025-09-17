@@ -31,6 +31,7 @@ import {
 import {
   Add,
   Edit,
+  Delete,
   Search,
   Person,
   Phone,
@@ -45,15 +46,36 @@ interface Patient {
   id: number;
   name: string;
   gender: string;
-  birth_date: string;
+  birth_date?: string;
+  age?: number;
   phone: string;
   whatsapp_number?: string;
   address: string;
-  emergency_contact: string;
-  emergency_phone: string;
-  medical_history: string;
-  allergies: string;
-  created_at: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
+  medical_history?: string;
+  allergies?: string;
+  // Original database fields
+  entry?: string;
+  deli?: string;
+  time?: string;
+  tsample?: string;
+  nsample?: string;
+  isample?: string;
+  paid?: number;
+  had?: string;
+  sender?: string; // Doctor name
+  pleft?: number;
+  total?: number;
+  lab?: string;
+  entryday?: string;
+  deliday?: string;
+  type?: string;
+  doctor_id?: number;
+  organization_id?: number;
+  doctor?: any;
+  organization?: any;
+  doctor_name?: string; // Computed doctor name from sender field
 }
 
 const Patients: React.FC = () => {
@@ -66,6 +88,9 @@ const Patients: React.FC = () => {
   const [generatedCredentials, setGeneratedCredentials] = useState<{username: string, password: string} | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     doctor: '',
@@ -77,6 +102,7 @@ const Patients: React.FC = () => {
     status: '',
     phone: '',
     whatsapp_number: '',
+    sender: '', // Doctor name
     // Keep existing fields for compatibility
     birth_date: '',
     address: '',
@@ -136,6 +162,7 @@ const Patients: React.FC = () => {
         address_optional: formData.address_optional,
         organization: formData.organization,
         status: formData.status,
+        sender: formData.sender, // Doctor name from sender field
       };
 
       console.log('Submitting patient data:', patientData);
@@ -220,6 +247,7 @@ const Patients: React.FC = () => {
       status: status,
       phone: patient.phone,
       whatsapp_number: patient.whatsapp_number || '',
+      sender: patient.sender || patient.doctor_name || '', // Use sender field as doctor name
       // Keep existing fields for compatibility
       birth_date: patient.birth_date,
       address: patient.address,
@@ -243,6 +271,7 @@ const Patients: React.FC = () => {
       status: '',
       phone: '',
       whatsapp_number: '',
+      sender: '', // Doctor name
       // Keep existing fields for compatibility
       birth_date: '',
       address: '',
@@ -265,11 +294,76 @@ const Patients: React.FC = () => {
     resetForm();
   };
 
+  const handleDeleteClick = (patient: Patient) => {
+    setPatientToDelete(patient);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!patientToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await axios.delete(`/api/patients/${patientToDelete.id}`);
+      
+      if (response.data.message) {
+        toast.success(response.data.message);
+        
+        // Show details of what was deleted
+        if (response.data.deleted_data) {
+          const deletedData = response.data.deleted_data;
+          const summary = Object.entries(deletedData)
+            .filter(([_, count]) => count > 0)
+            .map(([key, count]) => `${count} ${key}`)
+            .join(', ');
+          
+          if (summary) {
+            toast.info(`Deleted: ${summary}`);
+          }
+        }
+        
+        // Refresh the patients list
+        fetchPatients();
+      }
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error('Failed to delete patient');
+      }
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setPatientToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setPatientToDelete(null);
+  };
+
   const getGenderChip = (gender: string) => {
+    // Handle Arabic gender values
+    const isMale = gender === 'male' || gender === 'ذكر';
+    const isFemale = gender === 'female' || gender === 'انثي' || gender === 'انثى';
+    
+    let label = 'Unknown';
+    let color: 'primary' | 'secondary' | 'default' = 'default';
+    
+    if (isMale) {
+      label = 'Male';
+      color = 'primary';
+    } else if (isFemale) {
+      label = 'Female';
+      color = 'secondary';
+    }
+    
     return (
       <Chip
-        label={gender === 'male' ? 'Male' : 'Female'}
-        color={gender === 'male' ? 'primary' : 'secondary'}
+        label={label}
+        color={color}
         size="small"
       />
     );
@@ -328,6 +422,7 @@ const Patients: React.FC = () => {
                   <TableCell>Birth Date</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Address</TableCell>
+                  <TableCell>Doctor</TableCell>
                   <TableCell>Emergency Contact</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
@@ -335,7 +430,7 @@ const Patients: React.FC = () => {
               <TableBody>
                 {patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={8} align="center">
                       <Alert severity="info">No patients found</Alert>
                     </TableCell>
                   </TableRow>
@@ -350,7 +445,12 @@ const Patients: React.FC = () => {
                       </TableCell>
                       <TableCell>{getGenderChip(patient.gender)}</TableCell>
                       <TableCell>
-                        {new Date(patient.birth_date).toLocaleDateString()}
+                        {patient.birth_date ? 
+                          new Date(patient.birth_date).toLocaleDateString() : 
+                          patient.age ? 
+                            `Age: ${patient.age}` : 
+                            'N/A'
+                        }
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -365,15 +465,32 @@ const Patients: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        {patient.emergency_contact} ({patient.emergency_phone})
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Person fontSize="small" color="action" />
+                          {patient.doctor_name || patient.sender || 'N/A'}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        {patient.emergency_contact || 'N/A'} 
+                        {patient.emergency_phone && ` (${patient.emergency_phone})`}
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleEdit(patient)}
-                        >
-                          <Edit />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                          <IconButton
+                            color="primary"
+                            onClick={() => handleEdit(patient)}
+                            title="Edit Patient"
+                          >
+                            <Edit />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDeleteClick(patient)}
+                            title="Delete Patient"
+                          >
+                            <Delete />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))
@@ -420,10 +537,11 @@ const Patients: React.FC = () => {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="الدكتور"
-                  value={formData.doctor}
-                  onChange={(e) => setFormData({ ...formData, doctor: e.target.value })}
+                  label="الدكتور (اسم المرسل)"
+                  value={formData.sender}
+                  onChange={(e) => setFormData({ ...formData, sender: e.target.value })}
                   sx={{ '& .MuiInputBase-input': { direction: 'rtl' } }}
+                  placeholder="اسم الطبيب أو المرسل"
                 />
               </Grid>
               
@@ -602,6 +720,62 @@ const Patients: React.FC = () => {
             fullWidth
           >
             Got it!
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Delete color="error" />
+            Delete Patient
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Warning:</strong> This action cannot be undone!
+            </Typography>
+          </Alert>
+          
+          {patientToDelete && (
+            <Box>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                Are you sure you want to delete patient <strong>"{patientToDelete.name}"</strong>?
+              </Typography>
+              
+              <Alert severity="error" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  <strong>This will permanently delete:</strong>
+                </Typography>
+                <Typography variant="body2" component="div" sx={{ mt: 1 }}>
+                  • All patient visits and lab requests<br/>
+                  • All test results and samples<br/>
+                  • All invoices and payments<br/>
+                  • All reports and enhanced reports<br/>
+                  • Patient credentials and portal access
+                </Typography>
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleDeleteCancel} 
+            disabled={deleting}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            disabled={deleting}
+            variant="contained"
+            color="error"
+            startIcon={deleting ? <CircularProgress size={20} /> : <Delete />}
+          >
+            {deleting ? 'Deleting...' : 'Delete Patient'}
           </Button>
         </DialogActions>
       </Dialog>

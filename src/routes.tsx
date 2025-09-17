@@ -33,6 +33,7 @@ import PatientReports from './pages/erp/PatientReports';
 import PatientVisits from './pages/erp/PatientVisits';
 import PatientInvoices from './pages/erp/PatientInvoices';
 import Receipts from './pages/erp/Receipts';
+import Expenses from './pages/erp/Expenses';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -235,6 +236,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <Receipts />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/expenses',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <Expenses />
         </ERPLayout>
       </ProtectedRoute>
     ),

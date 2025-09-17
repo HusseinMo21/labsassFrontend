@@ -21,6 +21,9 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  Button,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   LineChart,
@@ -35,7 +38,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from 'recharts';
@@ -48,6 +51,8 @@ import {
   Schedule,
   CheckCircle,
   Pending,
+  Refresh,
+  Update,
 } from '@mui/icons-material';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import axios from '../../config/axios';
@@ -168,6 +173,15 @@ const LabInsightsDashboard: React.FC = () => {
     }
   };
 
+  // Auto-refresh data every 5 minutes for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchInsightsData();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [period]);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -191,10 +205,20 @@ const LabInsightsDashboard: React.FC = () => {
     return 'text.secondary';
   };
 
-  if (loading) {
+  if (loading && !insightsData) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '400px',
+        gap: 2
+      }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" color="text.secondary">
+          Loading insights data...
+        </Typography>
       </Box>
     );
   }
@@ -236,36 +260,75 @@ const LabInsightsDashboard: React.FC = () => {
         mb: 0
       }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" maxWidth="100%">
-    <Box>
+          <Box>
             <Typography variant="h4" sx={{ 
               fontWeight: 'bold',
               color: 'primary.main',
               mb: 0.5
             }}>
-        Lab Insights Dashboard
-      </Typography>
+              Lab Insights Dashboard
+            </Typography>
             <Typography variant="body2" color="text.secondary">
               Comprehensive analytics and performance metrics for your laboratory
             </Typography>
           </Box>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel>Time Period</InputLabel>
-            <Select
-              value={period}
-              label="Time Period"
-              onChange={(e) => setPeriod(e.target.value)}
-            >
-              <MenuItem value="7">Last 7 days</MenuItem>
-              <MenuItem value="30">Last 30 days</MenuItem>
-              <MenuItem value="90">Last 90 days</MenuItem>
-              <MenuItem value="365">Last year</MenuItem>
-            </Select>
-          </FormControl>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Tooltip title="Refresh data">
+              <IconButton 
+                onClick={fetchInsightsData} 
+                disabled={loading}
+                sx={{ 
+                  bgcolor: 'primary.main', 
+                  color: 'white',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                  '&:disabled': { bgcolor: 'grey.300' }
+                }}
+              >
+                <Refresh />
+              </IconButton>
+            </Tooltip>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Time Period</InputLabel>
+              <Select
+                value={period}
+                label="Time Period"
+                onChange={(e) => setPeriod(e.target.value)}
+              >
+                <MenuItem value="7">Last 7 days</MenuItem>
+                <MenuItem value="30">Last 30 days</MenuItem>
+                <MenuItem value="90">Last 90 days</MenuItem>
+                <MenuItem value="365">Last year</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </Box>
       </Box>
 
       {/* Main Content */}
-      <Box sx={{ px: 4, py: 3 }}>
+      <Box sx={{ px: 4, py: 3, position: 'relative' }}>
+        {/* Loading overlay for refresh */}
+        {loading && insightsData && (
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: 'rgba(255, 255, 255, 0.8)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            borderRadius: 1
+          }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <CircularProgress size={40} />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Updating data...
+              </Typography>
+            </Box>
+          </Box>
+        )}
 
         {/* Overview Cards */}
         <Grid container spacing={3} mb={4}>
@@ -440,21 +503,23 @@ const LabInsightsDashboard: React.FC = () => {
           <Grid item xs={12} lg={8}>
             <Card sx={{ 
               height: '100%',
-              boxShadow: 2,
+              boxShadow: 3,
+              borderRadius: 2,
               '&:hover': {
-                boxShadow: 4,
+                boxShadow: 6,
                 transition: 'box-shadow 0.3s ease-in-out'
               }
             }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ 
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" gutterBottom sx={{ 
                   fontWeight: 'bold',
                   color: 'primary.main',
-                  mb: 3
+                  mb: 4,
+                  fontSize: '1.5rem'
                 }}>
                   Daily Visits & Revenue Trend
                 </Typography>
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={450}>
                   <AreaChart data={insightsData.trends.daily_visits}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
@@ -473,7 +538,7 @@ const LabInsightsDashboard: React.FC = () => {
                       stroke="#666"
                       fontSize={12}
                     />
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value, name) => [
                         name === 'count' ? formatNumber(Number(value)) : formatCurrency(Number(value)),
                         name === 'count' ? 'Visits' : 'Revenue'
@@ -524,21 +589,23 @@ const LabInsightsDashboard: React.FC = () => {
           <Grid item xs={12} lg={4}>
             <Card sx={{ 
               height: '100%',
-              boxShadow: 2,
+              boxShadow: 3,
+              borderRadius: 2,
               '&:hover': {
-                boxShadow: 4,
+                boxShadow: 6,
                 transition: 'box-shadow 0.3s ease-in-out'
               }
             }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ 
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" gutterBottom sx={{ 
                   fontWeight: 'bold',
                   color: 'primary.main',
-                  mb: 3
+                  mb: 4,
+                  fontSize: '1.5rem'
                 }}>
                   Test Status Distribution
                 </Typography>
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={450}>
                   <PieChart>
                     <Pie
                       data={insightsData.tests.status_breakdown}
@@ -546,15 +613,17 @@ const LabInsightsDashboard: React.FC = () => {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
+                      outerRadius={120}
+                      innerRadius={40}
                       fill="#8884d8"
                       dataKey="count"
+                      fontSize={14}
                     >
                       {insightsData.tests.status_breakdown.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value) => formatNumber(Number(value))}
                       contentStyle={{
                         backgroundColor: 'white',
@@ -576,24 +645,26 @@ const LabInsightsDashboard: React.FC = () => {
           <Grid item xs={12} lg={6}>
             <Card sx={{ 
               height: '100%',
-              boxShadow: 2,
+              boxShadow: 3,
+              borderRadius: 2,
               '&:hover': {
-                boxShadow: 4,
+                boxShadow: 6,
                 transition: 'box-shadow 0.3s ease-in-out'
               }
             }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ 
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" gutterBottom sx={{ 
                   fontWeight: 'bold',
                   color: 'primary.main',
-                  mb: 3
+                  mb: 4,
+                  fontSize: '1.5rem'
                 }}>
                   Performance Metrics
                 </Typography>
-                <Box mb={3}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" fontWeight="medium">Test Completion Rate</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="primary.main">
+                <Box mb={4}>
+                  <Box display="flex" justifyContent="space-between" mb={2}>
+                    <Typography variant="h6" fontWeight="medium">Test Completion Rate</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="primary.main">
                       {insightsData.performance.completion_rate}%
                     </Typography>
                   </Box>
@@ -601,20 +672,20 @@ const LabInsightsDashboard: React.FC = () => {
                     variant="determinate"
                     value={insightsData.performance.completion_rate}
                     sx={{ 
-                      height: 10, 
-                      borderRadius: 5,
+                      height: 16, 
+                      borderRadius: 8,
                       backgroundColor: 'grey.200',
                       '& .MuiLinearProgress-bar': {
-                        borderRadius: 5,
+                        borderRadius: 8,
                         background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)'
                       }
                     }}
                   />
                 </Box>
-                <Box mb={3}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" fontWeight="medium">Average Processing Time</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="secondary.main">
+                <Box mb={4}>
+                  <Box display="flex" justifyContent="space-between" mb={2}>
+                    <Typography variant="h6" fontWeight="medium">Average Processing Time</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="secondary.main">
                       {insightsData.performance.average_processing_time_hours.toFixed(1)} hours
                     </Typography>
                   </Box>
@@ -623,30 +694,30 @@ const LabInsightsDashboard: React.FC = () => {
                     value={Math.min(100, (insightsData.performance.average_processing_time_hours / 24) * 100)}
                     color="secondary"
                     sx={{ 
-                      height: 10, 
-                      borderRadius: 5,
+                      height: 16, 
+                      borderRadius: 8,
                       backgroundColor: 'grey.200',
                       '& .MuiLinearProgress-bar': {
-                        borderRadius: 5,
+                        borderRadius: 8,
                         background: 'linear-gradient(90deg, #f093fb 0%, #f5576c 100%)'
                       }
                     }}
                   />
                 </Box>
-                <Box display="flex" justifyContent="space-between" mt={3}>
-                  <Box textAlign="center" sx={{ p: 2, bgcolor: 'success.50', borderRadius: 2, flex: 1, mr: 1 }}>
-                    <Typography variant="h5" color="success.main" fontWeight="bold">
+                <Box display="flex" justifyContent="space-between" mt={4}>
+                  <Box textAlign="center" sx={{ p: 3, bgcolor: 'success.50', borderRadius: 3, flex: 1, mr: 2, border: '2px solid', borderColor: 'success.200' }}>
+                    <Typography variant="h4" color="success.main" fontWeight="bold">
                       {formatNumber(insightsData.performance.completed_tests)}
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography variant="h6" color="textSecondary" fontWeight="medium">
                       Completed Tests
                     </Typography>
                   </Box>
-                  <Box textAlign="center" sx={{ p: 2, bgcolor: 'primary.50', borderRadius: 2, flex: 1, ml: 1 }}>
-                    <Typography variant="h5" color="primary.main" fontWeight="bold">
+                  <Box textAlign="center" sx={{ p: 3, bgcolor: 'primary.50', borderRadius: 3, flex: 1, ml: 2, border: '2px solid', borderColor: 'primary.200' }}>
+                    <Typography variant="h4" color="primary.main" fontWeight="bold">
                       {formatNumber(insightsData.performance.total_tests)}
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
+                    <Typography variant="h6" color="textSecondary" fontWeight="medium">
                       Total Tests
                     </Typography>
                   </Box>
@@ -659,72 +730,81 @@ const LabInsightsDashboard: React.FC = () => {
           <Grid item xs={12} lg={6}>
             <Card sx={{ 
               height: '100%',
-              boxShadow: 2,
+              boxShadow: 3,
+              borderRadius: 2,
               '&:hover': {
-                boxShadow: 4,
+                boxShadow: 6,
                 transition: 'box-shadow 0.3s ease-in-out'
               }
             }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ 
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" gutterBottom sx={{ 
                   fontWeight: 'bold',
                   color: 'primary.main',
-                  mb: 3
+                  mb: 4,
+                  fontSize: '1.5rem'
                 }}>
                   Revenue Breakdown
                 </Typography>
-                <Box mb={3}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" fontWeight="medium">Net Revenue</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="success.main">
+                <Box mb={4}>
+                  <Box display="flex" justifyContent="space-between" mb={2}>
+                    <Typography variant="h6" fontWeight="medium">Net Revenue</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="success.main">
                       {formatCurrency(insightsData.revenue.net_revenue)}
                     </Typography>
                   </Box>
                 </Box>
-                <Box mb={3}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" fontWeight="medium">Upfront Payments</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="primary.main">
+                <Box mb={4}>
+                  <Box display="flex" justifyContent="space-between" mb={2}>
+                    <Typography variant="h6" fontWeight="medium">Upfront Payments</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="primary.main">
                       {formatCurrency(insightsData.revenue.upfront_payments)}
                     </Typography>
                   </Box>
                 </Box>
-                <Box mb={3}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" fontWeight="medium">Outstanding Balance</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="warning.main">
+                <Box mb={4}>
+                  <Box display="flex" justifyContent="space-between" mb={2}>
+                    <Typography variant="h6" fontWeight="medium">Outstanding Balance</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="warning.main">
                       {formatCurrency(insightsData.revenue.outstanding_balance)}
                     </Typography>
                   </Box>
                 </Box>
-                <Box mb={3}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="body2" fontWeight="medium">Average Visit Value</Typography>
-                    <Typography variant="body2" fontWeight="bold" color="info.main">
+                <Box mb={4}>
+                  <Box display="flex" justifyContent="space-between" mb={2}>
+                    <Typography variant="h6" fontWeight="medium">Average Visit Value</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="info.main">
                       {formatCurrency(insightsData.revenue.average_visit_value)}
                     </Typography>
                   </Box>
                 </Box>
-                <Divider sx={{ my: 3 }} />
-                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+                <Divider sx={{ my: 4 }} />
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', mb: 3, fontSize: '1.2rem' }}>
                   Payment Methods
                 </Typography>
                 {insightsData.revenue.payment_methods.map((method, index) => (
-                  <Box key={index} display="flex" justifyContent="space-between" mb={2} sx={{ 
-                    p: 1.5, 
+                  <Box key={index} display="flex" justifyContent="space-between" mb={3} sx={{ 
+                    p: 3, 
                     bgcolor: 'grey.50', 
-                    borderRadius: 1,
+                    borderRadius: 2,
+                    border: '2px solid #e0e0e0',
                     '&:hover': {
                       bgcolor: 'grey.100',
-                      transition: 'background-color 0.2s ease-in-out'
+                      borderColor: 'primary.main',
+                      transition: 'all 0.3s ease-in-out'
                     }
                   }}>
-                    <Typography variant="body2" fontWeight="medium" sx={{ textTransform: 'capitalize' }}>
+                    <Typography variant="h6" fontWeight="medium" sx={{ textTransform: 'capitalize' }}>
                       {method.payment_method}
                     </Typography>
-                    <Typography variant="body2" fontWeight="bold" color="primary.main">
-                      {formatCurrency(method.amount)} ({method.count})
-                    </Typography>
+                    <Box textAlign="right">
+                      <Typography variant="h6" fontWeight="bold" color="primary.main">
+                        {formatCurrency(method.amount)}
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        {method.count} transactions
+                      </Typography>
+                    </Box>
                   </Box>
                 ))}
               </CardContent>

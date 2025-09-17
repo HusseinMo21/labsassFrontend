@@ -238,17 +238,13 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         </Alert>
       )}
 
-      {/* Debug Info (only in development) */}
-      {process.env.NODE_ENV === 'development' && scanResult && (
-        <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            Debug: {JSON.stringify(scanResult, null, 2)}
-          </Typography>
-        </Box>
-      )}
     </Box>
   );
 };
 
 export default BarcodeScanner;
+
+
+
+
 

@@ -776,9 +776,11 @@ const CheckIn: React.FC = () => {
                 />
               )}
               renderOption={(props, option) => {
+                const { key, ...otherProps } = props;
+                
                 if (typeof option === 'string') {
                   return (
-                    <Box component="li" {...props}>
+                    <Box key={key} component="li" {...otherProps}>
                       <Typography variant="body1">{option}</Typography>
                     </Box>
                   );
@@ -786,14 +788,14 @@ const CheckIn: React.FC = () => {
                 
                 if (!option || typeof option !== 'object' || !option.name) {
                   return (
-                    <Box component="li" {...props}>
+                    <Box key={key} component="li" {...otherProps}>
                       <Typography variant="body1">Invalid option</Typography>
                     </Box>
                   );
                 }
                 
                 return (
-                  <Box component="li" {...props}>
+                  <Box key={key} component="li" {...otherProps}>
                     <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
                       {String(option.name).charAt(0).toUpperCase()}
                     </Avatar>

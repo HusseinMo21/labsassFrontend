@@ -4,8 +4,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
-  Button,
   Table,
   TableBody,
   TableCell,
@@ -13,213 +11,415 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Button,
   Chip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
   Alert,
   CircularProgress,
   IconButton,
   Tooltip,
   Tabs,
   Tab,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Divider,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
+  Add,
   Visibility,
-  Download,
-  CheckCircle,
-  Cancel,
-  Warning,
-  Science,
-  Assessment,
-  Person,
-  AdminPanelSettings,
+  Edit,
+  Check,
   Print,
-  Refresh,
+  LocalShipping,
+  Send,
+  Assessment,
+  FilterList,
 } from '@mui/icons-material';
-import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useAuth } from '../../contexts/AuthContext';
-import axios from '../../config/axios';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
-interface Visit {
+interface EnhancedReport {
   id: number;
-  visit_number: string;
-  visit_date: string;
-  status: string;
-  patient: {
+  nos?: string;
+  reff?: string;
+  clinical?: string;
+  nature?: string;
+  report_date?: string;
+  lab_no: string;
+  age?: string;
+  gross?: string;
+  micro?: string;
+  conc?: string;
+  reco?: string;
+  type?: string;
+  sex?: string;
+  recieving?: string;
+  discharge?: string;
+  confirm: boolean;
+  print: boolean;
+  patient_id?: number;
+  lab_request_id?: number;
+  created_by?: number;
+  reviewed_by?: number;
+  approved_by?: number;
+  status: 'draft' | 'under_review' | 'approved' | 'printed' | 'delivered';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  examination_details?: any;
+  quality_control?: any;
+  barcode?: string;
+  digital_signature?: string;
+  reviewed_at?: string;
+  approved_at?: string;
+  printed_at?: string;
+  delivered_at?: string;
+  created_at: string;
+  updated_at: string;
+  patient?: {
     id: number;
     name: string;
+    phone?: string;
   };
-  visit_tests: VisitTest[];
   labRequest?: {
+    id: number;
     lab_no: string;
-    full_lab_no: string;
   };
-}
-
-interface VisitTest {
-  id: number;
-  status: string;
-  result_value?: string;
-  lab_test: {
+  createdBy?: {
     id: number;
     name: string;
-    code: string;
-    reference_range?: string;
   };
-  test_validations: TestValidation[];
-  quality_controls: QualityControl[];
-}
-
-interface TestValidation {
+  reviewedBy?: {
   id: number;
-  status: string;
-  validation_type: string;
-  clinical_correlation?: string;
-  validated_by_user?: {
     name: string;
   };
-  validated_at?: string;
-}
-
-interface QualityControl {
+  approvedBy?: {
   id: number;
-  status: string;
-  qc_type: string;
-  performed_by_user: {
     name: string;
   };
 }
 
-interface ReportStatus {
-  visit_id: number;
-  can_generate_report: boolean;
-  tests_status: Array<{
-    test_name: string;
-    is_validated: boolean;
-    validated_by?: string;
-    validated_at?: string;
-  }>;
-  quality_control_status: Array<{
-    test_name: string;
-    qc_type: string;
-    status: string;
-    performed_by: string;
-  }>;
-  blocking_issues: string[];
+interface ReportStats {
+  total_reports: number;
+  draft_reports: number;
+  under_review: number;
+  approved_reports: number;
+  printed_reports: number;
+  delivered_reports: number;
+  urgent_reports: number;
+  reports_today: number;
 }
 
 const EnhancedReports: React.FC = () => {
-  useDocumentTitle('Enhanced Reports - Lab System');
   const { user } = useAuth();
-  
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const [reports, setReports] = useState<EnhancedReport[]>([]);
+  const [stats, setStats] = useState<ReportStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
-  const [reportStatus, setReportStatus] = useState<ReportStatus | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
-  const [generatingReport, setGeneratingReport] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<EnhancedReport | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 20,
+    total: 0,
+    from: 0,
+    to: 0
+  });
+  const [filters, setFilters] = useState({
+    status: '',
+    priority: '',
+    lab_no: '',
+    patient_name: '',
+    date_from: '',
+    date_to: ''
+  });
+
+  // Form state for creating new report
+  const [newReport, setNewReport] = useState({
+    nos: '',
+    reff: '',
+    clinical: '',
+    nature: '',
+    report_date: new Date().toISOString().split('T')[0],
+    lab_no: '',
+    age: '',
+    gross: '',
+    micro: '',
+    conc: '',
+    reco: '',
+    type: '',
+    sex: '',
+    recieving: '',
+    discharge: '',
+    patient_id: '',
+    lab_request_id: '',
+    priority: 'normal'
+  });
 
   useEffect(() => {
-    fetchVisits();
-  }, []);
+    // Initialize CSRF token
+    const initializeCSRF = async () => {
+      try {
+        await axios.get('/sanctum/csrf-cookie');
+        console.log('CSRF cookie set for Enhanced Reports');
+      } catch (error) {
+        console.error('Failed to set CSRF cookie:', error);
+      }
+    };
 
-  const fetchVisits = async () => {
+    initializeCSRF();
+    fetchReports(1); // Reset to first page when filters change
+    fetchStats();
+  }, [filters]);
+
+  const fetchReports = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/visits');
-      setVisits(response.data.data || response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch visits');
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      params.append('page', page.toString());
+      
+      const response = await axios.get(`/api/enhanced-reports?${params}`);
+      setReports(response.data.data.data);
+      setPagination({
+        current_page: response.data.data.current_page,
+        last_page: response.data.data.last_page,
+        per_page: response.data.data.per_page,
+        total: response.data.data.total,
+        from: response.data.data.from,
+        to: response.data.data.to
+      });
+    } catch (error) {
+      console.error('Error fetching reports:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchReportStatus = async (visitId: number) => {
+  const fetchStats = async () => {
     try {
-      const response = await axios.get(`/api/enhanced-reports/status/${visitId}`);
-      setReportStatus(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch report status');
+      const response = await axios.get('/api/enhanced-reports-statistics');
+      setStats(response.data.data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
     }
   };
 
-  const handleOpenDialog = (visit: Visit) => {
-    setSelectedVisit(visit);
-    setOpenDialog(true);
-    fetchReportStatus(visit.id);
+  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+    fetchReports(page);
+    // Scroll to top of table when page changes
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedVisit(null);
-    setReportStatus(null);
-  };
-
-  const handleGenerateReport = async () => {
-    if (!selectedVisit) return;
-
+  const handleCreateReport = async () => {
     try {
-      setGeneratingReport(true);
-      const response = await axios.get(`/api/enhanced-reports/professional/${selectedVisit.id}`, {
+      // Fetch CSRF token before the request
+      await axios.get('/sanctum/csrf-cookie');
+      const csrfResponse = await axios.get('/api/auth/csrf-token');
+      const csrfToken = csrfResponse.data.csrf_token;
+      
+      const response = await axios.post('/api/enhanced-reports', newReport, {
+        headers: {
+          'X-CSRF-TOKEN': csrfToken
+        }
+      });
+      setReports([response.data.data, ...reports]);
+      setIsCreateDialogOpen(false);
+      setNewReport({
+        nos: '',
+        reff: '',
+        clinical: '',
+        nature: '',
+        report_date: new Date().toISOString().split('T')[0],
+        lab_no: '',
+        age: '',
+        gross: '',
+        micro: '',
+        conc: '',
+        reco: '',
+        type: '',
+        sex: '',
+        recieving: '',
+        discharge: '',
+        patient_id: '',
+        lab_request_id: '',
+        priority: 'normal'
+      });
+    } catch (error) {
+      console.error('Error creating report:', error);
+    }
+  };
+
+  const handleWorkflowAction = async (reportId: number, action: string) => {
+    try {
+      if (action === 'print') {
+        // Handle print action like the existing Reports system
+        await handlePrintReport(reportId);
+      } else {
+        // Fetch CSRF token before the request
+        await axios.get('/sanctum/csrf-cookie');
+        const csrfResponse = await axios.get('/api/auth/csrf-token');
+        const csrfToken = csrfResponse.data.csrf_token;
+        
+        await axios.post(`/api/enhanced-reports/${reportId}/${action}`, {}, {
+          headers: {
+            'X-CSRF-TOKEN': csrfToken
+          }
+        });
+        fetchReports(pagination.current_page);
+        fetchStats();
+      }
+    } catch (error) {
+      console.error(`Error ${action} report:`, error);
+    }
+  };
+
+  const handlePrintReport = async (reportId: number) => {
+    try {
+      console.log('Starting PDF generation for enhanced report:', reportId);
+      
+      // Show loading toast
+      const loadingToast = toast.loading('Generating PDF report...');
+      
+      // Ensure CSRF token is available
+      await axios.get('/sanctum/csrf-cookie');
+      const csrfResponse = await axios.get('/api/auth/csrf-token');
+      const csrfToken = csrfResponse.data.csrf_token;
+      
+      // Generate PDF using the backend endpoint
+      const response = await axios.get(`/api/enhanced-reports/${reportId}/print`, {
         responseType: 'blob',
+        timeout: 30000, // 30 second timeout for PDF generation
+        headers: {
+          'X-CSRF-TOKEN': csrfToken
+        }
       });
 
-      // Create blob URL and download
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      console.log('PDF response received:', response);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      // Create blob URL and open in new tab for preview
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `pathology_report_${selectedVisit.labRequest?.full_lab_no || selectedVisit.visit_number}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      
+      // Open PDF in new tab for preview
+      const newWindow = window.open(url, '_blank');
+      
+      if (newWindow) {
+        // Add download button to the new window
+        newWindow.onload = function() {
+          const downloadBtn = newWindow.document.createElement('button');
+          downloadBtn.innerHTML = 'Download PDF';
+          downloadBtn.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+          `;
+          downloadBtn.onclick = function() {
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `enhanced_report_${reportId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+          };
+          newWindow.document.body.appendChild(downloadBtn);
+        };
+        
+        toast.success('PDF report opened in new tab');
+      } else {
+        // Fallback: direct download if popup blocked
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `enhanced_report_${reportId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        toast.success('PDF report downloaded (popup blocked)');
+      }
 
-      handleCloseDialog();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to generate report');
-    } finally {
-      setGeneratingReport(false);
+      // Clean up the blob URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 10000); // 10 seconds delay to allow preview
+
+      // Refresh reports to update status
+      fetchReports(pagination.current_page);
+      fetchStats();
+
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      // Dismiss loading toast if it exists
+      toast.dismiss();
+      
+      if (error.code === 'ECONNABORTED') {
+        toast.error('PDF generation timed out. Please try again.');
+      } else if (error.response?.status === 404) {
+        toast.error('PDF endpoint not found. Please check if the backend server is running.');
+      } else if (error.response?.status === 401) {
+        toast.error('Authentication required. Please log in again.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error while generating PDF. Please try again.');
+      } else {
+        toast.error(`Failed to generate PDF report: ${error.response?.data?.message || error.message}`);
+      }
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'success';
-      case 'pending': return 'warning';
-      case 'in_progress': return 'info';
-      case 'validated': return 'success';
-      case 'failed': return 'error';
-      default: return 'default';
-    }
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      draft: 'default',
+      under_review: 'warning',
+      approved: 'success',
+      printed: 'info',
+      delivered: 'secondary'
+    };
+    return badges[status as keyof typeof badges] || 'default';
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle />;
-      case 'validated': return <CheckCircle />;
-      case 'failed': return <Cancel />;
-      case 'pending': return <Warning />;
-      default: return <Science />;
-    }
+  const getPriorityBadge = (priority: string) => {
+    const badges = {
+      low: 'default',
+      normal: 'primary',
+      high: 'warning',
+      urgent: 'error'
+    };
+    return badges[priority as keyof typeof badges] || 'default';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
         <CircularProgress />
       </Box>
     );
@@ -227,81 +427,318 @@ const EnhancedReports: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-          Enhanced Report Generation
+        <Box>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Enhanced Reports
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Manage laboratory reports with enhanced workflow
         </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<Refresh />}
-          onClick={fetchVisits}
-        >
-          Refresh
-        </Button>
+        </Box>
+        {user?.role !== 'staff' && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setIsCreateDialogOpen(true)}
+            sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+          >
+            New Report
+          </Button>
+        )}
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+      {/* Statistics Cards */}
+      {stats && (
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Reports
+                    </Typography>
+                    <Typography variant="h4" component="div">
+                      {stats.total_reports}
+                    </Typography>
+                  </Box>
+                  <Assessment color="primary" sx={{ fontSize: 40 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Draft
+                    </Typography>
+                    <Typography variant="h4" component="div">
+                      {stats.draft_reports}
+                    </Typography>
+                  </Box>
+                  <Edit color="action" sx={{ fontSize: 40 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Under Review
+                    </Typography>
+                    <Typography variant="h4" component="div">
+                      {stats.under_review}
+                    </Typography>
+                  </Box>
+                  <Visibility color="warning" sx={{ fontSize: 40 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Approved
+                    </Typography>
+                    <Typography variant="h4" component="div">
+                      {stats.approved_reports}
+                    </Typography>
+                  </Box>
+                  <Check color="success" sx={{ fontSize: 40 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       )}
 
+      {/* Filters */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box display="flex" alignItems="center" mb={2}>
+            <FilterList sx={{ mr: 1 }} />
+            <Typography variant="h6">Filters</Typography>
+          </Box>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={filters.status}
+                  label="Status"
+                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                >
+                  <MenuItem value="">All Status</MenuItem>
+                  <MenuItem value="draft">Draft</MenuItem>
+                  <MenuItem value="under_review">Under Review</MenuItem>
+                  <MenuItem value="approved">Approved</MenuItem>
+                  <MenuItem value="printed">Printed</MenuItem>
+                  <MenuItem value="delivered">Delivered</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={filters.priority}
+                  label="Priority"
+                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                >
+                  <MenuItem value="">All Priority</MenuItem>
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="normal">Normal</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value="urgent">Urgent</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Lab Number"
+                placeholder="Lab Number"
+                value={filters.lab_no}
+                onChange={(e) => setFilters({...filters, lab_no: e.target.value})}
+              />
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Patient Name"
+                placeholder="Patient Name"
+                value={filters.patient_name}
+                onChange={(e) => setFilters({...filters, patient_name: e.target.value})}
+              />
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="From Date"
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => setFilters({...filters, date_from: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="To Date"
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => setFilters({...filters, date_to: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Reports Table */}
       <Card>
         <CardContent>
-          <TableContainer>
+          {user?.role === 'staff' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Staff Access:</strong> You can view and print completed reports only. 
+                To create or modify reports, contact an administrator or doctor.
+              </Typography>
+            </Alert>
+          )}
+          <Typography variant="h6" gutterBottom>
+            Reports
+          </Typography>
+          <TableContainer component={Paper} variant="outlined">
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Visit Number</TableCell>
+                  <TableCell>Lab No</TableCell>
                   <TableCell>Patient</TableCell>
-                  <TableCell>Date</TableCell>
+                  <TableCell>Type</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell>Tests Count</TableCell>
-                  <TableCell>Report Status</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Created By</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {visits.map((visit) => (
-                  <TableRow key={visit.id}>
+                {reports.map((report) => (
+                  <TableRow key={report.id}>
                     <TableCell>
+                      <Box>
                       <Typography variant="body2" fontWeight="medium">
-                        {visit.visit_number}
-                      </Typography>
-                      {visit.labRequest && (
-                        <Typography variant="caption" color="textSecondary">
-                          Lab: {visit.labRequest.full_lab_no}
+                          {report.lab_no}
+                        </Typography>
+                        {report.barcode && (
+                          <Typography variant="caption" color="text.secondary">
+                            {report.barcode}
                         </Typography>
                       )}
+                      </Box>
                     </TableCell>
-                    <TableCell>{visit.patient.name}</TableCell>
-                    <TableCell>{new Date(visit.visit_date).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {report.patient ? report.patient.name : (report.nos || 'N/A')}
+                    </TableCell>
+                    <TableCell>{report.type || 'N/A'}</TableCell>
                     <TableCell>
                       <Chip
-                        icon={getStatusIcon(visit.status)}
-                        label={visit.status.toUpperCase()}
-                        color={getStatusColor(visit.status)}
+                        label={report.status.replace('_', ' ').toUpperCase()}
+                        color={getStatusBadge(report.status) as any}
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>{visit.visit_tests?.length || 0}</TableCell>
                     <TableCell>
                       <Chip
-                        label={visit.status === 'completed' ? 'Ready' : 'Pending'}
-                        color={visit.status === 'completed' ? 'success' : 'warning'}
+                        label={report.priority.toUpperCase()}
+                        color={getPriorityBadge(report.priority) as any}
                         size="small"
                       />
                     </TableCell>
+                    <TableCell>
+                      {report.report_date ? formatDate(report.report_date) : 'N/A'}
+                    </TableCell>
+                    <TableCell>{report.createdBy?.name || 'N/A'}</TableCell>
                     <TableCell>
                       <Box display="flex" gap={1}>
-                        <Tooltip title="View Report Status">
+                        <Tooltip title="View">
                           <IconButton
                             size="small"
-                            onClick={() => handleOpenDialog(visit)}
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setIsViewDialogOpen(true);
+                            }}
                           >
                             <Visibility />
                           </IconButton>
                         </Tooltip>
+                        
+                        {report.status === 'draft' && user?.role !== 'staff' && (
+                          <Tooltip title="Submit for Review">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleWorkflowAction(report.id, 'submit-review')}
+                            >
+                              <Send />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        
+                        {report.status === 'under_review' && user?.role === 'admin' && (
+                          <Tooltip title="Approve">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleWorkflowAction(report.id, 'approve')}
+                            >
+                              <Check />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        
+                        <Tooltip title={report.status === 'draft' ? 'Print (Draft reports cannot be printed)' : 'Print Report'}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleWorkflowAction(report.id, 'print')}
+                            disabled={report.status === 'draft'}
+                          >
+                            <Print />
+                          </IconButton>
+                        </Tooltip>
+                        
+                        {report.status === 'printed' && (
+                          <Tooltip title="Mark as Delivered">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleWorkflowAction(report.id, 'deliver')}
+                            >
+                              <LocalShipping />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -309,222 +746,334 @@ const EnhancedReports: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
+          
+          {/* Pagination */}
+          {pagination.total > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Showing {pagination.from} to {pagination.to} of {pagination.total} reports
+              </Typography>
+              <Stack spacing={2}>
+                <Pagination
+                  count={pagination.last_page}
+                  page={pagination.current_page}
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                />
+              </Stack>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
-      {/* Report Status Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
+      {/* Create Report Dialog */}
+      <Dialog 
+        open={isCreateDialogOpen} 
+        onClose={() => setIsCreateDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Create New Report</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Lab Number"
+                value={newReport.lab_no}
+                onChange={(e) => setNewReport({...newReport, lab_no: e.target.value})}
+                placeholder="Auto-generated if empty"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Patient Number (NOS)"
+                value={newReport.nos}
+                onChange={(e) => setNewReport({...newReport, nos: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Reference Number"
+                value={newReport.reff}
+                onChange={(e) => setNewReport({...newReport, reff: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Report Type</InputLabel>
+                <Select
+                  value={newReport.type}
+                  label="Report Type"
+                  onChange={(e) => setNewReport({...newReport, type: e.target.value})}
+                >
+                  <MenuItem value="pathology">Pathology</MenuItem>
+                  <MenuItem value="hematology">Hematology</MenuItem>
+                  <MenuItem value="biochemistry">Biochemistry</MenuItem>
+                  <MenuItem value="microbiology">Microbiology</MenuItem>
+                  <MenuItem value="immunology">Immunology</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={newReport.priority}
+                  label="Priority"
+                  onChange={(e) => setNewReport({...newReport, priority: e.target.value})}
+                >
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="normal">Normal</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value="urgent">Urgent</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Report Date"
+                type="date"
+                value={newReport.report_date}
+                onChange={(e) => setNewReport({...newReport, report_date: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Clinical History"
+                value={newReport.clinical}
+                onChange={(e) => setNewReport({...newReport, clinical: e.target.value})}
+                placeholder="Enter clinical history and symptoms..."
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Nature of Specimen"
+                value={newReport.nature}
+                onChange={(e) => setNewReport({...newReport, nature: e.target.value})}
+                placeholder="Describe the nature of the specimen..."
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Gross Examination"
+                value={newReport.gross}
+                onChange={(e) => setNewReport({...newReport, gross: e.target.value})}
+                placeholder="Enter gross examination findings..."
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Microscopic Examination"
+                value={newReport.micro}
+                onChange={(e) => setNewReport({...newReport, micro: e.target.value})}
+                placeholder="Enter microscopic examination findings..."
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Conclusion"
+                value={newReport.conc}
+                onChange={(e) => setNewReport({...newReport, conc: e.target.value})}
+                placeholder="Enter the final conclusion..."
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Recommendation"
+                value={newReport.reco}
+                onChange={(e) => setNewReport({...newReport, reco: e.target.value})}
+                placeholder="Enter recommendations for treatment/follow-up..."
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsCreateDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreateReport} variant="contained">
+            Create Report
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Report Dialog */}
+      <Dialog 
+        open={isViewDialogOpen} 
+        onClose={() => setIsViewDialogOpen(false)}
+        maxWidth="lg"
+        fullWidth
+      >
         <DialogTitle>
-          Report Generation Status - {selectedVisit?.patient.name}
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Typography variant="h6">Report Details</Typography>
+            {selectedReport && (
+              <Box display="flex" gap={1}>
+                <Chip
+                  label={selectedReport.status.replace('_', ' ').toUpperCase()}
+                  color={getStatusBadge(selectedReport.status) as any}
+                  size="small"
+                />
+                <Chip
+                  label={selectedReport.priority.toUpperCase()}
+                  color={getPriorityBadge(selectedReport.priority) as any}
+                  size="small"
+                />
+              </Box>
+            )}
+          </Box>
         </DialogTitle>
         <DialogContent>
-          {reportStatus && (
-            <Box sx={{ mt: 2 }}>
-              <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
-                <Tab label="Overview" />
-                <Tab label="Test Validation" />
-                <Tab label="Quality Control" />
-                <Tab label="Workflow" />
-              </Tabs>
-
-              {activeTab === 0 && (
+          {selectedReport && (
                 <Box>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Card variant="outlined">
-                        <CardContent>
-                          <Typography variant="h6" gutterBottom>
-                            Report Status
+              {/* Basic Information */}
+              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                Basic Information
                           </Typography>
-                          <Chip
-                            icon={reportStatus.can_generate_report ? <CheckCircle /> : <Warning />}
-                            label={reportStatus.can_generate_report ? 'Ready to Generate' : 'Not Ready'}
-                            color={reportStatus.can_generate_report ? 'success' : 'warning'}
-                            sx={{ mb: 2 }}
-                          />
-                          {reportStatus.blocking_issues.length > 0 && (
-                            <Box>
-                              <Typography variant="subtitle2" color="error" gutterBottom>
-                                Blocking Issues:
+              <Grid container spacing={2} mb={3}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">Lab Number</Typography>
+                  <Typography variant="body1">{selectedReport.lab_no}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">Barcode</Typography>
+                  <Typography variant="body1">{selectedReport.barcode || 'Not generated'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">Patient Number</Typography>
+                  <Typography variant="body1">{selectedReport.nos || 'N/A'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">Reference</Typography>
+                  <Typography variant="body1">{selectedReport.reff || 'N/A'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">Type</Typography>
+                  <Typography variant="body1">{selectedReport.type || 'N/A'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">Report Date</Typography>
+                  <Typography variant="body1">
+                    {selectedReport.report_date ? formatDate(selectedReport.report_date) : 'N/A'}
                               </Typography>
-                              <List dense>
-                                {reportStatus.blocking_issues.map((issue, index) => (
-                                  <ListItem key={index}>
-                                    <ListItemIcon>
-                                      <Cancel color="error" />
-                                    </ListItemIcon>
-                                    <ListItemText primary={issue} />
-                                  </ListItem>
-                                ))}
-                              </List>
-                            </Box>
-                          )}
-                        </CardContent>
-                      </Card>
+                </Grid>
                     </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Card variant="outlined">
-                        <CardContent>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Clinical Information */}
                           <Typography variant="h6" gutterBottom>
-                            Summary
+                Clinical Information
+              </Typography>
+              <Box mb={3}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Clinical History
                           </Typography>
-                          <Typography variant="body2">
-                            Total Tests: {reportStatus.tests_status.length}
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="body1">
+                    {selectedReport.clinical || 'No clinical history provided'}
                           </Typography>
-                          <Typography variant="body2">
-                            Validated Tests: {reportStatus.tests_status.filter(t => t.is_validated).length}
+                </Paper>
+              </Box>
+              <Box mb={3}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Nature of Specimen
                           </Typography>
-                          <Typography variant="body2">
-                            QC Records: {reportStatus.quality_control_status.length}
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="body1">
+                    {selectedReport.nature || 'No specimen information provided'}
                           </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  </Grid>
+                </Paper>
                 </Box>
-              )}
 
-              {activeTab === 1 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Test Validation Status
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined">
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Test Name</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell>Validated By</TableCell>
-                          <TableCell>Date</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {reportStatus.tests_status.map((test, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{test.test_name}</TableCell>
-                            <TableCell>
-                              <Chip
-                                icon={test.is_validated ? <CheckCircle /> : <Warning />}
-                                label={test.is_validated ? 'Validated' : 'Pending'}
-                                color={test.is_validated ? 'success' : 'warning'}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>{test.validated_by || 'N/A'}</TableCell>
-                            <TableCell>
-                              {test.validated_at ? new Date(test.validated_at).toLocaleDateString() : 'N/A'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Box>
-              )}
+              <Divider sx={{ my: 2 }} />
 
-              {activeTab === 2 && (
-                <Box>
+              {/* Examination Results */}
                   <Typography variant="h6" gutterBottom>
-                    Quality Control Status
+                Examination Results
+              </Typography>
+              <Box mb={3}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Gross Examination
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="body1">
+                    {selectedReport.gross || 'No gross examination findings'}
                   </Typography>
-                  {reportStatus.quality_control_status.length > 0 ? (
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Test Name</TableCell>
-                            <TableCell>QC Type</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Performed By</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {reportStatus.quality_control_status.map((qc, index) => (
-                            <TableRow key={index}>
-                              <TableCell>{qc.test_name}</TableCell>
-                              <TableCell>{qc.qc_type.replace('_', ' ').toUpperCase()}</TableCell>
-                              <TableCell>
-                                <Chip
-                                  icon={getStatusIcon(qc.status)}
-                                  label={qc.status.toUpperCase()}
-                                  color={getStatusColor(qc.status)}
-                                  size="small"
-                                />
-                              </TableCell>
-                              <TableCell>{qc.performed_by}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : (
-                    <Alert severity="info">
-                      No quality control records found for this visit.
-                    </Alert>
-                  )}
+                </Paper>
                 </Box>
-              )}
+              <Box mb={3}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Microscopic Examination
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Typography variant="body1">
+                    {selectedReport.micro || 'No microscopic examination findings'}
+                  </Typography>
+                </Paper>
+                </Box>
 
-              {activeTab === 3 && (
-                <Box>
+              <Divider sx={{ my: 2 }} />
+
+              {/* Conclusion & Recommendation */}
                   <Typography variant="h6" gutterBottom>
-                    Report Generation Workflow
+                Conclusion & Recommendation
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Conclusion
                   </Typography>
-                  <Stepper orientation="vertical">
-                    <Step active={true}>
-                      <StepLabel>Test Execution</StepLabel>
-                      <StepContent>
-                        <Typography variant="body2">
-                          Laboratory tests are performed and results are entered.
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="body1">
+                      {selectedReport.conc || 'No conclusion provided'}
                         </Typography>
-                      </StepContent>
-                    </Step>
-                    <Step active={reportStatus.tests_status.some(t => t.is_validated)}>
-                      <StepLabel>Doctor Validation</StepLabel>
-                      <StepContent>
-                        <Typography variant="body2">
-                          Doctors review and validate test results with clinical correlation.
+                  </Paper>
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Recommendation
                         </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          {reportStatus.tests_status.filter(t => t.is_validated).length} of {reportStatus.tests_status.length} tests validated
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="body1">
+                      {selectedReport.reco || 'No recommendations provided'}
                         </Typography>
-                      </StepContent>
-                    </Step>
-                    <Step active={reportStatus.can_generate_report}>
-                      <StepLabel>Admin Final Approval</StepLabel>
-                      <StepContent>
-                        <Typography variant="body2">
-                          Head of Doctors (Admin) provides final approval for report generation.
-                        </Typography>
-                      </StepContent>
-                    </Step>
-                    <Step active={false}>
-                      <StepLabel>Report Generation</StepLabel>
-                      <StepContent>
-                        <Typography variant="body2">
-                          Professional pathology report is generated and ready for delivery.
-                        </Typography>
-                      </StepContent>
-                    </Step>
-                  </Stepper>
-                </Box>
-              )}
+                  </Paper>
+                </Grid>
+              </Grid>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Close</Button>
-          {reportStatus?.can_generate_report && (
-            <Button
-              variant="contained"
-              startIcon={generatingReport ? <CircularProgress size={20} /> : <Print />}
-              onClick={handleGenerateReport}
-              disabled={generatingReport}
-            >
-              {generatingReport ? 'Generating...' : 'Generate Report'}
+          <Button onClick={() => setIsViewDialogOpen(false)}>
+            Close
             </Button>
-          )}
         </DialogActions>
       </Dialog>
     </Box>

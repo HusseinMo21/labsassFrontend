@@ -134,11 +134,6 @@ const Receipts: React.FC = () => {
 
       const response = await axios.get('/api/visits', { params });
       
-      // Debug: Log the first visit to see what data we're getting
-      if (response.data.data && response.data.data.length > 0) {
-        console.log('First visit data:', response.data.data[0]);
-        console.log('Lab number in first visit:', response.data.data[0].lab_number);
-      }
       
       // Filter to only include visits with receipt numbers and normalize data
       const receiptsData = response.data.data

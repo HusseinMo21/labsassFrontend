@@ -117,3 +117,7 @@ const BarcodeInput: React.FC<BarcodeInputProps> = ({
 
 export default BarcodeInput;
 
+
+
+
+
