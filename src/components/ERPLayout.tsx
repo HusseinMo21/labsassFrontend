@@ -59,6 +59,7 @@ const navigationItems: NavigationItem[] = [
   // Admin - Only specified tabs
   { path: '/admin/dashboard', label: 'Admin Dashboard', icon: <Dashboard />, roles: ['admin'] },
   { path: '/patients', label: 'Patients', icon: <People />, roles: ['admin'] },
+  { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['admin'] },
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['admin'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['admin'] },
   { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['admin'] },
@@ -76,6 +77,7 @@ const navigationItems: NavigationItem[] = [
   // Staff - Limited access (including Check-In & Billing and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
   { path: '/patients', label: 'Patients', icon: <People />, roles: ['staff'] },
+  { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['staff'] },
   { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['staff'] },

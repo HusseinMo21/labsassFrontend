@@ -54,9 +54,6 @@ import {
   Refresh,
   DateRange,
   Search as SearchIcon,
-  Folder,
-  CheckCircle,
-  Person,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -80,21 +77,6 @@ interface Visit {
   image_size?: number;
   image_uploaded_at?: string;
   image_uploaded_by?: number;
-  lab_number?: string;
-  checked_by_doctors?: string[];
-  last_checked_at?: string;
-  labRequest?: {
-    id: number;
-    lab_no: string;
-    suffix?: string;
-    full_lab_no: string;
-    reports?: Array<{
-      id: number;
-      content: string;
-      title: string;
-      status: string;
-    }>;
-  };
   patient: {
     id: number;
     name: string;
@@ -178,13 +160,6 @@ const Reports: React.FC = () => {
   const [showReplaceImageModal, setShowReplaceImageModal] = useState(false);
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [visitToComplete, setVisitToComplete] = useState<Visit | null>(null);
-  const [showCheckedByModal, setShowCheckedByModal] = useState(false);
-  const [visitToCheck, setVisitToCheck] = useState<Visit | null>(null);
-  const [doctorName, setDoctorName] = useState('');
-  const [showReportedByModal, setShowReportedByModal] = useState(false);
-  const [visitToShowReportedBy, setVisitToShowReportedBy] = useState<Visit | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -197,26 +172,16 @@ const Reports: React.FC = () => {
   const [resultsData, setResultsData] = useState<{ [key: number]: { result_value: string; result_status: string; result_notes: string } }>({});
   const [dateRange, setDateRange] = useState({
     start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end_date: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Tomorrow to include today's full date
+    end_date: new Date().toISOString().split('T')[0],
   });
 
-  // Separate effects for better performance
   useEffect(() => {
     fetchReportData();
-  }, []); // Only fetch once on mount
-
-  // Debounce search term to reduce API calls
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchVisits();
-    }, searchTerm ? 300 : 0); // 300ms delay for search, immediate for other filters
-
-    return () => clearTimeout(timeoutId);
+    fetchVisits();
   }, [currentPage, searchTerm, statusFilter, dateRange]);
 
   const fetchVisits = async () => {
     try {
-      setLoading(true);
       let params: any = {
         page: currentPage,
         per_page: 15,
@@ -224,18 +189,20 @@ const Reports: React.FC = () => {
 
       // Role-based filtering
       if (user?.role === 'doctor') {
-        // Doctors can see pending and under_review tests, but not completed ones
+        // Doctors can only see pending and under_review tests
         params.test_status = 'pending,under_review';
-        // Don't exclude completed for doctors - they need to see their assigned reports
+      } else if (user?.role === 'admin') {
+        // Admins can see completed tests for final review
+        params.status = 'completed';
+        params.sample_completed = 'true'; // Only show visits with completed samples
+      } else if (user?.role === 'staff') {
+        // Staff can only see completed visits for viewing/printing
+        params.status = 'completed';
+        params.sample_completed = 'true'; // Only show visits with completed samples
       } else {
-        // Both admin and staff can see all visits
-        // No role-based filtering
-      }
-
-      // Exclude completed visits from Reports & Analytics (only for admin/staff)
-      // Completed visits should only appear in Enhanced Reports
-      if (user?.role !== 'doctor') {
-        params.exclude_completed = 'true';
+        // Others see all visits
+        params.status = 'completed';
+        params.sample_completed = 'true'; // Only show visits with completed samples
       }
 
       // Add search functionality
@@ -259,9 +226,6 @@ const Reports: React.FC = () => {
       setTotalPages(response.data.last_page || 1);
     } catch (error) {
       console.error('Failed to fetch visits:', error);
-      toast.error('Failed to load reports');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -274,9 +238,9 @@ const Reports: React.FC = () => {
         axios.get('/api/reports/financial')
       ]);
 
-          setPatientsData(patientsResponse.data);
-          setTestsData(testsResponse.data);
-          setFinancialData(financialResponse.data);
+      setPatientsData(patientsResponse.data);
+      setTestsData(testsResponse.data);
+      setFinancialData(financialResponse.data);
     } catch (error) {
       console.error('Failed to fetch report data:', error);
     } finally {
@@ -287,11 +251,6 @@ const Reports: React.FC = () => {
   const handleTestReport = (visit: Visit) => {
     // Navigate to the new ReportForm component
     navigate(`/reports/${visit.id}`);
-  };
-
-  const handleViewDocuments = (visit: Visit) => {
-    // Navigate to the documents component
-    navigate(`/documents/${visit.id}`);
   };
 
   const handleViewImage = (visit: Visit) => {
@@ -420,65 +379,6 @@ const Reports: React.FC = () => {
     }));
   };
 
-  const handleMarkCompleted = (visit: Visit) => {
-    setVisitToComplete(visit);
-    setShowCompleteModal(true);
-  };
-
-  const confirmMarkCompleted = async () => {
-    if (!visitToComplete) return;
-
-    try {
-      // Mark the visit as completed
-      await axios.put(`/api/visits/${visitToComplete.id}/complete`);
-
-      toast.success('Report marked as completed and moved to Enhanced Reports');
-      
-      // Close modal and refresh the visits list
-      setShowCompleteModal(false);
-      setVisitToComplete(null);
-      fetchVisits();
-    } catch (error) {
-      console.error('Failed to mark report as completed:', error);
-      toast.error('Failed to mark report as completed');
-    }
-  };
-
-  const handleCheckedBy = (visit: Visit) => {
-    setVisitToCheck(visit);
-    setDoctorName('');
-    setShowCheckedByModal(true);
-  };
-
-  const confirmMarkAsChecked = async () => {
-    if (!visitToCheck || !doctorName.trim()) {
-      toast.error('Please enter a doctor name');
-      return;
-    }
-
-    try {
-      await axios.post(`/api/visits/${visitToCheck.id}/mark-checked`, {
-        doctor_name: doctorName.trim()
-      });
-
-      toast.success('Report marked as checked successfully');
-      
-      // Close modal and refresh the visits list
-      setShowCheckedByModal(false);
-      setVisitToCheck(null);
-      setDoctorName('');
-      fetchVisits();
-    } catch (error) {
-      console.error('Failed to mark report as checked:', error);
-      toast.error('Failed to mark report as checked');
-    }
-  };
-
-  const handleReportedBy = (visit: Visit) => {
-    setVisitToShowReportedBy(visit);
-    setShowReportedByModal(true);
-  };
-
   const handleExport = async (type: string) => {
     try {
       const response = await axios.get('/api/reports/export', {
@@ -513,13 +413,13 @@ const Reports: React.FC = () => {
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
+      const link = document.createElement('a');
+      link.href = url;
       link.setAttribute('download', `report_${visit.visit_number}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        window.URL.revokeObjectURL(url);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
 
       toast.success('Report PDF generated successfully');
     } catch (error) {
@@ -529,8 +429,7 @@ const Reports: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    const safeStatus = status || 'pending';
-    switch (safeStatus) {
+    switch (status) {
       case 'completed': return 'success';
       case 'pending': return 'warning';
       case 'under_review': return 'info';
@@ -539,11 +438,10 @@ const Reports: React.FC = () => {
   };
 
   const getTestStatusChip = (status: string) => {
-    const safeStatus = status || 'pending';
     return (
       <Chip
-        label={safeStatus.replace('_', ' ').toUpperCase()}
-        color={getStatusColor(safeStatus) as any}
+        label={status.replace('_', ' ').toUpperCase()}
+        color={getStatusColor(status) as any}
         size="small"
       />
     );
@@ -557,9 +455,9 @@ const Reports: React.FC = () => {
           Reports & Analytics
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
-        <Button
-          variant="outlined"
-          startIcon={<Download />}
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
             onClick={() => handleExport('patients')}
           >
             Export Patients
@@ -577,7 +475,7 @@ const Reports: React.FC = () => {
             onClick={() => handleExport('financial')}
           >
             Export Financial
-        </Button>
+          </Button>
         </Box>
       </Box>
 
@@ -728,54 +626,67 @@ const Reports: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 Visit Reports
               </Typography>
+              {user?.role === 'staff' && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Staff Access: You can view and print completed reports only. To create or modify reports, contact an administrator or doctor.
+                </Alert>
+              )}
               
               <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
+                <Table>
+                  <TableHead>
+                    <TableRow>
                       <TableCell>Visit #</TableCell>
                       <TableCell>Patient</TableCell>
                       <TableCell>Date</TableCell>
                       <TableCell>Tests</TableCell>
+                      <TableCell>Test Status</TableCell>
+                      <TableCell>Report Status</TableCell>
                       <TableCell>Image</TableCell>
                       <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {visits.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()).map((visit) => (
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {visits.map((visit) => (
                       <TableRow key={visit.id}>
-                      <TableCell>
+                        <TableCell>
                           <Typography variant="body2" fontWeight="bold">
-                          {visit.visit_number}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
+                            {visit.visit_number}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
                             <Typography variant="body2" fontWeight="bold">
-                              {visit.patient?.name || 'Unknown Patient'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                              #{visit.patient?.id || 'N/A'} • {visit.patient?.phone || 'N/A'}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
+                              {visit.patient.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              #{visit.patient.id} • {visit.patient.phone}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2">
                             {new Date(visit.visit_date).toLocaleDateString()}
                           </Typography>
-                      </TableCell>
-                      <TableCell>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2">
-                            {visit.visit_tests?.length || 0} tests
+                            {visit.visit_tests.length} tests
                           </Typography>
-                          {visit.visit_tests?.map((test) => (
+                          {visit.visit_tests.map((test) => (
                             <Typography key={test.id} variant="caption" display="block">
-                              {test.lab_test?.name || 'Unknown Test'}
+                              {test.lab_test.name}
                             </Typography>
                           ))}
-                      </TableCell>
+                        </TableCell>
                         <TableCell>
-                        {visit.image_path ? (
+                          {getTestStatusChip(visit.test_status)}
+                        </TableCell>
+                        <TableCell>
+                          <Chip label="Pending Report" color="warning" size="small" />
+                        </TableCell>
+                        <TableCell>
+                          {visit.image_path ? (
                             <Button
                               size="small"
                               startIcon={<Image />}
@@ -787,61 +698,21 @@ const Reports: React.FC = () => {
                             <Typography variant="body2" color="text.secondary">
                               No Image
                             </Typography>
-                        )}
-                      </TableCell>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<Description />}
-                              onClick={() => handleTestReport(visit)}
-                            >
-                              Report
-                            </Button>
-                            {user?.role === 'admin' ? (
-                              <>
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  color="success"
-                                  startIcon={<CheckCircle />}
-                                  onClick={() => handleMarkCompleted(visit)}
-                                >
-                                  Completed
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="info"
-                                  startIcon={<Person />}
-                                  onClick={() => handleReportedBy(visit)}
-                                >
-                                  Reported By
-                                </Button>
-                              </>
-                            ) : user?.role === 'doctor' ? (
-                              <>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="info"
-                                  startIcon={<Assessment />}
-                                  onClick={() => handleTestResults(visit)}
-                                >
-                                  Results
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="primary"
-                                  startIcon={<Person />}
-                                  onClick={() => handleCheckedBy(visit)}
-                                >
-                                  Checked By
-                                </Button>
-                              </>
-                            ) : (
+                            {user?.role !== 'staff' && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<Description />}
+                                onClick={() => handleTestReport(visit)}
+                              >
+                                Report
+                              </Button>
+                            )}
+                            {user?.role !== 'staff' && (
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -855,115 +726,47 @@ const Reports: React.FC = () => {
                             <Button
                               size="small"
                               variant="outlined"
-                            color="secondary"
-                            startIcon={<Folder />}
-                            onClick={() => handleViewDocuments(visit)}
-                          >
-                            Documents
+                              color="error"
+                              startIcon={<PictureAsPdf />}
+                              onClick={() => handlePrintReport(visit)}
+                            >
+                              PDF
                             </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-      
-      {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(event, page) => setCurrentPage(page)}
-            color="primary"
-          />
-        </Box>
-        </>
-      )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Pagination */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Pagination
+                  count={totalPages}
+                  page={currentPage}
+                  onChange={(event, page) => setCurrentPage(page)}
+                  color="primary"
+                />
+              </Box>
+            </>
+          )}
 
           {activeTab === 1 && (
             <>
               <Typography variant="h6" gutterBottom>
                 Enhanced Reports
-                  </Typography>
+              </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Manage laboratory reports with enhanced workflow
-                  </Typography>
-              
-              <TableContainer component={Paper}>
-                <Table>
-                      <TableHead>
-                        <TableRow>
-                      <TableCell>Lab No</TableCell>
-                      <TableCell>Patient</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Created By</TableCell>
-                      <TableCell>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                    {visits.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()).map((visit) => (
-                      <TableRow key={visit.id}>
-                            <TableCell>
-                          <Typography variant="body2" fontWeight="bold">
-                            {visit.lab_number || visit.labRequest?.full_lab_no || visit.visit_number}
-                  </Typography>
-                            </TableCell>
-                            <TableCell>
-    <Box>
-                            <Typography variant="body2" fontWeight="bold">
-                              {visit.patient?.name || 'Unknown Patient'}
-                  </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              #{visit.patient?.id || 'N/A'} • {visit.patient?.phone || 'N/A'}
-                  </Typography>
-                          </Box>
-                            </TableCell>
-                            <TableCell>
-                          <Chip label="Pathology" color="primary" size="small" />
-                            </TableCell>
-                            <TableCell>
-                          <Typography variant="body2">
-                            {new Date(visit.visit_date).toLocaleDateString()}
-                          </Typography>
-                            </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            N/A
-                  </Typography>
-                        </TableCell>
-                            <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <Tooltip title="View Report">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handleTestReport(visit)}
-                              >
-                                <Visibility />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Documents">
-                              <IconButton
-                                size="small"
-                                color="secondary"
-                                onClick={() => handleViewDocuments(visit)}
-                              >
-                                <Folder />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+              </Typography>
+              <Alert severity="info">
+                Enhanced Reports functionality will be available in the Enhanced Reports section.
+              </Alert>
             </>
           )}
-                </CardContent>
-              </Card>
+        </CardContent>
+      </Card>
 
       {/* Test Results Modal */}
       <Dialog open={showResultsModal} onClose={() => setShowResultsModal(false)} maxWidth="md" fullWidth>
@@ -978,18 +781,18 @@ const Reports: React.FC = () => {
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
+                      <TextField
+                        fullWidth
                         label="Result Value"
                         value={resultsData[test.id]?.result_value || ''}
                         onChange={(e) => handleResultChange(test.id, 'result_value', e.target.value)}
                         placeholder="Enter result value..."
-              />
-            </Grid>
+                      />
+                    </Grid>
                     <Grid item xs={12} md={4}>
                       <FormControl fullWidth>
                         <InputLabel>Result Status</InputLabel>
-                  <Select
+                        <Select
                           value={resultsData[test.id]?.result_status || 'normal'}
                           onChange={(e) => handleResultChange(test.id, 'result_status', e.target.value)}
                           label="Result Status"
@@ -997,19 +800,19 @@ const Reports: React.FC = () => {
                           <MenuItem value="normal">Normal</MenuItem>
                           <MenuItem value="abnormal">Abnormal</MenuItem>
                           <MenuItem value="critical">Critical</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+                        </Select>
+                      </FormControl>
+                    </Grid>
                     <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
+                      <TextField
+                        fullWidth
                         label="Notes"
                         value={resultsData[test.id]?.result_notes || ''}
                         onChange={(e) => handleResultChange(test.id, 'result_notes', e.target.value)}
                         placeholder="Enter notes..."
-                />
-              </Grid>
-            </Grid>
+                      />
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             ))}
@@ -1060,17 +863,17 @@ const Reports: React.FC = () => {
               {/* Image Display */}
               {selectedImageVisit.image_path && (
                 <Box sx={{ textAlign: 'center' }}>
-                    <img
+                  <img
                     src={`/storage/${selectedImageVisit.image_path}`}
                     alt="Lab Result"
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '500px',
-                        objectFit: 'contain',
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '500px',
+                      objectFit: 'contain',
                       border: '1px solid #ddd',
-                        borderRadius: '8px'
-                      }}
-                    />
+                      borderRadius: '8px'
+                    }}
+                  />
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" color="text.secondary">
                       File: {selectedImageVisit.image_filename}
@@ -1080,7 +883,7 @@ const Reports: React.FC = () => {
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Uploaded: {new Date(selectedImageVisit.image_uploaded_at!).toLocaleString()}
-                  </Typography>
+                    </Typography>
                   </Box>
                 </Box>
               )}
@@ -1103,21 +906,25 @@ const Reports: React.FC = () => {
               >
                 Download
               </Button>
-              <Button
-                variant="outlined"
-                color="warning"
-                startIcon={<CloudUpload />}
-                onClick={() => handleReplaceImage(selectedImageVisit)}
-              >
-                Replace
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => handleRemoveImage(selectedImageVisit)}
-              >
-                Remove
-              </Button>
+              {user?.role !== 'staff' && (
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<CloudUpload />}
+                  onClick={() => handleReplaceImage(selectedImageVisit)}
+                >
+                  Replace
+                </Button>
+              )}
+              {user?.role !== 'staff' && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => handleRemoveImage(selectedImageVisit)}
+                >
+                  Remove
+                </Button>
+              )}
             </>
           )}
         </DialogActions>
@@ -1136,44 +943,44 @@ const Reports: React.FC = () => {
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Select a new image to replace the current lab result image for this visit.
-                </Typography>
-                
-                <input
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id="replace-image-upload"
-                  type="file"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      // Validate file size (20MB limit)
-                      if (file.size > 20 * 1024 * 1024) {
+              </Typography>
+              
+              <input
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="replace-image-upload"
+                type="file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // Validate file size (20MB limit)
+                    if (file.size > 20 * 1024 * 1024) {
                       toast.error('File size must be less than 20MB');
-                        return;
-                      }
-                    
-                      // Validate file type
-                      if (!file.type.startsWith('image/')) {
-                      toast.error('Please select an image file');
-                        return;
-                      }
-                    
-                      setNewImageFile(file);
-                    toast.success('New image selected');
+                      return;
                     }
-                  }}
-                />
-                <label htmlFor="replace-image-upload">
+                    
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                      toast.error('Please select an image file');
+                      return;
+                    }
+                    
+                    setNewImageFile(file);
+                    toast.success('New image selected');
+                  }
+                }}
+              />
+              <label htmlFor="replace-image-upload">
                 <Button variant="outlined" component="span" startIcon={<CloudUpload />} fullWidth>
                   Choose New Image
-                  </Button>
-                </label>
-                
-                {newImageFile && (
+                </Button>
+              </label>
+              
+              {newImageFile && (
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Typography variant="body2" color="success.main">
+                  <Typography variant="body2" color="success.main">
                     Selected: {newImageFile.name} ({(newImageFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </Typography>
+                  </Typography>
                 </Box>
               )}
             </Box>
@@ -1181,198 +988,12 @@ const Reports: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowReplaceImageModal(false)}>Cancel</Button>
-          <Button
-            variant="contained"
+          <Button 
+            variant="contained" 
             onClick={handleReplaceImageSubmit}
             disabled={!newImageFile}
           >
             Replace Image
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Complete Report Confirmation Modal */}
-      <Dialog 
-        open={showCompleteModal} 
-        onClose={() => setShowCompleteModal(false)} 
-        maxWidth="sm" 
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckCircle color="success" />
-            <Typography variant="h6">Mark Report as Completed</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Are you sure you want to mark this report as completed?
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            This action will move the report to Enhanced Reports and it will no longer appear in Reports & Analytics.
-          </Typography>
-          {visitToComplete && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Report Details:
-              </Typography>
-              <Typography variant="body2">
-                <strong>Visit:</strong> {visitToComplete.visit_number}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Patient:</strong> {visitToComplete.patient?.name}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date:</strong> {new Date(visitToComplete.visit_date).toLocaleDateString()}
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowCompleteModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            color="success"
-            startIcon={<CheckCircle />}
-            onClick={confirmMarkCompleted}
-          >
-            Mark as Completed
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Checked By Modal */}
-      <Dialog 
-        open={showCheckedByModal} 
-        onClose={() => setShowCheckedByModal(false)} 
-        maxWidth="sm" 
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Person color="primary" />
-            <Typography variant="h6">Mark Report as Checked</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Enter your name to mark this report as checked by you.
-          </Typography>
-          {visitToCheck && (
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Report Details:
-              </Typography>
-              <Typography variant="body2">
-                <strong>Visit:</strong> {visitToCheck.visit_number}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Lab No:</strong> {visitToCheck.lab_number || visitToCheck.labRequest?.full_lab_no || 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Patient:</strong> {visitToCheck.patient?.name}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date:</strong> {new Date(visitToCheck.visit_date).toLocaleDateString()}
-              </Typography>
-            </Box>
-          )}
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Doctor Name"
-            fullWidth
-            variant="outlined"
-            value={doctorName}
-            onChange={(e) => setDoctorName(e.target.value)}
-            placeholder="Enter your name"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowCheckedByModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            color="primary"
-            startIcon={<Person />}
-            onClick={confirmMarkAsChecked}
-            disabled={!doctorName.trim()}
-          >
-            Mark as Checked
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Reported By Modal */}
-      <Dialog 
-        open={showReportedByModal} 
-        onClose={() => setShowReportedByModal(false)} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Person color="info" />
-            <Typography variant="h6">Reported By Doctors</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {visitToShowReportedBy && (
-            <>
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Report Details:
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Visit:</strong> {visitToShowReportedBy.visit_number}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Lab No:</strong> {visitToShowReportedBy.lab_number || visitToShowReportedBy.labRequest?.full_lab_no || 'N/A'}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Patient:</strong> {visitToShowReportedBy.patient?.name}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Date:</strong> {new Date(visitToShowReportedBy.visit_date).toLocaleDateString()}
-                </Typography>
-              </Box>
-              
-              {visitToShowReportedBy.checked_by_doctors && visitToShowReportedBy.checked_by_doctors.length > 0 ? (
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    Checked by {visitToShowReportedBy.checked_by_doctors.length} doctor(s):
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {visitToShowReportedBy.checked_by_doctors.map((doctor: string, index: number) => (
-                      <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: 'primary.50', borderRadius: 1 }}>
-                        <Person color="primary" />
-                        <Typography variant="body1">{doctor}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                  {visitToShowReportedBy.last_checked_at && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                      Last checked: {new Date(visitToShowReportedBy.last_checked_at).toLocaleString()}
-                    </Typography>
-                  )}
-                </Box>
-              ) : (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Person sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary">
-                    No doctors have checked this report yet
-                  </Typography>
-                </Box>
-              )}
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowReportedByModal(false)}>
-            Close
           </Button>
         </DialogActions>
       </Dialog>
@@ -1381,3 +1002,4 @@ const Reports: React.FC = () => {
 };
 
 export default Reports;
+

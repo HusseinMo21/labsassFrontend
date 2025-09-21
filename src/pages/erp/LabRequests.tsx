@@ -48,6 +48,10 @@ import { toast } from 'react-toastify';
 
 interface Sample {
   id?: number;
+  sample_type?: string;
+  case_type?: string;
+  sample_size?: string;
+  number_of_samples?: number;
   tsample?: string;
   nsample?: string;
   isample?: string;
@@ -187,7 +191,16 @@ const LabRequests: React.FC = () => {
   // Form state
   const [formData, setFormData] = useState({
     patient_id: '',
-    samples: [{ tsample: '', nsample: '', isample: '', notes: '' }],
+    samples: [{ 
+      sample_type: '', 
+      case_type: '', 
+      sample_size: '', 
+      number_of_samples: 1, 
+      tsample: '', 
+      nsample: '', 
+      isample: '', 
+      notes: '' 
+    }],
   });
 
   const statusColors: { [key: string]: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' } = {
@@ -369,7 +382,16 @@ const LabRequests: React.FC = () => {
   const resetForm = () => {
     setFormData({
       patient_id: '',
-      samples: [{ tsample: '', nsample: '', isample: '', notes: '' }],
+      samples: [{ 
+        sample_type: '', 
+        case_type: '', 
+        sample_size: '', 
+        number_of_samples: 1, 
+        tsample: '', 
+        nsample: '', 
+        isample: '', 
+        notes: '' 
+      }],
     });
     setEditingLabRequest(null);
   };
@@ -377,7 +399,16 @@ const LabRequests: React.FC = () => {
   const addSample = () => {
     setFormData({
       ...formData,
-      samples: [...formData.samples, { tsample: '', nsample: '', isample: '', notes: '' }],
+      samples: [...formData.samples, { 
+        sample_type: '', 
+        case_type: '', 
+        sample_size: '', 
+        number_of_samples: 1, 
+        tsample: '', 
+        nsample: '', 
+        isample: '', 
+        notes: '' 
+      }],
     });
   };
 
@@ -663,11 +694,54 @@ const LabRequests: React.FC = () => {
             </Typography>
             {formData.samples.map((sample, index) => (
               <Card key={index} sx={{ mb: 2, p: 2 }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                  🧪 Sample Information
+                </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Sample Type"
+                      label="🧪 نوع العينة (Sample Type)"
+                      value={sample.sample_type}
+                      onChange={(e) => updateSample(index, 'sample_type', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="📊 نوع الحالة (Case Type)"
+                      value={sample.case_type}
+                      onChange={(e) => updateSample(index, 'case_type', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="📏 حجم العينة (Sample Size)"
+                      value={sample.sample_size}
+                      onChange={(e) => updateSample(index, 'sample_size', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="🔢 عدد العينات (Number of Samples)"
+                      value={sample.number_of_samples}
+                      onChange={(e) => updateSample(index, 'number_of_samples', parseInt(e.target.value) || 1)}
+                      inputProps={{ min: 1 }}
+                    />
+                  </Grid>
+                </Grid>
+                
+                <Typography variant="subtitle1" sx={{ mb: 2, mt: 3, fontWeight: 'bold' }}>
+                  📋 Sample Details
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Sample Type (Legacy)"
                       value={sample.tsample}
                       onChange={(e) => updateSample(index, 'tsample', e.target.value)}
                     />
@@ -675,7 +749,7 @@ const LabRequests: React.FC = () => {
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Sample Name"
+                      label="Sample Name (Legacy)"
                       value={sample.nsample}
                       onChange={(e) => updateSample(index, 'nsample', e.target.value)}
                     />
@@ -683,7 +757,7 @@ const LabRequests: React.FC = () => {
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Sample ID"
+                      label="Sample ID (Legacy)"
                       value={sample.isample}
                       onChange={(e) => updateSample(index, 'isample', e.target.value)}
                     />

@@ -413,13 +413,19 @@ const UnpaidInvoices: React.FC = () => {
           
           ${receiptData.barcode ? `
           <div class="barcode">
-            ${receiptData.barcode}
+            ${receiptData.barcode.includes('<svg') ? 
+              receiptData.barcode : 
+              `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />`
+            }
+            <div style="font-size: 8px; margin-top: 2px;">${receiptData.barcode_text || receiptData.lab_number}</div>
           </div>
           ` : ''}
           
           <div class="footer">
             <p>Thank you for choosing our lab!</p>
-            <p>Visit: ${receiptData.visit_id || 'N/A'}</p>
+            <p>Printed by: ${receiptData.printed_by || 'System'}</p>
+            <p>Printed at: ${receiptData.printed_at || new Date().toLocaleString()}</p>
+            <p>Visit ID: ${receiptData.visit_id || 'N/A'}</p>
           </div>
         </body>
       </html>
@@ -660,7 +666,9 @@ const UnpaidInvoices: React.FC = () => {
         
         <div class="footer">
           <p>Thank you for choosing our lab!</p>
-          <p>Visit: ${receiptData?.visit_id}</p>
+          <p>Processed by: ${receiptData?.processed_by || 'System'}</p>
+          <p>Processed at: ${new Date().toLocaleString()}</p>
+          <p>Visit ID: ${receiptData?.visit_id || 'N/A'}</p>
         </div>
       </body>
     </html>

@@ -34,6 +34,9 @@ import PatientVisits from './pages/erp/PatientVisits';
 import PatientInvoices from './pages/erp/PatientInvoices';
 import Receipts from './pages/erp/Receipts';
 import Expenses from './pages/erp/Expenses';
+import PatientRegistration from './pages/erp/PatientRegistration';
+import PathologyRecordForm from './pages/erp/PathologyRecordForm';
+import PatientDocuments from './pages/erp/PatientDocuments';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -141,6 +144,16 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: '/patient-registration',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <PatientRegistration />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/doctors',
     element: (
       <ProtectedRoute>
@@ -220,6 +233,26 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+          {
+            path: '/reports/:visitId',
+            element: (
+              <ProtectedRoute>
+                <ERPLayout>
+                  <PathologyRecordForm />
+                </ERPLayout>
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: '/documents/:visitId',
+            element: (
+              <ProtectedRoute>
+                <ERPLayout>
+                  <PatientDocuments />
+                </ERPLayout>
+              </ProtectedRoute>
+            ),
+          },
   {
     path: '/barcode-demo',
     element: (

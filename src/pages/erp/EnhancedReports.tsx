@@ -43,8 +43,10 @@ import {
   Send,
   Assessment,
   FilterList,
+  Folder,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -92,6 +94,9 @@ interface EnhancedReport {
   labRequest?: {
     id: number;
     lab_no: string;
+    visit?: {
+      id: number;
+    };
   };
   createdBy?: {
     id: number;
@@ -120,6 +125,7 @@ interface ReportStats {
 
 const EnhancedReports: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [reports, setReports] = useState<EnhancedReport[]>([]);
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +176,7 @@ const EnhancedReports: React.FC = () => {
     const initializeCSRF = async () => {
       try {
         await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF cookie set for Enhanced Reports');
+        // CSRF cookie set for Enhanced Reports
       } catch (error) {
         console.error('Failed to set CSRF cookie:', error);
       }
@@ -191,14 +197,18 @@ const EnhancedReports: React.FC = () => {
       params.append('page', page.toString());
       
       const response = await axios.get(`/api/enhanced-reports?${params}`);
-      setReports(response.data.data.data);
-      setPagination({
-        current_page: response.data.data.current_page,
-        last_page: response.data.data.last_page,
-        per_page: response.data.data.per_page,
-        total: response.data.data.total,
-        from: response.data.data.from,
-        to: response.data.data.to
+      
+      // Use requestAnimationFrame to defer state updates and improve performance
+      requestAnimationFrame(() => {
+        setReports(response.data.data.data);
+        setPagination({
+          current_page: response.data.data.current_page,
+          last_page: response.data.data.last_page,
+          per_page: response.data.data.per_page,
+          total: response.data.data.total,
+          from: response.data.data.from,
+          to: response.data.data.to
+        });
       });
     } catch (error) {
       console.error('Error fetching reports:', error);
@@ -287,7 +297,7 @@ const EnhancedReports: React.FC = () => {
 
   const handlePrintReport = async (reportId: number) => {
     try {
-      console.log('Starting PDF generation for enhanced report:', reportId);
+      // Starting PDF generation for enhanced report
       
       // Show loading toast
       const loadingToast = toast.loading('Generating PDF report...');
@@ -309,9 +319,7 @@ const EnhancedReports: React.FC = () => {
       // Dismiss loading toast
       toast.dismiss(loadingToast);
 
-      console.log('PDF response received:', response);
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
+      // PDF response received successfully
 
       // Create blob URL and open in new tab for preview
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
@@ -685,9 +693,10 @@ const EnhancedReports: React.FC = () => {
                     <TableCell>{report.createdBy?.name || 'N/A'}</TableCell>
                     <TableCell>
                       <Box display="flex" gap={1}>
-                        <Tooltip title="View">
+                        <Tooltip title="View Report">
                           <IconButton
                             size="small"
+                            color="primary"
                             onClick={() => {
                               setSelectedReport(report);
                               setIsViewDialogOpen(true);
@@ -697,48 +706,33 @@ const EnhancedReports: React.FC = () => {
                           </IconButton>
                         </Tooltip>
                         
-                        {report.status === 'draft' && user?.role !== 'staff' && (
-                          <Tooltip title="Submit for Review">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleWorkflowAction(report.id, 'submit-review')}
-                            >
-                              <Send />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        
-                        {report.status === 'under_review' && user?.role === 'admin' && (
-                          <Tooltip title="Approve">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleWorkflowAction(report.id, 'approve')}
-                            >
-                              <Check />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        
-                        <Tooltip title={report.status === 'draft' ? 'Print (Draft reports cannot be printed)' : 'Print Report'}>
+                        <Tooltip title="Documents">
                           <IconButton
                             size="small"
-                            onClick={() => handleWorkflowAction(report.id, 'print')}
-                            disabled={report.status === 'draft'}
+                            color="secondary"
+                            onClick={async () => {
+                              let visitId = report.labRequest?.visit?.id;
+                              
+                              // If visit is not loaded, try to fetch it
+                              if (!visitId && report.lab_request_id) {
+                                try {
+                                  const visitResponse = await axios.get(`/api/lab-requests/${report.lab_request_id}/visit`);
+                                  visitId = visitResponse.data?.id;
+                                } catch (error) {
+                                  console.error('Failed to fetch visit:', error);
+                                }
+                              }
+                              
+                              if (visitId) {
+                                navigate(`/documents/${visitId}`);
+                              } else {
+                                toast.error(`Visit not found for report ${report.id}. Lab Request ID: ${report.lab_request_id || 'N/A'}`);
+                              }
+                            }}
                           >
-                            <Print />
+                            <Folder />
                           </IconButton>
                         </Tooltip>
-                        
-                        {report.status === 'printed' && (
-                          <Tooltip title="Mark as Delivered">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleWorkflowAction(report.id, 'deliver')}
-                            >
-                              <LocalShipping />
-                            </IconButton>
-                          </Tooltip>
-                        )}
                       </Box>
                     </TableCell>
                   </TableRow>

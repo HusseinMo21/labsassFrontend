@@ -42,11 +42,15 @@ import axios from 'axios';
 
 interface Expense {
   id: number;
-  name: string;
+  description: string;
   amount: number;
-  date: string;
-  author: number | { id: number; name: string; email: string; role: string };
-  author_name?: string;
+  category: string;
+  expense_date: string;
+  payment_method?: string;
+  reference_number?: string;
+  notes?: string;
+  created_by: number;
+  author?: { id: number; name: string; email: string; role: string };
   created_at?: string;
   updated_at?: string;
 }
@@ -72,9 +76,13 @@ const Expenses: React.FC = () => {
 
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
+    description: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    category: '',
+    expense_date: new Date().toISOString().split('T')[0],
+    payment_method: '',
+    reference_number: '',
+    notes: '',
   });
 
   useEffect(() => {
@@ -147,9 +155,13 @@ const Expenses: React.FC = () => {
     setSelectedExpense(null);
     setIsEditing(false);
     setFormData({
-      name: '',
+      description: '',
       amount: '',
-      date: new Date().toISOString().split('T')[0],
+      category: '',
+      expense_date: new Date().toISOString().split('T')[0],
+      payment_method: '',
+      reference_number: '',
+      notes: '',
     });
     setShowModal(true);
   };
@@ -158,9 +170,13 @@ const Expenses: React.FC = () => {
     setSelectedExpense(expense);
     setIsEditing(true);
     setFormData({
-      name: expense.name,
+      description: expense.description,
       amount: expense.amount.toString(),
-      date: expense.date,
+      category: expense.category,
+      expense_date: expense.expense_date,
+      payment_method: expense.payment_method || '',
+      reference_number: expense.reference_number || '',
+      notes: expense.notes || '',
     });
     setShowModal(true);
   };
@@ -182,16 +198,20 @@ const Expenses: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.amount || !formData.date) {
+    if (!formData.description.trim() || !formData.amount || !formData.category.trim() || !formData.expense_date) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     try {
       const expenseData = {
-        name: formData.name.trim(),
+        description: formData.description.trim(),
         amount: parseFloat(formData.amount),
-        date: formData.date,
+        category: formData.category.trim(),
+        expense_date: formData.expense_date,
+        payment_method: formData.payment_method.trim() || null,
+        reference_number: formData.reference_number.trim() || null,
+        notes: formData.notes.trim() || null,
       };
 
       if (isEditing && selectedExpense) {
@@ -219,7 +239,11 @@ const Expenses: React.FC = () => {
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString();
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   if (loading && expenses.length === 0) {
@@ -329,7 +353,7 @@ const Expenses: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               fullWidth
-              placeholder="Search by expense name, amount, or author"
+              placeholder="Search by description, category, amount, or author"
               value={searchTerm}
               onChange={(e) => handleSearchInputChange(e.target.value)}
               InputProps={{
@@ -390,7 +414,8 @@ const Expenses: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
+                    <TableCell>Description</TableCell>
+                    <TableCell>Category</TableCell>
                     <TableCell align="right">Amount</TableCell>
                     <TableCell>Date</TableCell>
                     <TableCell>Author</TableCell>
@@ -402,8 +427,16 @@ const Expenses: React.FC = () => {
                     <TableRow key={expense.id} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          {expense.name}
+                          {expense.description}
                         </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={expense.category} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                        />
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="body2" fontWeight="medium" color="error.main">
@@ -414,7 +447,7 @@ const Expenses: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <CalendarToday sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2">
-                            {formatDate(expense.date)}
+                            {formatDate(expense.expense_date)}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -422,9 +455,7 @@ const Expenses: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Person sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2">
-                            {typeof expense.author === 'object' && expense.author?.name 
-                              ? expense.author.name 
-                              : expense.author_name || `User ${expense.author}`}
+                            {expense.author?.name || `User ${expense.created_by}`}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -497,9 +528,17 @@ const Expenses: React.FC = () => {
           <Box sx={{ pt: 2 }}>
             <TextField
               fullWidth
-              label="Expense Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              label="Description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              margin="normal"
+              required
+            />
+            <TextField
+              fullWidth
+              label="Category"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               margin="normal"
               required
             />
@@ -515,13 +554,36 @@ const Expenses: React.FC = () => {
             />
             <TextField
               fullWidth
-              label="Date"
+              label="Expense Date"
               type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              value={formData.expense_date}
+              onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
               margin="normal"
               required
               InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              fullWidth
+              label="Payment Method"
+              value={formData.payment_method}
+              onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+              margin="normal"
+            />
+            <TextField
+              fullWidth
+              label="Reference Number"
+              value={formData.reference_number}
+              onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+              margin="normal"
+            />
+            <TextField
+              fullWidth
+              label="Notes"
+              multiline
+              rows={3}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              margin="normal"
             />
           </Box>
         </DialogContent>

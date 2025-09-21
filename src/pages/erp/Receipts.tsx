@@ -390,7 +390,10 @@ const Receipts: React.FC = () => {
         
         ${receipt.barcode ? `
         <div class="barcode">
-          ${receipt.barcode}
+          ${receipt.barcode.includes('<svg') ? 
+            receipt.barcode : 
+            `<img src="data:image/png;base64,${receipt.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />`
+          }
         </div>
         ` : ''}
         

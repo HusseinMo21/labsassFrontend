@@ -383,14 +383,6 @@ const Patients: React.FC = () => {
         <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
           Patients
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={handleOpen}
-          sx={{ bgcolor: 'primary.main' }}
-        >
-          Add New Patient
-        </Button>
       </Box>
 
       {/* Search and Filters */}
@@ -449,7 +441,7 @@ const Patients: React.FC = () => {
                           new Date(patient.birth_date).toLocaleDateString() : 
                           patient.age ? 
                             `Age: ${patient.age}` : 
-                            'N/A'
+                            '-'
                         }
                       </TableCell>
                       <TableCell>
@@ -461,17 +453,17 @@ const Patients: React.FC = () => {
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <LocationOn fontSize="small" color="action" />
-                          {patient.address}
+                          {patient.address || '-'}
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Person fontSize="small" color="action" />
-                          {patient.doctor_name || patient.sender || 'N/A'}
+                          {patient.doctor_name || patient.sender || '-'}
                         </Box>
                       </TableCell>
                       <TableCell>
-                        {patient.emergency_contact || 'N/A'} 
+                        {patient.emergency_contact || '-'} 
                         {patient.emergency_phone && ` (${patient.emergency_phone})`}
                       </TableCell>
                       <TableCell align="center">

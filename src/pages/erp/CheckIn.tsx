@@ -583,7 +583,10 @@ const CheckIn: React.FC = () => {
         </div>
         
         <div class="barcode">
-          ${receiptData.barcode || ''}
+          ${receiptData.barcode && receiptData.barcode.includes('<svg') ? 
+            receiptData.barcode : 
+            (receiptData.barcode ? `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />` : '')
+          }
         </div>
         
         <div class="footer">
