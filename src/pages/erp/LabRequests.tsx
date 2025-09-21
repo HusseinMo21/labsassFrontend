@@ -946,10 +946,10 @@ const LabRequests: React.FC = () => {
                     <TableBody>
                       {patientDetails.samples.map((sample, index) => (
                         <TableRow key={index}>
-                          <TableCell>{sample.tsample}</TableCell>
-                          <TableCell>{sample.nsample}</TableCell>
-                          <TableCell>{sample.isample}</TableCell>
-                          <TableCell>{sample.notes}</TableCell>
+                          <TableCell>{sample.sample_type || sample.tsample || 'N/A'}</TableCell>
+                          <TableCell>{sample.case_type || sample.nsample || 'N/A'}</TableCell>
+                          <TableCell>{sample.sample_size || sample.isample || 'N/A'}</TableCell>
+                          <TableCell>{sample.notes || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

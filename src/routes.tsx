@@ -37,6 +37,7 @@ import Expenses from './pages/erp/Expenses';
 import PatientRegistration from './pages/erp/PatientRegistration';
 import PathologyRecordForm from './pages/erp/PathologyRecordForm';
 import PatientDocuments from './pages/erp/PatientDocuments';
+import ShiftManagement from './pages/ShiftManagement';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -372,6 +373,17 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <StaffDashboard />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Shift Management
+  {
+    path: '/shift-management',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <ShiftManagement />
         </ERPLayout>
       </ProtectedRoute>
     ),

@@ -38,9 +38,9 @@ import {
   Visibility,
   Edit,
   Check,
+  Send,
   Print,
   LocalShipping,
-  Send,
   Assessment,
   FilterList,
   Folder,
@@ -733,6 +733,29 @@ const EnhancedReports: React.FC = () => {
                             <Folder />
                           </IconButton>
                         </Tooltip>
+
+                        {/* Send to Patient button - only for staff users */}
+                        {user?.role === 'staff' && (report.status === 'completed' || report.status === 'approved' || report.status === 'printed') && (
+                          <Tooltip title="Send to Patient Dashboard">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={async () => {
+                                try {
+                                  await axios.post(`/api/enhanced-reports/${report.id}/send-to-patient`);
+                                  toast.success('Report sent to patient dashboard successfully');
+                                  // Refresh the reports list
+                                  fetchReports();
+                                } catch (error: any) {
+                                  console.error('Failed to send report to patient:', error);
+                                  toast.error(error.response?.data?.message || 'Failed to send report to patient');
+                                }
+                              }}
+                            >
+                              <Send />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>

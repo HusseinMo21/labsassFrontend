@@ -41,10 +41,14 @@ import {
   Assignment,
   QrCodeScanner,
   AttachMoney,
+  Schedule,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import logo from '../assets/logo.jpg';
+import ShiftOpeningDialog from './ShiftOpeningDialog';
+import axios from 'axios';
+import { useEffect } from 'react';
 
 const drawerWidth = 280;
 
@@ -76,6 +80,7 @@ const navigationItems: NavigationItem[] = [
 
   // Staff - Limited access (including Check-In & Billing and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
+  { path: '/shift-management', label: 'Shift Management', icon: <Schedule />, roles: ['staff'] },
   { path: '/patients', label: 'Patients', icon: <People />, roles: ['staff'] },
   { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },
@@ -114,6 +119,8 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [showShiftDialog, setShowShiftDialog] = useState(false);
+  const [hasCheckedShift, setHasCheckedShift] = useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -131,6 +138,32 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     await logout();
     navigate('/login');
     setAnchorEl(null);
+  };
+
+  // Check for active shift when staff user loads the layout
+  useEffect(() => {
+    const checkActiveShift = async () => {
+      if (user?.role === 'staff' && !hasCheckedShift) {
+        try {
+          const response = await axios.get('/api/shifts/current');
+          if (response.data.success && !response.data.data) {
+            // No active shift found, show dialog
+            setShowShiftDialog(true);
+          }
+        } catch (error) {
+          console.error('Failed to check current shift:', error);
+        } finally {
+          setHasCheckedShift(true);
+        }
+      }
+    };
+
+    checkActiveShift();
+  }, [user, hasCheckedShift]);
+
+  const handleShiftOpened = () => {
+    setShowShiftDialog(false);
+    setHasCheckedShift(true);
   };
 
   const getRoleDisplayName = (role: string) => {
@@ -367,6 +400,13 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       >
         {children}
       </Box>
+
+      {/* Shift Opening Dialog for Staff */}
+      <ShiftOpeningDialog
+        open={showShiftDialog}
+        onClose={() => setShowShiftDialog(false)}
+        onShiftOpened={handleShiftOpened}
+      />
     </Box>
   );
 };
