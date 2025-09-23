@@ -10,7 +10,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Chip,
   Alert,
   CircularProgress,
@@ -48,13 +47,11 @@ import {
   Cancel,
   MoreVert,
   Visibility,
-  Edit,
   Delete,
   Add,
   Search,
   FilterList,
   Refresh,
-  QrCode,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-toastify';
@@ -98,7 +95,7 @@ interface Visit {
 }
 
 const Visits: React.FC = () => {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -111,7 +108,7 @@ const Visits: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalVisits, setTotalVisits] = useState(0);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -428,7 +425,7 @@ const Visits: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Search visits"
@@ -449,7 +446,7 @@ const Visits: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <FormControl fullWidth>
                 <InputLabel>Status Filter</InputLabel>
                 <Select
@@ -466,7 +463,7 @@ const Visits: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   variant="outlined"
@@ -483,7 +480,7 @@ const Visits: React.FC = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -500,7 +497,7 @@ const Visits: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -517,7 +514,7 @@ const Visits: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -534,7 +531,7 @@ const Visits: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -544,7 +541,7 @@ const Visits: React.FC = () => {
                   </Typography>
                   <Typography variant="h4">
                     {formatCurrency(visits.reduce((sum, v) => {
-                      const amount = parseFloat(v.final_amount) || 0;
+                      const amount = parseFloat(String(v.final_amount)) || 0;
                       return sum + amount;
                     }, 0))}
       </Typography>
@@ -637,7 +634,7 @@ const Visits: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                          {formatCurrency(parseFloat(visit.final_amount) || 0)}
+                          {formatCurrency(parseFloat(String(visit.final_amount)) || 0)}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
@@ -722,7 +719,7 @@ const Visits: React.FC = () => {
           {selectedVisit && (
             <Box>
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
                     Patient Information
                   </Typography>
@@ -747,7 +744,7 @@ const Visits: React.FC = () => {
                     </ListItem>
                   </List>
                 </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
                     Visit Information
                   </Typography>
@@ -779,7 +776,7 @@ const Visits: React.FC = () => {
                     <ListItem>
                       <ListItemText 
                         primary="Total Amount" 
-                        secondary={formatCurrency(parseFloat(selectedVisit.final_amount) || 0)} 
+                        secondary={formatCurrency(parseFloat(String(selectedVisit.final_amount)) || 0)} 
                       />
                     </ListItem>
                   </List>
@@ -791,23 +788,23 @@ const Visits: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 Tests ({selectedVisit.visitTests?.length || 0})
               </Typography>
-              {(selectedVisit.visitTests || []).map((test, index) => (
+              {(selectedVisit.visitTests || []).map((test) => (
                 <Accordion key={test.id}>
                   <AccordionSummary expandIcon={<ExpandMore />}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
                       <Science />
                       <Typography variant="body1" sx={{ flexGrow: 1 }}>
-                        {test.custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}
+                        {(test as any).custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}
                       </Typography>
                       {getStatusChip(test.status || 'pending')}
                       <Typography variant="body2" color="text.secondary">
-                        {formatCurrency(test.final_price || (test.labTest || test.lab_test)?.price || 0)}
+                        {formatCurrency((test as any).final_price || (test.labTest || test.lab_test)?.price || 0)}
                       </Typography>
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid item xs={12} md={6}>
                         <Typography variant="body2" color="text.secondary">
                           Status: {test.status || 'pending'}
                         </Typography>
@@ -840,5 +837,6 @@ const Visits: React.FC = () => {
 };
 
 export default Visits;
+
 
 

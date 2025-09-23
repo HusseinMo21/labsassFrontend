@@ -24,7 +24,6 @@ import {
   Tooltip,
   Pagination,
   CircularProgress,
-  Divider,
   List,
   ListItem,
   ListItemText,
@@ -230,7 +229,7 @@ const ReviewReports: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 placeholder="Search by visit number, patient name, phone, or patient ID"
@@ -239,7 +238,7 @@ const ReviewReports: React.FC = () => {
                 size="small"
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <TextField
                 select
                 fullWidth
@@ -255,7 +254,7 @@ const ReviewReports: React.FC = () => {
                 <option value="rejected">Rejected</option>
               </TextField>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Button
                 variant="contained"
                 onClick={fetchReports}
@@ -420,7 +419,7 @@ const ReviewReports: React.FC = () => {
             <Box>
               {/* Visit & Patient Info */}
               <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -434,7 +433,7 @@ const ReviewReports: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -614,3 +613,4 @@ const ReviewReports: React.FC = () => {
 };
 
 export default ReviewReports;
+

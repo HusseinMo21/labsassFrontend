@@ -38,7 +38,6 @@ import {
   Person,
   Email,
   AdminPanelSettings,
-  PersonAdd,
   Visibility,
   VisibilityOff,
 } from '@mui/icons-material';
@@ -211,7 +210,10 @@ const Users: React.FC = () => {
     setOpenDialog(true);
   };
 
-  const handleCloseDialog = () => {
+  const handleCloseDialog = (_?: any, reason?: string): React.ReactNode => {
+    if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+      return null;
+    }
     setOpenDialog(false);
     setEditingUser(null);
     setFormData({
@@ -221,6 +223,7 @@ const Users: React.FC = () => {
       password: '',
       is_active: true,
     });
+    return null;
   };
 
   const handleSubmit = async () => {
@@ -471,7 +474,7 @@ const Users: React.FC = () => {
       </Card>
 
       {/* Add/Edit User Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog open={openDialog} onClose={handleCloseDialog as any} maxWidth="sm" fullWidth>
         <DialogTitle>
           {editingUser ? 'Edit User' : 'Add New User'}
         </DialogTitle>
@@ -527,11 +530,11 @@ const Users: React.FC = () => {
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.value as boolean })}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.value === "true" })}
                   label="Status"
                 >
-                  <MenuItem value={true}>Active</MenuItem>
-                  <MenuItem value={false}>Inactive</MenuItem>
+                  <MenuItem value="true">Active</MenuItem>
+                  <MenuItem value="false">Inactive</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -597,5 +600,6 @@ const Users: React.FC = () => {
 };
 
 export default Users;
+
 
 

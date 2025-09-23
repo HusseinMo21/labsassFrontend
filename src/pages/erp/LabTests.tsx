@@ -305,7 +305,7 @@ const LabTests: React.FC = () => {
               <Pagination
                 count={totalPages}
                 page={currentPage}
-                onChange={(event, page) => setCurrentPage(page)}
+                onChange={(_, page) => setCurrentPage(page)}
                 color="primary"
               />
             </Box>
@@ -321,7 +321,7 @@ const LabTests: React.FC = () => {
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Test Name"
@@ -330,7 +330,7 @@ const LabTests: React.FC = () => {
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth required>
                   <InputLabel>Category</InputLabel>
                   <Select
@@ -347,7 +347,7 @@ const LabTests: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Price"
@@ -357,7 +357,7 @@ const LabTests: React.FC = () => {
                   required
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Unit"
@@ -365,7 +365,7 @@ const LabTests: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                 />
               </Grid>
-              <Grid size={{ xs: 12 }}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Description"
@@ -375,7 +375,7 @@ const LabTests: React.FC = () => {
                   rows={2}
                 />
               </Grid>
-              <Grid size={{ xs: 12 }}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Normal Range"
@@ -399,3 +399,4 @@ const LabTests: React.FC = () => {
 };
 
 export default LabTests;
+

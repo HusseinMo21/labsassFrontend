@@ -9,7 +9,6 @@ import {
   CardContent,
   Alert,
   Chip,
-  Divider,
   List,
   ListItem,
   ListItemText,
@@ -22,7 +21,6 @@ import {
   Tabs,
   Tab,
   IconButton,
-  Tooltip,
   Badge,
   CircularProgress,
   Accordion,
@@ -31,10 +29,7 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
-  TableHead,
   TableRow,
-  Fab,
   Stack,
 } from '@mui/material';
 import {
@@ -45,24 +40,12 @@ import {
   CheckCircle,
   Error,
   Receipt,
-  Description,
   History,
-  Refresh,
   Print,
   Visibility,
-  Edit,
-  Delete,
   ExpandMore,
-  Add,
-  Search,
   Clear,
-  Download,
-  Share,
-  LocalHospital,
   Biotech,
-  Assessment,
-  Payment,
-  Schedule,
   AttachMoney,
   Phone,
   Email,
@@ -198,19 +181,19 @@ const BarcodeDemo: React.FC = () => {
     }
   };
 
-  const clearScanResult = () => {
-    setScanResult(null);
-    setError(null);
-  };
+  // const clearScanResult = (): void => {
+  //   setScanResult(null);
+  //   setError(null);
+  // };
 
   const clearHistory = () => {
     setScanHistory([]);
     localStorage.removeItem('barcodeScanHistory');
   };
 
-  const getStatusColor = (success: boolean) => {
-    return success ? 'success' : 'error';
-  };
+  // const getStatusColor = (success: boolean): string => {
+  //   return success ? 'success' : 'error';
+  // };
 
   const getStatusIcon = (success: boolean) => {
     return success ? <CheckCircle /> : <Error />;
@@ -707,11 +690,11 @@ const BarcodeDemo: React.FC = () => {
 
       {/* Tabs */}
       <Paper sx={{ mb: 4 }}>
-        <Tabs 
-          value={currentTab} 
-          onChange={(e, newValue) => setCurrentTab(newValue)}
-          variant="fullWidth"
-        >
+          <Tabs 
+            value={currentTab} 
+            onChange={(_, newValue) => setCurrentTab(newValue)}
+            variant="fullWidth"
+          >
           <Tab 
             label="Scan Results" 
             icon={<CheckCircle />}

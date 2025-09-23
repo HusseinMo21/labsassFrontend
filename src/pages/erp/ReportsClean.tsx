@@ -26,17 +26,10 @@ import {
   MenuItem,
   Grid,
   Alert,
-  CircularProgress,
   IconButton,
   Tooltip,
   Tabs,
   Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Divider,
-  LinearProgress,
   Pagination,
 } from '@mui/material';
 import {
@@ -46,13 +39,10 @@ import {
   Science,
   AttachMoney,
   Description,
-  Edit,
-  Visibility,
   PictureAsPdf,
   Image,
   CloudUpload,
   Refresh,
-  DateRange,
   Search as SearchIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -148,7 +138,7 @@ const Reports: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [patientsData, setPatientsData] = useState<PatientsData | null>(null);
   const [testsData, setTestsData] = useState<TestsData | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
@@ -616,7 +606,7 @@ const Reports: React.FC = () => {
       {/* Report Tabs */}
       <Card>
         <CardContent>
-          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
+          <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
             <Tab label="Visits" />
             <Tab label="Enhanced Reports" />
           </Tabs>
@@ -745,7 +735,7 @@ const Reports: React.FC = () => {
                 <Pagination
                   count={totalPages}
                   page={currentPage}
-                  onChange={(event, page) => setCurrentPage(page)}
+                  onChange={(_, page) => setCurrentPage(page)}
                   color="primary"
                 />
               </Box>
@@ -1002,5 +992,6 @@ const Reports: React.FC = () => {
 };
 
 export default Reports;
+
 
 

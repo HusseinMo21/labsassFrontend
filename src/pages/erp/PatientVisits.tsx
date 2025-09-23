@@ -27,7 +27,6 @@ import {
   CalendarToday,
   ExpandMore,
   Science,
-  AttachMoney,
   CheckCircle,
   Schedule,
   Cancel,
@@ -65,7 +64,7 @@ interface PatientVisit {
 }
 
 const PatientVisits: React.FC = () => {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [visits, setVisits] = useState<PatientVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,7 +162,7 @@ const PatientVisits: React.FC = () => {
         </Card>
       ) : (
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Typography variant="h6" gutterBottom>
               Your Visit History ({visits.length} visits)
             </Typography>
@@ -187,7 +186,7 @@ const PatientVisits: React.FC = () => {
                 </AccordionSummary>
                 <AccordionDetails>
                   <Grid container spacing={3}>
-                    <Grid size={{ xs: 12, md: 6 }}>
+                    <Grid item xs={12} md={6}>
                       <Typography variant="h6" gutterBottom>
                         Visit Information
                       </Typography>
@@ -221,7 +220,7 @@ const PatientVisits: React.FC = () => {
                       </List>
                     </Grid>
                     
-                    <Grid size={{ xs: 12, md: 6 }}>
+                    <Grid item xs={12} md={6}>
                       <Typography variant="h6" gutterBottom>
                         Payment Information
                       </Typography>
@@ -265,7 +264,7 @@ const PatientVisits: React.FC = () => {
                       </List>
                     </Grid>
 
-                    <Grid size={{ xs: 12 }}>
+                    <Grid item xs={12}>
                       <Divider sx={{ my: 2 }} />
                       <Typography variant="h6" gutterBottom>
                         Tests Ordered ({visit.visit_tests.length})
@@ -312,7 +311,7 @@ const PatientVisits: React.FC = () => {
                     </Grid>
 
                     {(visit.clinical_data || visit.microscopic_description || visit.diagnosis || visit.recommendations) && (
-                      <Grid size={{ xs: 12 }}>
+                      <Grid item xs={12}>
                         <Divider sx={{ my: 2 }} />
                         <Typography variant="h6" gutterBottom>
                           Clinical Information
@@ -371,4 +370,5 @@ const PatientVisits: React.FC = () => {
 };
 
 export default PatientVisits;
+
 

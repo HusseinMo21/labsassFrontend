@@ -77,7 +77,7 @@ const StaffDashboard: React.FC = () => {
 
       <Grid container spacing={3}>
         {quickActions.map((action, index) => (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
+          <Grid item xs={12} sm={6} md={4} key={index}>
             <Card
               sx={{
                 height: '100%',
@@ -136,4 +136,5 @@ const StaffDashboard: React.FC = () => {
 };
 
 export default StaffDashboard;
+
 

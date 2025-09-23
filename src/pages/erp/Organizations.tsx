@@ -35,7 +35,6 @@ import {
   Delete,
   WhatsApp,
   Phone,
-  Email,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
@@ -98,7 +97,7 @@ const Organizations: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrganizations, setTotalOrganizations] = useState(0);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
   const itemsPerPage = 15;
   const [formData, setFormData] = useState({
     name: '',
@@ -249,8 +248,8 @@ const Organizations: React.FC = () => {
       fetchOrganizations();
     } catch (error) {
       console.error('Failed to save organization:', error);
-      if (error.response?.data?.errors) {
-        const validationErrors = Object.values(error.response.data.errors).flat();
+      if ((error as any).response?.data?.errors) {
+        const validationErrors = Object.values((error as any).response.data.errors).flat();
         toast.error(`Failed to save: ${validationErrors.join(', ')}`);
       } else {
         toast.error('Failed to save organization');
@@ -463,7 +462,7 @@ const Organizations: React.FC = () => {
               <Pagination
                 count={totalPages}
                 page={currentPage}
-                onChange={(event, page) => setCurrentPage(page)}
+                onChange={(_, page) => setCurrentPage(page)}
                 color="primary"
                 showFirstButton
                 showLastButton
@@ -481,7 +480,7 @@ const Organizations: React.FC = () => {
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12 }}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Organization Name *"
@@ -648,5 +647,6 @@ const Organizations: React.FC = () => {
 };
 
 export default Organizations;
+
 
 

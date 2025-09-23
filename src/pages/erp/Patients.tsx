@@ -29,13 +29,11 @@ import {
   Pagination,
 } from '@mui/material';
 import {
-  Add,
   Edit,
   Delete,
   Search,
   Person,
   Phone,
-  Email,
   LocationOn,
   WhatsApp,
 } from '@mui/icons-material';
@@ -206,8 +204,8 @@ const Patients: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to save patient:', error);
-      if (error.response?.data?.errors) {
-        const validationErrors = Object.values(error.response.data.errors).flat();
+      if ((error as any).response?.data?.errors) {
+        const validationErrors = Object.values((error as any).response.data.errors).flat();
         toast.error(`فشل في الحفظ: ${validationErrors.join(', ')}`);
       } else {
         toast.error('فشل في حفظ بيانات المريض');
@@ -249,12 +247,12 @@ const Patients: React.FC = () => {
       whatsapp_number: patient.whatsapp_number || '',
       sender: patient.sender || patient.doctor_name || '', // Use sender field as doctor name
       // Keep existing fields for compatibility
-      birth_date: patient.birth_date,
+      birth_date: patient.birth_date || '',
       address: patient.address,
-      emergency_contact: patient.emergency_contact,
-      emergency_phone: patient.emergency_phone,
-      medical_history: patient.medical_history,
-      allergies: patient.allergies,
+      emergency_contact: patient.emergency_contact || '',
+      emergency_phone: patient.emergency_phone || '',
+      medical_history: patient.medical_history || '',
+      allergies: patient.allergies || '',
     });
     setOpen(true);
   };
@@ -282,11 +280,11 @@ const Patients: React.FC = () => {
     });
   };
 
-  const handleOpen = () => {
-    resetForm();
-    setEditingPatient(null);
-    setOpen(true);
-  };
+  // const handleOpen = (): void => {
+  //   resetForm();
+  //   setEditingPatient(null);
+  //   setOpen(true);
+  // };
 
   const handleClose = () => {
     setOpen(false);
@@ -313,7 +311,7 @@ const Patients: React.FC = () => {
         if (response.data.deleted_data) {
           const deletedData = response.data.deleted_data;
           const summary = Object.entries(deletedData)
-            .filter(([_, count]) => count > 0)
+            .filter(([_, count]) => (count as any) > 0)
             .map(([key, count]) => `${count} ${key}`)
             .join(', ');
           
@@ -497,7 +495,7 @@ const Patients: React.FC = () => {
               <Pagination
                 count={totalPages}
                 page={currentPage}
-                onChange={(event, page) => setCurrentPage(page)}
+                onChange={(_, page) => setCurrentPage(page)}
                 color="primary"
               />
             </Box>
@@ -514,7 +512,7 @@ const Patients: React.FC = () => {
           <DialogContent>
             <Grid container spacing={3}>
               {/* الاسم */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="الاسم *"
@@ -526,7 +524,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* الدكتور */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="الدكتور (اسم المرسل)"
@@ -538,7 +536,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* النوع */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth required>
                   <InputLabel>النوع *</InputLabel>
                   <Select
@@ -553,7 +551,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* السن */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="السن"
@@ -565,7 +563,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* العنوان المطلوب */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="العنوان (مطلوب) *"
@@ -579,7 +577,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* العنوان الاختياري */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="العنوان (اختياري)"
@@ -592,7 +590,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* الجهة */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="الجهة"
@@ -603,7 +601,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* الحالة */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="الحالة"
@@ -614,7 +612,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* رقم التليفون */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="رقم التليفون *"
@@ -625,7 +623,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* رقم الواتساب */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="رقم الواتساب (اختياري)"
@@ -639,7 +637,7 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* Additional fields for compatibility */}
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Birth Date (for system compatibility)"
@@ -776,3 +774,4 @@ const Patients: React.FC = () => {
 };
 
 export default Patients;
+

@@ -16,7 +16,6 @@ import {
   Alert,
   CircularProgress,
   IconButton,
-  Tooltip,
   Paper,
   Divider,
   Chip,
@@ -78,7 +77,7 @@ interface Visit {
 const ReportForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { } = useAuth();
   const [visit, setVisit] = useState<Visit | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -212,12 +211,12 @@ const ReportForm: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('clinical_data', testFormData.clinical_data);
-      formData.append('specimen_information', testFormData.specimen_information);
-      formData.append('gross_examination', testFormData.gross_examination);
-      formData.append('microscopic_description', testFormData.microscopic_description);
-      formData.append('diagnosis', testFormData.diagnosis);
+      formData.append('specimen_information', (testFormData as any).specimen_information);
+      formData.append('gross_examination', (testFormData as any).gross_examination);
+      formData.append('microscopic_description', (testFormData as any).microscopic_description);
+      formData.append('diagnosis', (testFormData as any).diagnosis);
       formData.append('recommendations', testFormData.recommendations);
-      formData.append('referred_doctor', testFormData.referred_doctor);
+      formData.append('referred_doctor', (testFormData as any).referred_doctor);
       formData.append('test_status', testFormData.test_status);
       
       if (testFormData.image) {
@@ -406,7 +405,7 @@ const ReportForm: React.FC = () => {
                   label="Specimen Information"
                   multiline
                   rows={2}
-                  value={testFormData.specimen_information}
+                  value={(testFormData as any).specimen_information}
                   onChange={(e) => handleInputChange('specimen_information', e.target.value)}
                   sx={{ mb: 2 }}
                 />
@@ -417,7 +416,7 @@ const ReportForm: React.FC = () => {
                   label="Gross Examination"
                   multiline
                   rows={3}
-                  value={testFormData.gross_examination}
+                  value={(testFormData as any).gross_examination}
                   onChange={(e) => handleInputChange('gross_examination', e.target.value)}
                   sx={{ mb: 2 }}
                 />
@@ -428,7 +427,7 @@ const ReportForm: React.FC = () => {
                   label="Microscopic Description"
                   multiline
                   rows={3}
-                  value={testFormData.microscopic_description}
+                  value={(testFormData as any).microscopic_description}
                   onChange={(e) => handleInputChange('microscopic_description', e.target.value)}
                   sx={{ mb: 2 }}
                 />
@@ -439,7 +438,7 @@ const ReportForm: React.FC = () => {
                   label="Diagnosis"
                   multiline
                   rows={2}
-                  value={testFormData.diagnosis}
+                  value={(testFormData as any).diagnosis}
                   onChange={(e) => handleInputChange('diagnosis', e.target.value)}
                   sx={{ mb: 2 }}
                 />
@@ -459,7 +458,7 @@ const ReportForm: React.FC = () => {
                 <TextField
                   fullWidth
                   label="Referred Doctor"
-                  value={testFormData.referred_doctor}
+                  value={(testFormData as any).referred_doctor}
                   onChange={(e) => handleInputChange('referred_doctor', e.target.value)}
                   sx={{ mb: 2 }}
                 />
@@ -531,3 +530,4 @@ const ReportForm: React.FC = () => {
 };
 
 export default ReportForm;
+

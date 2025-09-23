@@ -14,7 +14,6 @@ import {
   Assessment,
   CalendarToday,
   Receipt,
-  Payment,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -96,7 +95,7 @@ const PatientDashboard: React.FC = () => {
 
       <Grid container spacing={3}>
         {quickActions.map((action, index) => (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
+          <Grid item xs={12} sm={6} md={4} key={index}>
             <Card
               sx={{
                 height: '100%',

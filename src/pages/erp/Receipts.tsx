@@ -32,7 +32,6 @@ import {
   Visibility,
   Print,
   Refresh,
-  Download,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -76,7 +75,7 @@ interface Receipt {
 }
 
 const Receipts: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,7 +84,7 @@ const Receipts: React.FC = () => {
   const [printOpen, setPrintOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
@@ -348,8 +347,8 @@ const Receipts: React.FC = () => {
           <h3>TESTS (${receipt.visitTests?.length || 0})</h3>
           ${(receipt.visitTests || []).map((test) => `
             <div class="test-item">
-              <span class="test-name">${test.custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</span>
-              <span class="test-price">${formatCurrency(test.final_price || (test.labTest || test.lab_test)?.price || 0)}</span>
+              <span class="test-name">${(test as any).custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</span>
+              <span class="test-price">${formatCurrency((test as any).final_price || (test.labTest || test.lab_test)?.price || 0)}</span>
             </div>
           `).join('')}
         </div>
@@ -615,7 +614,7 @@ const Receipts: React.FC = () => {
               <Pagination
                 count={totalPages}
                 page={currentPage}
-                onChange={(event, page) => setCurrentPage(page)}
+                onChange={(_, page) => setCurrentPage(page)}
                 color="primary"
                 showFirstButton
                 showLastButton
@@ -667,8 +666,8 @@ const Receipts: React.FC = () => {
                     <TableBody>
                       {(selectedReceipt.visitTests || []).map((test) => (
                         <TableRow key={test.id}>
-                          <TableCell>{test.custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</TableCell>
-                          <TableCell>{formatCurrency(test.final_price || (test.labTest || test.lab_test)?.price || 0)}</TableCell>
+                          <TableCell>{(test as any).custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</TableCell>
+                          <TableCell>{formatCurrency((test as any).final_price || (test.labTest || test.lab_test)?.price || 0)}</TableCell>
                           <TableCell>{getStatusChip(test.status)}</TableCell>
                         </TableRow>
                       ))}
@@ -776,3 +775,4 @@ const Receipts: React.FC = () => {
 };
 
 export default Receipts;
+

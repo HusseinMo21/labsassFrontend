@@ -58,7 +58,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   const [scanResult, setScanResult] = useState<BarcodeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scanTimeoutRef = useRef<number | null>(null);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -123,11 +123,11 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   };
 
   // Handle manual scan trigger
-  const handleScanClick = () => {
-    if (barcode.trim()) {
-      processBarcode(barcode);
-    }
-  };
+  // const handleScanClick = () => {
+  //   if (barcode.trim()) {
+  //     processBarcode(barcode);
+  //   }
+  // };
 
   // Clear the input
   const handleClear = () => {
@@ -243,6 +243,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
 };
 
 export default BarcodeScanner;
+
 
 
 

@@ -10,12 +10,10 @@ import {
   Tabs,
   Tab,
   Container,
-  Paper,
   Avatar,
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import Navbar from '../../components/Navbar';
 
 const Login: React.FC = () => {
@@ -61,7 +59,7 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: string) => {
     setLoginType(newValue);
     setFormData(prev => ({ ...prev, login: '' }));
     setError('');
@@ -210,3 +208,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+

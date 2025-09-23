@@ -5,31 +5,21 @@ import TemplateSaveModal from '../../components/TemplateSaveModal';
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
   Button,
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Grid,
   Alert,
   CircularProgress,
   IconButton,
-  Tooltip,
   Paper,
-  Divider,
   Chip,
 } from '@mui/material';
 import {
   ArrowBack,
-  Save,
   CloudUpload,
-  Person,
-  CalendarToday,
-  Science,
-  Description,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -94,7 +84,7 @@ interface Visit {
 const PathologyRecordForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [visit, setVisit] = useState<Visit | null>(null);
@@ -156,7 +146,7 @@ const PathologyRecordForm: React.FC = () => {
       setFormData({
         // Patient Information
         patient_name: visitData.patient?.name || '',
-        referred_by: reportData.referred_by || visitData.patient?.doctor_id || '',
+        referred_by: (reportData as any).referred_by || visitData.patient?.doctor_id || '',
         lab_no: visitData.lab_number || visitData.labRequest?.full_lab_no || '',
         date: visitData.visit_date ? visitData.visit_date.split('T')[0] : '',
         age: visitData.patient?.age || '',
@@ -165,15 +155,15 @@ const PathologyRecordForm: React.FC = () => {
         discharge_date: '',
         
         // Pathology Details
-        clinical_data: reportData.clinical_data || '',
-        nature_of_specimen: reportData.nature_of_specimen || '',
-        gross_pathology: reportData.gross_pathology || '',
-        microscopic_examination: reportData.microscopic_examination || '',
-        conclusion: reportData.conclusion || '',
-        recommendations: reportData.recommendations || '',
+        clinical_data: (reportData as any).clinical_data || '',
+        nature_of_specimen: (reportData as any).nature_of_specimen || '',
+        gross_pathology: (reportData as any).gross_pathology || '',
+        microscopic_examination: (reportData as any).microscopic_examination || '',
+        conclusion: (reportData as any).conclusion || '',
+        recommendations: (reportData as any).recommendations || '',
         
         // Document Type
-        type_of_analysis: reportData.type_of_analysis || 'Pathology',
+        type_of_analysis: (reportData as any).type_of_analysis || 'Pathology',
         test_status: visitData.test_status || 'pending',
         image: null,
       });
@@ -285,7 +275,7 @@ const PathologyRecordForm: React.FC = () => {
         formDataToSend.append('image', formData.image);
       }
 
-      const response = await axios.post(`/api/visits/${visitId}/report`, formDataToSend, {
+      await axios.post(`/api/visits/${visitId}/report`, formDataToSend, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -655,3 +645,4 @@ const PathologyRecordForm: React.FC = () => {
 };
 
 export default PathologyRecordForm;
+

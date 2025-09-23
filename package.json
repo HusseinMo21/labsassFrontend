@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "env:dev": "node scripts/switch-env.cjs dev",
+    "env:prod": "node scripts/switch-env.cjs prod",
+    "env:status": "node scripts/switch-env.cjs status",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -13,8 +16,8 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@gsap/react": "^2.1.2",
-    "@mui/icons-material": "^7.3.1",
-    "@mui/material": "^7.3.2",
+    "@mui/icons-material": "^5.18.0",
+    "@mui/material": "^5.18.0",
     "@mui/x-charts": "^8.11.2",
     "@tailwindcss/vite": "^4.1.11",
     "axios": "^1.11.0",

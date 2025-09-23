@@ -33,7 +33,7 @@ const BarcodeInput: React.FC<BarcodeInputProps> = ({
 }) => {
   const [barcode, setBarcode] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scanTimeoutRef = useRef<number | null>(null);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -116,6 +116,7 @@ const BarcodeInput: React.FC<BarcodeInputProps> = ({
 };
 
 export default BarcodeInput;
+
 
 
 

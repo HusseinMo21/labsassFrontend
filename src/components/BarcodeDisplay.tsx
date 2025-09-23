@@ -35,7 +35,7 @@ const BarcodeDisplay: React.FC<BarcodeDisplayProps> = ({
     <div className={`barcode-display barcode ${className}`}>
       <Barcode
         value={value}
-        format={format}
+        format={format as any}
         width={width / value.length}
         height={height}
         displayValue={true}
@@ -47,3 +47,4 @@ const BarcodeDisplay: React.FC<BarcodeDisplayProps> = ({
 };
 
 export default BarcodeDisplay;
+

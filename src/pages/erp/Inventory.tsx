@@ -31,25 +31,6 @@ import {
   Fab,
   Tabs,
   Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Divider,
-  LinearProgress,
-  Badge,
-  Autocomplete,
-  Switch,
-  FormControlLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  Breadcrumbs,
-  Link,
 } from '@mui/material';
 import {
   Add,
@@ -63,145 +44,34 @@ import {
   CheckCircle,
   Schedule,
   TrendingUp,
-  TrendingDown,
   Refresh,
   Download,
   Upload,
   Science,
-  LocalHospital,
-  Biotech,
-  ExpandMore,
   Category,
   LocalShipping,
   Assessment,
   Print,
-  QrCode,
-  Visibility,
-  VisibilityOff,
-  Person,
-  Phone,
-  Email,
-  LocationOn,
   AttachMoney,
-  Timeline,
-  History,
   Settings,
   Analytics,
   Notifications,
   Info,
-  Check,
-  Close,
-  Save,
-  Cancel,
-  AddCircle,
-  RemoveCircle,
-  ContentCopy,
   Share,
   GetApp,
   CloudUpload,
-  CloudDownload,
-  Sync,
-  Image,
-  Build,
-  Engineering,
-  MedicalServices,
-  Psychology,
-  Biotech as BiotechIcon,
-  LocalPharmacy,
-  Healing,
-  Coronavirus,
-  Bloodtype,
-  MonitorHeart,
-  Thermostat,
-  WaterDrop,
-  ScatterPlot,
-  Timeline as TimelineIcon,
-  TrendingFlat,
-  Security,
-  Verified,
-  VerifiedUser,
-  Shield,
-  Lock,
-  LockOpen,
-  Key,
-  VpnKey,
-  Fingerprint,
-  Face,
-  PersonPin,
-  ContactPhone,
-  ContactMail,
-  ContactSupport,
-  Help,
-  HelpOutline,
-  QuestionAnswer,
-  Quiz,
-  School,
-  Book,
-  LibraryBooks,
-  MenuBook,
-  Article,
-  Description,
-  Note,
-  Notes,
-  StickyNote2,
-  TextSnippet,
-  FileCopy,
-  FileDownload,
-  FileUpload,
-  Folder,
-  FolderOpen,
-  FolderShared,
-  Cloud,
-  CloudQueue,
-  CloudDone,
-  CloudOff,
-  CloudSync,
-  CloudCircle,
-  WbSunny,
-  Brightness4,
-  Brightness7,
-  DarkMode,
-  LightMode,
-  Palette,
-  ColorLens,
-  Brush,
-  FormatColorFill,
-  FormatColorText,
-  FormatColorReset,
-  FormatBold,
-  FormatItalic,
-  FormatUnderlined,
-  FormatStrikethrough,
-  FormatAlignLeft,
-  FormatAlignCenter,
-  FormatAlignRight,
-  FormatAlignJustify,
-  FormatListBulleted,
-  FormatListNumbered,
-  FormatIndentIncrease,
-  FormatIndentDecrease,
-  FormatLineSpacing,
-  FormatSize,
-  VerticalAlignTop,
-  VerticalAlignCenter,
-  VerticalAlignBottom,
-  HorizontalRule,
-  BorderAll,
-  BorderClear,
-  BorderOuter,
-  BorderInner,
-  BorderTop,
-  BorderBottom,
-  BorderLeft,
-  BorderRight,
-  BorderStyle,
-  BorderColor,
-  TableChart,
-  TableRows,
   TableView,
   GridView,
-  ViewList,
   ViewModule,
+  LocalPharmacy,
+  Engineering,
+  MedicalServices,
+  Biotech as BiotechIcon,
+  Coronavirus,
+  Close,
+  Visibility,
+  Image as ImageIcon,
+  Save,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -282,7 +152,7 @@ interface InventoryAlert {
 const Inventory: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [stats, setStats] = useState<InventoryStats | null>(null);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [, setSuppliers] = useState<Supplier[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -708,10 +578,10 @@ const Inventory: React.FC = () => {
     return diffDays;
   };
 
-  const isExpiringSoon = (expiryDate: string, daysThreshold: number = 30) => {
-    const days = getDaysUntilExpiry(expiryDate);
-    return days !== null && days <= daysThreshold && days > 0;
-  };
+  // const isExpiringSoon = (expiryDate: string, daysThreshold: number = 30) => {
+  //   const days = getDaysUntilExpiry(expiryDate);
+  //   return days !== null && days <= daysThreshold && days > 0;
+  // };
 
   const getExpiryStatus = (expiryDate: string) => {
     const days = getDaysUntilExpiry(expiryDate);
@@ -801,7 +671,7 @@ const Inventory: React.FC = () => {
     return (
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {statCards.map((stat, index) => (
-          <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={index}>
+          <Grid item xs={12} sm={6} md={2} key={index}>
             <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -1343,7 +1213,7 @@ const Inventory: React.FC = () => {
         </Box>
       </Box>
 
-      <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
+      <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
         <Tab label="Overview" icon={<Assessment />} />
         <Tab label="Inventory" icon={<InventoryIcon />} />
         <Tab label="Alerts" icon={<Notifications />} />
@@ -1387,8 +1257,8 @@ const Inventory: React.FC = () => {
                   {(alerts || []).map((alert, index) => (
                     <Alert 
                       key={index}
-                      severity={alert.severity}
-                      icon={alert.icon}
+                      severity={(alert as any).severity}
+                      icon={(alert as any).icon}
                       action={
                         <Button 
                           color="inherit" 
@@ -1403,7 +1273,7 @@ const Inventory: React.FC = () => {
                       }
                     >
                       <Typography variant="subtitle2" fontWeight="bold">
-                        {alert.title}
+                        {(alert as any).title}
                       </Typography>
                       <Typography variant="body2">
                         {alert.message}
@@ -1520,7 +1390,7 @@ const Inventory: React.FC = () => {
                               <Chip 
                                 label={count} 
                                 size="small" 
-                                color={getCategoryColor(category)}
+                                color={getCategoryColor(category) as any}
                               />
                             </Box>
                           ))}
@@ -1557,7 +1427,7 @@ const Inventory: React.FC = () => {
                         </Button>
                         <Button
                           variant="outlined"
-                          startIcon={<Image />}
+                           startIcon={<ImageIcon />}
                           onClick={() => {
                             toast.info('Image upload feature is ready for lab results!');
                           }}
@@ -1635,13 +1505,13 @@ const Inventory: React.FC = () => {
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* Basic Information */}
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <Typography variant="h6" gutterBottom sx={{ borderBottom: 1, borderColor: 'divider', pb: 1 }}>
                 Basic Information
               </Typography>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Item Name"
@@ -1652,7 +1522,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth required>
                 <InputLabel>Category</InputLabel>
                 <Select
@@ -1671,7 +1541,7 @@ const Inventory: React.FC = () => {
               </FormControl>
             </Grid>
             
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Description"
@@ -1684,13 +1554,13 @@ const Inventory: React.FC = () => {
             </Grid>
 
             {/* Quantity and Pricing */}
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <Typography variant="h6" gutterBottom sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mt: 2 }}>
                 Quantity and Pricing
               </Typography>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
                 label="Current Quantity"
@@ -1702,7 +1572,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
                 label="Unit"
@@ -1713,7 +1583,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 4 }}>
+            <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
                 label="Minimum Quantity"
@@ -1726,19 +1596,18 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Unit Price (EGP)"
                 type="number"
-                step="0.01"
                 value={formData.unit_price}
                 onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                inputProps={{ min: 0 }}
+                inputProps={{ step: "0.01", min: 0 }}
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Supplier"
@@ -1749,13 +1618,13 @@ const Inventory: React.FC = () => {
             </Grid>
 
             {/* Laboratory Specific Information */}
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <Typography variant="h6" gutterBottom sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mt: 2 }}>
                 Laboratory Information
               </Typography>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Batch Number"
@@ -1765,7 +1634,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Lot Number"
@@ -1775,7 +1644,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Storage Conditions"
@@ -1785,7 +1654,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Temperature Range"
@@ -1795,7 +1664,7 @@ const Inventory: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>Hazard Level</InputLabel>
                 <Select
@@ -1811,7 +1680,7 @@ const Inventory: React.FC = () => {
               </FormControl>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Expiry Date"
@@ -1887,7 +1756,7 @@ const Inventory: React.FC = () => {
             </Typography>
           </Box>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="New Quantity"
@@ -1898,19 +1767,18 @@ const Inventory: React.FC = () => {
                 helperText="Leave empty to keep current"
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="New Unit Price (EGP)"
                 type="number"
-                step="0.01"
                 value={bulkUpdateData.unit_price}
                 onChange={(e) => setBulkUpdateData({ ...bulkUpdateData, unit_price: e.target.value })}
-                inputProps={{ min: 0 }}
+                inputProps={{ step: "0.01", min: 0 }}
                 helperText="Leave empty to keep current"
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="New Supplier"
@@ -2005,7 +1873,7 @@ const Inventory: React.FC = () => {
                         <Typography variant="body2" color="text.secondary">Category</Typography>
                         <Chip 
                           label={selectedItem.category} 
-                          color={getCategoryColor(selectedItem.category)}
+                          color={getCategoryColor(selectedItem.category) as any}
                           size="small"
                           icon={getCategoryIcon(selectedItem.category)}
                         />
@@ -2084,7 +1952,7 @@ const Inventory: React.FC = () => {
                         <Typography variant="body2" color="text.secondary">Hazard Level</Typography>
                         <Chip 
                           label={selectedItem.hazard_level || 'Low'} 
-                          color={getHazardLevelColor(selectedItem.hazard_level || 'low')}
+                          color={getHazardLevelColor(selectedItem.hazard_level || 'low') as any}
                           size="small"
                         />
                       </Box>

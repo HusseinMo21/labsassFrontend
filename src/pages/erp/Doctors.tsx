@@ -35,7 +35,6 @@ import {
   Delete,
   WhatsApp,
   Phone,
-  Email,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
@@ -98,7 +97,7 @@ const Doctors: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalDoctors, setTotalDoctors] = useState(0);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
   const itemsPerPage = 15;
   const [formData, setFormData] = useState({
     name: '',
@@ -202,7 +201,7 @@ const Doctors: React.FC = () => {
               totalPaid,
               totalTests,
               labNumbers,
-              visitDetails: detailedPatient.visits?.map(v => ({
+              visitDetails: detailedPatient.visits?.map((v: any) => ({
                 id: v.id,
                 visitTests: v.visit_tests?.length,
                 labRequest: v.lab_request?.lab_no,
@@ -263,8 +262,8 @@ const Doctors: React.FC = () => {
       fetchDoctors();
     } catch (error) {
       console.error('Failed to save doctor:', error);
-      if (error.response?.data?.errors) {
-        const validationErrors = Object.values(error.response.data.errors).flat();
+      if ((error as any).response?.data?.errors) {
+        const validationErrors = Object.values((error as any).response.data.errors).flat();
         toast.error(`Failed to save: ${validationErrors.join(', ')}`);
       } else {
         toast.error('Failed to save doctor');
@@ -477,7 +476,7 @@ const Doctors: React.FC = () => {
               <Pagination
                 count={totalPages}
                 page={currentPage}
-                onChange={(event, page) => setCurrentPage(page)}
+                onChange={(_, page) => setCurrentPage(page)}
                 color="primary"
                 showFirstButton
                 showLastButton
@@ -495,7 +494,7 @@ const Doctors: React.FC = () => {
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12 }}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Doctor Name *"
@@ -662,5 +661,6 @@ const Doctors: React.FC = () => {
 };
 
 export default Doctors;
+
 
 

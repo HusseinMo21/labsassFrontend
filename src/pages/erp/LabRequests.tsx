@@ -11,7 +11,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Chip,
   IconButton,
   Dialog,
@@ -26,7 +25,6 @@ import {
   Grid,
   Alert,
   CircularProgress,
-  Fab,
   Tooltip,
   Pagination,
   Stack,
@@ -35,8 +33,6 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  QrCode as QrCodeIcon,
-  QrCodeScanner as BarcodeIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
   Visibility as ViewIcon,
@@ -324,7 +320,7 @@ const LabRequests: React.FC = () => {
 
   const handleCreateLabRequest = async () => {
     try {
-      const response = await axios.post('/api/lab-requests', formData);
+      await axios.post('/api/lab-requests', formData);
       toast.success('Lab request created successfully');
       setOpenDialog(false);
       resetForm();
@@ -336,16 +332,16 @@ const LabRequests: React.FC = () => {
     }
   };
 
-  const handleUpdateStatus = async (id: number, status: string) => {
-    try {
-      await axios.put(`/api/lab-requests/${id}`, { status });
-      toast.success('Status updated successfully');
-      fetchLabRequests(currentPage);
-    } catch (error: any) {
-      console.error('Error updating status:', error);
-      toast.error(error.response?.data?.message || 'Failed to update status');
-    }
-  };
+  // const handleUpdateStatus = async (id: number, status: string) => {
+  //   try {
+  //     await axios.put(`/api/lab-requests/${id}`, { status });
+  //     toast.success('Status updated successfully');
+  //     fetchLabRequests(currentPage);
+  //   } catch (error: any) {
+  //     console.error('Error updating status:', error);
+  //     toast.error(error.response?.data?.message || 'Failed to update status');
+  //   }
+  // };
 
   const handleUpdateSuffix = async () => {
     if (!selectedLabRequest) return;
@@ -434,7 +430,7 @@ const LabRequests: React.FC = () => {
   };
 
   // Pagination handlers
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
     setCurrentPage(page);
     fetchLabRequests(page);
   };
@@ -728,7 +724,7 @@ const LabRequests: React.FC = () => {
                       type="number"
                       label="🔢 عدد العينات (Number of Samples)"
                       value={sample.number_of_samples}
-                      onChange={(e) => updateSample(index, 'number_of_samples', parseInt(e.target.value) || 1)}
+                      onChange={(e) => updateSample(index, 'number_of_samples', String(parseInt(String(e.target.value)) || 1))}
                       inputProps={{ min: 1 }}
                     />
                   </Grid>
@@ -1219,3 +1215,4 @@ const LabRequests: React.FC = () => {
 };
 
 export default LabRequests;
+

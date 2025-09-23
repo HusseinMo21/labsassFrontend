@@ -63,23 +63,24 @@ interface UserCredentials {
 
 const PatientRegistration: React.FC = () => {
   const [formData, setFormData] = useState<Patient>({
+    id: 0,
     name: '',
     phone: '',
-    age: '',
+    age: 0,
     gender: '',
     organization: '',
     doctor: '',
     sample_type: '',
     case_type: '',
     sample_size: '',
-    number_of_samples: '',
+    number_of_samples: 0,
     day_of_week: '',
     medical_history: '',
     previous_tests: '',
     attendance_date: '',
     delivery_date: '',
-    total_amount: '',
-    amount_paid: '',
+    total_amount: 0,
+    amount_paid: 0,
     lab_number: '',
   });
 
@@ -89,7 +90,7 @@ const PatientRegistration: React.FC = () => {
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [, setSelectedPatient] = useState<Patient | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<{
     labNumber: string;
@@ -161,23 +162,24 @@ const PatientRegistration: React.FC = () => {
   const handleSelectPatient = (patient: Patient) => {
     setSelectedPatient(patient);
     setFormData({
+      id: patient.id || 0,
       name: patient.name || '',
       phone: patient.phone || '',
-      age: patient.age?.toString() || '',
+      age: patient.age || 0,
       gender: patient.gender || '',
       organization: patient.organization || '',
       doctor: patient.doctor || '',
       sample_type: patient.sample_type || '',
       case_type: patient.case_type || '',
       sample_size: patient.sample_size || '',
-      number_of_samples: patient.number_of_samples?.toString() || '',
+      number_of_samples: patient.number_of_samples || 0,
       day_of_week: patient.day_of_week || '',
       medical_history: patient.medical_history || '',
       previous_tests: patient.previous_tests || '',
       attendance_date: patient.attendance_date || '',
       delivery_date: patient.delivery_date || '',
-      total_amount: patient.total_amount?.toString() || '',
-      amount_paid: patient.amount_paid?.toString() || '',
+      total_amount: patient.total_amount || 0,
+      amount_paid: patient.amount_paid || 0,
       lab_number: patient.lab_number || patient.lab || '',
     });
     setSearchResults([]);
@@ -208,23 +210,24 @@ const PatientRegistration: React.FC = () => {
         
         // Reset form
         setFormData({
+          id: 0,
           name: '',
           phone: '',
-          age: '',
+          age: 0,
           gender: '',
           organization: '',
           doctor: '',
           sample_type: '',
           case_type: '',
           sample_size: '',
-          number_of_samples: '',
+          number_of_samples: 0,
           day_of_week: '',
           medical_history: '',
           previous_tests: '',
           attendance_date: '',
           delivery_date: '',
-          total_amount: '',
-          amount_paid: '',
+          total_amount: 0,
+          amount_paid: 0,
           lab_number: '',
         });
         setSelectedPatient(null);
@@ -268,23 +271,24 @@ const PatientRegistration: React.FC = () => {
 
   const handleClear = () => {
     setFormData({
+      id: 0,
       name: '',
       phone: '',
-      age: '',
+      age: 0,
       gender: '',
       organization: '',
       doctor: '',
       sample_type: '',
       case_type: '',
       sample_size: '',
-      number_of_samples: '',
+      number_of_samples: 0,
       day_of_week: '',
       medical_history: '',
       previous_tests: '',
       attendance_date: '',
       delivery_date: '',
-      total_amount: '',
-      amount_paid: '',
+      total_amount: 0,
+      amount_paid: 0,
       lab_number: '',
     });
     setSelectedPatient(null);
@@ -1412,3 +1416,4 @@ const PatientRegistration: React.FC = () => {
 };
 
 export default PatientRegistration;
+

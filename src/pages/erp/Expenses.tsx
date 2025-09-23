@@ -18,7 +18,6 @@ import {
   Button,
   TextField,
   IconButton,
-  Alert,
   CircularProgress,
   Chip,
   Pagination,
@@ -72,7 +71,7 @@ const Expenses: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState<ExpenseStats | null>(null);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -493,7 +492,7 @@ const Expenses: React.FC = () => {
                 <Pagination
                   count={totalPages}
                   page={currentPage}
-                  onChange={(event, page) => setCurrentPage(page)}
+                  onChange={(_, page) => setCurrentPage(page)}
                   color="primary"
                   showFirstButton
                   showLastButton
@@ -601,3 +600,4 @@ const Expenses: React.FC = () => {
 };
 
 export default Expenses;
+

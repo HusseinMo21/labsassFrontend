@@ -17,10 +17,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Chip,
   IconButton,
   Alert,
@@ -38,9 +34,6 @@ import {
   Receipt,
   Visibility,
   PictureAsPdf,
-  Print,
-  Edit,
-  Download,
   Refresh,
   Search,
 } from '@mui/icons-material';
@@ -90,7 +83,7 @@ const Invoices: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
 
   useEffect(() => {
     fetchInvoices();
@@ -479,7 +472,7 @@ const Invoices: React.FC = () => {
                 <Pagination
                   count={totalPages}
                   page={currentPage}
-                  onChange={(event, page) => setCurrentPage(page)}
+                  onChange={(_, page) => setCurrentPage(page)}
                   color="primary"
                   showFirstButton
                   showLastButton
@@ -501,7 +494,7 @@ const Invoices: React.FC = () => {
         <DialogContent>
           {selectedInvoice && (
             <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
                   Invoice Information
                 </Typography>
@@ -545,7 +538,7 @@ const Invoices: React.FC = () => {
                 </List>
               </Grid>
               
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
                   Financial Information
                 </Typography>
@@ -604,7 +597,7 @@ const Invoices: React.FC = () => {
                 </List>
               </Grid>
 
-              <Grid size={{ xs: 12 }}>
+              <Grid item xs={12}>
                 <Divider sx={{ my: 2 }} />
                 <Typography variant="h6" gutterBottom>
                   Payment History

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, Collapse, IconButton } from '@mui/material';
-import { Close, Info } from '@mui/icons-material';
+import { Close } from '@mui/icons-material';
 
 const DevNotice: React.FC = () => {
   const [show, setShow] = useState(false);
@@ -56,6 +56,7 @@ const DevNotice: React.FC = () => {
 };
 
 export default DevNotice;
+
 
 
 

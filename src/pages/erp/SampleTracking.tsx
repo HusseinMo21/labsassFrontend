@@ -37,7 +37,6 @@ import {
   Person,
   LocationOn,
   Schedule,
-  FilterList,
   Refresh,
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -129,7 +128,7 @@ const SampleTracking: React.FC = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
 
   useEffect(() => {
     // Fetch CSRF token when component loads
@@ -295,7 +294,7 @@ const SampleTracking: React.FC = () => {
       
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
@@ -307,7 +306,7 @@ const SampleTracking: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="success.main" sx={{ fontWeight: 'bold' }}>
@@ -319,7 +318,7 @@ const SampleTracking: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="warning.main" sx={{ fontWeight: 'bold' }}>
@@ -331,7 +330,7 @@ const SampleTracking: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="info.main" sx={{ fontWeight: 'bold' }}>
@@ -349,7 +348,7 @@ const SampleTracking: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid item xs={12} md={4}>
               <FormControl fullWidth size="small">
                 <InputLabel>Status Filter</InputLabel>
                 <Select
@@ -366,7 +365,7 @@ const SampleTracking: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 size="small"
@@ -391,7 +390,7 @@ const SampleTracking: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
+            <Grid item xs={12} md={2}>
               <Button
                 variant="contained"
                 startIcon={<Search />}
@@ -505,7 +504,7 @@ const SampleTracking: React.FC = () => {
               <Pagination
                 count={totalPages}
                 page={currentPage}
-                onChange={(event, page) => setCurrentPage(page)}
+                onChange={(_, page) => setCurrentPage(page)}
                 color="primary"
                 showFirstButton
                 showLastButton
@@ -579,6 +578,7 @@ const SampleTracking: React.FC = () => {
 };
 
 export default SampleTracking;
+
 
 
 

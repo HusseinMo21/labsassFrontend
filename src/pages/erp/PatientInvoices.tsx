@@ -57,7 +57,7 @@ interface PatientInvoice {
 }
 
 const PatientInvoices: React.FC = () => {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [invoices, setInvoices] = useState<PatientInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -176,7 +176,7 @@ const PatientInvoices: React.FC = () => {
         </Card>
       ) : (
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Typography variant="h6" gutterBottom>
               Your Invoices ({invoices.length} invoices)
             </Typography>
@@ -258,4 +258,5 @@ const PatientInvoices: React.FC = () => {
 };
 
 export default PatientInvoices;
+
 

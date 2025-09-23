@@ -38,7 +38,6 @@ import {
   People,
   AttachMoney,
   Receipt,
-  AccessTime,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -256,7 +255,7 @@ const ShiftManagement: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  ${reportData.patients.map(patient => `
+                  ${reportData.patients.map((patient: any) => `
                     <tr>
                       <td>${patient.patient_name}</td>
                       <td>${patient.lab_number}</td>
@@ -632,3 +631,4 @@ const ShiftManagement: React.FC = () => {
 };
 
 export default ShiftManagement;
+

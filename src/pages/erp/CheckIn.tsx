@@ -37,26 +37,17 @@ import {
   Step,
   StepLabel,
   Avatar,
-  Badge,
   Tooltip,
   LinearProgress,
   InputAdornment,
   Fade,
   Slide,
-  Stack,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
 } from '@mui/material';
 import {
   Add,
   Remove,
   Receipt,
   Print,
-  LocalShipping,
   CheckCircle,
   Person,
   Science,
@@ -67,18 +58,12 @@ import {
   Close,
   Payment,
   ShoppingCart,
-  Assignment,
-  LocalHospital,
-  Cancel,
-  ArrowBack,
   NavigateNext,
   NavigateBefore,
   Done,
-  Edit,
   MonetizationOn,
   CreditCard,
   AccountBalance,
-  ExpandMore,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -305,10 +290,10 @@ const CheckIn: React.FC = () => {
       setShowLabelModal(true);
       toast.success('Sample labels generated successfully');
     } catch (error) {
-      console.error('Failed to generate sample label:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      toast.error(`Failed to generate sample label: ${error.response?.data?.message || error.message}`);
+      console.error('Failed to generate sample label:', (error as any));
+      console.error('Error response:', (error as any).response?.data);
+      console.error('Error status:', (error as any).response?.status);
+      toast.error(`Failed to generate sample label: ${(error as any).response?.data?.message || (error as any).message}`);
     }
   };
 
@@ -389,226 +374,6 @@ const CheckIn: React.FC = () => {
     setShowReceiptModal(false);
   };
 
-  const handlePrintReceipt = () => {
-    const receiptData = currentVisit?.receipt_data || {
-      patient_name: selectedPatient?.name || 'N/A',
-      patient_phone: selectedPatient?.phone || 'N/A',
-      tests: selectedTests.map(test => ({
-        name: test.name,
-        price: test.price,
-      })),
-      total_amount: calculateTotal(),
-      discount_amount: 0,
-      final_amount: calculateTotal(),
-      upfront_payment: paymentForm.upfront_payment,
-      remaining_balance: calculateBalance(),
-      payment_method: paymentForm.payment_method,
-      expected_delivery_date: new Date().toISOString().split('T')[0],
-      barcode: 'LAB-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      check_in_by: 'Staff Member',
-      check_in_at: new Date().toLocaleString(),
-      receipt_number: 'RCP-' + Date.now(),
-      date: new Date().toLocaleDateString(),
-    };
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Popup blocked. Please allow popups for this site.');
-      return;
-    }
-
-    const receiptHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Receipt - ${receiptData.receipt_number}</title>
-        <style>
-          @page { 
-            size: 80mm 200mm; 
-            margin: 5mm; 
-          }
-          body { 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 0; 
-            width: 70mm;
-          }
-          .header { 
-            text-align: center; 
-            border-bottom: 1px solid #000; 
-            padding-bottom: 8px; 
-            margin-bottom: 8px; 
-          }
-          .header h1 { 
-            font-size: 14px; 
-            margin: 0 0 4px 0; 
-            font-weight: bold;
-          }
-          .header p { 
-            margin: 2px 0; 
-            font-size: 10px; 
-          }
-          .section { 
-            margin-bottom: 8px; 
-          }
-          .section h3 { 
-            font-size: 11px; 
-            margin: 0 0 4px 0; 
-            font-weight: bold;
-            border-bottom: 1px dotted #000;
-            padding-bottom: 2px;
-          }
-          .row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 2px; 
-            font-size: 10px;
-          }
-          .row .label { 
-            flex: 1; 
-          }
-          .row .value { 
-            flex: 1; 
-            text-align: right; 
-            font-weight: bold;
-          }
-          .total { 
-            font-weight: bold; 
-            border-top: 1px solid #000; 
-            padding-top: 4px; 
-            margin-top: 4px;
-          }
-          .total .row { 
-            font-size: 11px; 
-          }
-          .barcode { 
-            text-align: center; 
-            font-family: 'Courier New', monospace; 
-            font-size: 8px; 
-            margin: 4px 0; 
-            padding: 2px; 
-            background: #f0f0f0; 
-            border: 1px solid #000;
-          }
-          .footer { 
-            text-align: center; 
-            font-size: 8px; 
-            margin-top: 8px; 
-            border-top: 1px dotted #000; 
-            padding-top: 4px;
-          }
-          .test-item { 
-            margin-bottom: 1px; 
-            font-size: 9px;
-          }
-          .test-name { 
-            display: inline-block; 
-            width: 60%; 
-          }
-          .test-price { 
-            display: inline-block; 
-            width: 35%; 
-            text-align: right; 
-          }
-          @media print { 
-            body { margin: 0; padding: 0; }
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>PATHOLOGY LAB RECEIPT</h1>
-          <p>Date: ${receiptData.date}</p>
-          <p>Receipt #: ${receiptData.receipt_number}</p>
-          <p>Lab #: ${receiptData.lab_number || receiptData.barcode}</p>
-        </div>
-        
-        <div class="section">
-          <h3>PATIENT INFO</h3>
-          <div class="row">
-            <span class="label">Name:</span>
-            <span class="value" style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${receiptData.patient_name}</span>
-          </div>
-          <div class="row">
-            <span class="label">Phone:</span>
-            <span class="value">${receiptData.patient_phone}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>TESTS (${receiptData.tests?.length || 0})</h3>
-          ${(receiptData.tests || selectedTests).map((test: any) => `
-            <div class="test-item">
-              <span class="test-name">${test.name}</span>
-              <span class="test-price">${formatCurrency(test.price)}</span>
-            </div>
-          `).join('')}
-        </div>
-        
-        <div class="section total">
-          <div class="row">
-            <span class="label">Total:</span>
-            <span class="value">${formatCurrency(receiptData.total_amount || calculateTotal())}</span>
-          </div>
-          <div class="row">
-            <span class="label">Discount:</span>
-            <span class="value">${formatCurrency(receiptData.discount_amount || 0)}</span>
-          </div>
-          <div class="row">
-            <span class="label">Final:</span>
-            <span class="value">${formatCurrency(receiptData.final_amount || calculateTotal())}</span>
-          </div>
-          <div class="row">
-            <span class="label">Paid:</span>
-            <span class="value">${formatCurrency(receiptData.upfront_payment || paymentForm.upfront_payment)}</span>
-          </div>
-          <div class="row">
-            <span class="label">Remaining:</span>
-            <span class="value">${formatCurrency(receiptData.remaining_balance || calculateBalance())}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <div class="row">
-            <span class="label">Method:</span>
-            <span class="value">${receiptData.payment_method || paymentForm.payment_method}</span>
-          </div>
-          <div class="row">
-            <span class="label">Delivery:</span>
-            <span class="value">${new Date(receiptData.expected_delivery_date).toLocaleDateString()}</span>
-          </div>
-        </div>
-        
-        <div class="barcode">
-          ${receiptData.barcode && receiptData.barcode.includes('<svg') ? 
-            receiptData.barcode : 
-            (receiptData.barcode ? `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />` : '')
-          }
-        </div>
-        
-        <div class="footer">
-          <p>Processed by: ${receiptData.check_in_by}</p>
-          <p>Thank you for choosing our lab!</p>
-          ${receiptData.patient_credentials ? `
-          <div style="margin-top: 8px; padding: 5px; background: #f0f0f0; border-radius: 3px; font-size: 10px;">
-            <p style="margin: 0; font-weight: bold;">🔐 Patient Portal Access:</p>
-            <p style="margin: 2px 0; font-family: monospace;">Username: ${receiptData.patient_credentials.username}</p>
-            <p style="margin: 2px 0; font-family: monospace;">Password: ${receiptData.patient_credentials.password}</p>
-          </div>
-          ` : ''}
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(receiptHTML);
-    printWindow.document.close();
-    printWindow.print();
-    printWindow.close();
-  };
 
 
   const handleNext = () => {
@@ -693,14 +458,14 @@ const CheckIn: React.FC = () => {
       });
       setCurrentStep(0);
     } catch (error) {
-      console.error('Failed to complete visit:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('Failed to complete visit:', (error as any));
+      console.error('Error response:', (error as any).response?.data);
       
-      if (error.response?.data?.errors) {
-        const validationErrors = Object.values(error.response.data.errors).flat();
+      if ((error as any).response?.data?.errors) {
+        const validationErrors = Object.values((error as any).response.data.errors).flat();
         toast.error(`Validation failed: ${validationErrors.join(', ')}`);
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
+      } else if ((error as any).response?.data?.message) {
+        toast.error((error as any).response.data.message);
       } else {
         toast.error('Failed to complete visit. Please try again.');
       }
@@ -745,12 +510,12 @@ const CheckIn: React.FC = () => {
               loading={searching}
               value={selectedPatient}
               filterOptions={(options) => options} // Disable built-in filtering since we do server-side filtering
-              onChange={(event, newValue) => {
+              onChange={(_, newValue) => {
                 if (typeof newValue === 'object' && newValue) {
                   setSelectedPatient(newValue);
                 }
               }}
-              onInputChange={(event, newInputValue) => {
+              onInputChange={(_, newInputValue) => {
                 setPatientQuery(newInputValue);
               }}
               getOptionLabel={(option) => {
@@ -893,7 +658,7 @@ const CheckIn: React.FC = () => {
         </Box>
 
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 8 }}>
+          <Grid item xs={12} md={8}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -902,7 +667,7 @@ const CheckIn: React.FC = () => {
                 </Typography>
                 
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
                       <InputLabel>Test Category</InputLabel>
                       <Select
@@ -926,7 +691,7 @@ const CheckIn: React.FC = () => {
                     </FormControl>
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
                       label="Test Name"
@@ -936,7 +701,7 @@ const CheckIn: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       fullWidth
                       label="Test Price"
@@ -949,7 +714,7 @@ const CheckIn: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       fullWidth
                       label="Discount %"
@@ -962,7 +727,7 @@ const CheckIn: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 4 }}>
+                  <Grid item xs={12} sm={4}>
                     <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
                       <Button
                         variant="contained"
@@ -989,7 +754,7 @@ const CheckIn: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Card sx={{ position: 'sticky', top: 20 }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -1076,7 +841,7 @@ const CheckIn: React.FC = () => {
         </Box>
 
         <Grid container spacing={4}>
-          <Grid size={{ xs: 12, lg: 8 }}>
+          <Grid item xs={12} lg={8}>
             <Card sx={{ mb: 4, height: 'fit-content' }}>
               <CardContent sx={{ p: 4 }}>
                 <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -1085,7 +850,7 @@ const CheckIn: React.FC = () => {
                 </Typography>
                 
                 <Grid container spacing={4}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
                       label="Upfront Payment"
@@ -1119,7 +884,7 @@ const CheckIn: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <FormControl fullWidth sx={{ '& .MuiInputBase-root': { height: 56 } }}>
                       <InputLabel>Payment Method</InputLabel>
                       <Select
@@ -1154,7 +919,7 @@ const CheckIn: React.FC = () => {
                   {/* Insurance Details - Show only when insurance is selected */}
                   {paymentForm.payment_method === 'insurance' && (
                     <>
-                      <Grid size={{ xs: 12, sm: 6 }}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="Insurance Provider"
@@ -1166,7 +931,7 @@ const CheckIn: React.FC = () => {
                           sx={{ '& .MuiInputBase-root': { height: 56 } }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="Policy Number"
@@ -1178,7 +943,7 @@ const CheckIn: React.FC = () => {
                           sx={{ '& .MuiInputBase-root': { height: 56 } }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="Claim Number (Optional)"
@@ -1194,7 +959,7 @@ const CheckIn: React.FC = () => {
                   )}
 
                   {/* Discount Section */}
-                  <Grid size={{ xs: 12 }}>
+                  <Grid item xs={12}>
                     <Divider sx={{ my: 2 }}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Discount
@@ -1202,7 +967,7 @@ const CheckIn: React.FC = () => {
                     </Divider>
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
                       label="Discount Amount"
@@ -1226,7 +991,7 @@ const CheckIn: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
                       label="Discount Percentage"
@@ -1251,7 +1016,7 @@ const CheckIn: React.FC = () => {
                   </Grid>
 
                   {/* Delivery Date */}
-                  <Grid size={{ xs: 12 }}>
+                  <Grid item xs={12}>
                     <Divider sx={{ my: 2 }}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Delivery Information
@@ -1259,7 +1024,7 @@ const CheckIn: React.FC = () => {
                     </Divider>
                   </Grid>
                   
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
                       label="Expected Delivery Date"
@@ -1277,7 +1042,7 @@ const CheckIn: React.FC = () => {
                     />
                   </Grid>
                   
-                  <Grid size={{ xs: 12 }}>
+                  <Grid item xs={12}>
                     <TextField
                       fullWidth
                       label="Notes (Optional)"
@@ -1297,7 +1062,7 @@ const CheckIn: React.FC = () => {
             </Card>
           </Grid>
 
-          <Grid size={{ xs: 12, lg: 4 }}>
+          <Grid item xs={12} lg={4}>
             <Card sx={{ position: 'sticky', top: 20, height: 'fit-content' }}>
               <CardContent sx={{ p: 4 }}>
                 <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -1496,13 +1261,13 @@ const CheckIn: React.FC = () => {
                 Patient Information
               </Typography>
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                      <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary" gutterBottom>Name:</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
                     {String(receiptData.patient_name)}
                   </Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                      <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary" gutterBottom>Phone:</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
                     {String(receiptData.patient_phone)}
@@ -1527,7 +1292,7 @@ const CheckIn: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {(receiptData.tests || selectedTests).map((test, index) => (
+                    {(receiptData.tests || selectedTests).map((test: any, index: number) => (
                       <TableRow key={test.id || index}>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -1602,13 +1367,13 @@ const CheckIn: React.FC = () => {
               {/* Additional Info */}
               <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'success.300' }}>
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">Checked in by:</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {receiptData.check_in_by || 'Staff Member'}
                     </Typography>
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">Date & Time:</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {receiptData.check_in_at || new Date().toLocaleString()}
@@ -1775,7 +1540,7 @@ const CheckIn: React.FC = () => {
               
               <Grid container spacing={2}>
                 {labelData.test_labels?.map((testLabel: any, index: number) => (
-                  <Grid size={{ xs: 12, sm: 6 }} key={index}>
+                  <Grid item xs={12} sm={6} key={index}>
                     <Card variant="outlined" sx={{ p: 2 }}>
                       <Box sx={{ textAlign: 'left' }}>
                         <Typography variant="subtitle2" gutterBottom>

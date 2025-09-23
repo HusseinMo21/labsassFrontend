@@ -16,22 +16,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   LinearProgress,
   Alert,
   CircularProgress,
   Divider,
-  Button,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -48,11 +42,7 @@ import {
   People,
   Science,
   AttachMoney,
-  Schedule,
-  CheckCircle,
-  Pending,
   Refresh,
-  Update,
 } from '@mui/icons-material';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import axios from '../../config/axios';
@@ -199,11 +189,11 @@ const LabInsightsDashboard: React.FC = () => {
     return null;
   };
 
-  const getChangeColor = (change: number) => {
-    if (change > 0) return 'success.main';
-    if (change < 0) return 'error.main';
-    return 'text.secondary';
-  };
+  // const getChangeColor = (change: number) => {
+  //   if (change > 0) return 'success.main';
+  //   if (change < 0) return 'error.main';
+  //   return 'text.secondary';
+  // };
 
   if (loading && !insightsData) {
     return (
@@ -612,15 +602,15 @@ const LabInsightsDashboard: React.FC = () => {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
                       outerRadius={120}
                       innerRadius={40}
                       fill="#8884d8"
                       dataKey="count"
                       fontSize={14}
                     >
-                      {insightsData.tests.status_breakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      {insightsData.tests.status_breakdown.map((entry, _) => (
+                        <Cell key={`cell-${entry.status}`} fill={COLORS[Math.floor(Math.random() * COLORS.length)]} />
                       ))}
                     </Pie>
                     <RechartsTooltip 
@@ -847,7 +837,7 @@ const LabInsightsDashboard: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {insightsData.top_tests.map((test, index) => (
+                      {insightsData.top_tests.map((test, _) => (
                         <TableRow 
                           key={test.id}
                           sx={{ 
@@ -857,7 +847,7 @@ const LabInsightsDashboard: React.FC = () => {
                         >
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
-                              {test.name}
+                              {(test as any).name}
                             </Typography>
                             <Typography variant="caption" color="textSecondary">
                               {test.code}
@@ -884,7 +874,7 @@ const LabInsightsDashboard: React.FC = () => {
                           </TableCell>
                           <TableCell align="right">
                             <Typography variant="body2" fontWeight="medium">
-                              {formatCurrency(test.price)}
+                              {formatCurrency((test as any).price)}
                             </Typography>
                           </TableCell>
                         </TableRow>

@@ -347,7 +347,7 @@ const Notifications: React.FC = () => {
 
       {/* Stats */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -364,7 +364,7 @@ const Notifications: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -381,7 +381,7 @@ const Notifications: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -398,7 +398,7 @@ const Notifications: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -421,7 +421,7 @@ const Notifications: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Search patients"
@@ -433,7 +433,7 @@ const Notifications: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <FormControl fullWidth>
                 <InputLabel>Gender</InputLabel>
                 <Select
@@ -449,7 +449,7 @@ const Notifications: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid item xs={12} md={3}>
               <Button
                 variant="outlined"
                 startIcon={<FilterList />}
@@ -469,7 +469,7 @@ const Notifications: React.FC = () => {
       {/* Patients List */}
       <Grid container spacing={2}>
         {filteredPatients.map((patient) => (
-          <Grid size={{ xs: 12, md: 6 }} key={patient.id}>
+          <Grid item xs={12} md={6} key={patient.id}>
             <Card 
               sx={{ 
                 height: '100%',
@@ -606,7 +606,7 @@ const Notifications: React.FC = () => {
           {selectedPatient && (
             <Box>
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
                     Personal Information
                   </Typography>
@@ -696,7 +696,7 @@ const Notifications: React.FC = () => {
                   </List>
                 </Grid>
                 
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="h6" gutterBottom>
                     Account Information
                   </Typography>
@@ -793,6 +793,7 @@ const Notifications: React.FC = () => {
 };
 
 export default Notifications;
+
 
 
 

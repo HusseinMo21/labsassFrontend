@@ -28,7 +28,6 @@ import {
   InputAdornment,
   Pagination,
   Stack,
-  Divider,
   IconButton,
   Tooltip,
 } from '@mui/material';
@@ -171,7 +170,7 @@ const UnpaidInvoices: React.FC = () => {
       const response = await axios.post(`/api/invoices/${selectedInvoice.id}/add-payment`, paymentForm);
       
       // Check if this payment completes the invoice
-      const newRemainingBalance = response.data.remaining_balance;
+      // const _ = response.data.remaining_balance;
       const isFullyPaid = response.data.is_fully_paid;
       
       if (isFullyPaid) {
@@ -372,7 +371,7 @@ const UnpaidInvoices: React.FC = () => {
           
           <div class="section">
             <h3>Tests (${receiptData.tests?.length || 0})</h3>
-            ${(receiptData.tests || []).map(test => `
+            ${(receiptData.tests || []).map((test: any) => `
                 <div class="test-item">
                   <span class="test-name">${test.name}</span>
                   <span class="test-price">EGP ${test.price}</span>
@@ -639,11 +638,11 @@ const UnpaidInvoices: React.FC = () => {
           </div>
           <div class="row">
             <span class="label">Lab #:</span>
-            <span class="value">${receiptData?.lab_number || 'N/A'}</span>
+            <span class="value">${(receiptData as any)?.lab_number || 'N/A'}</span>
           </div>
           <div class="row">
             <span class="label">Processed by:</span>
-            <span class="value">${receiptData?.processed_by || 'N/A'}</span>
+            <span class="value">${(receiptData as any)?.processed_by || 'N/A'}</span>
           </div>
         </div>
         
@@ -666,9 +665,9 @@ const UnpaidInvoices: React.FC = () => {
         
         <div class="footer">
           <p>Thank you for choosing our lab!</p>
-          <p>Processed by: ${receiptData?.processed_by || 'System'}</p>
+          <p>Processed by: ${(receiptData as any)?.processed_by || 'System'}</p>
           <p>Processed at: ${new Date().toLocaleString()}</p>
-          <p>Visit ID: ${receiptData?.visit_id || 'N/A'}</p>
+          <p>Visit ID: ${(receiptData as any)?.visit_id || 'N/A'}</p>
         </div>
       </body>
     </html>
@@ -688,7 +687,7 @@ const UnpaidInvoices: React.FC = () => {
       {/* Summary Cards */}
       {summary && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card sx={{ textAlign: 'center', height: '100%' }}>
               <CardContent>
                 <Assessment color="primary" sx={{ fontSize: 40, mb: 1 }} />
@@ -701,7 +700,7 @@ const UnpaidInvoices: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card sx={{ textAlign: 'center', height: '100%' }}>
               <CardContent>
                 <TrendingUp color="success" sx={{ fontSize: 40, mb: 1 }} />
@@ -714,7 +713,7 @@ const UnpaidInvoices: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card sx={{ textAlign: 'center', height: '100%' }}>
               <CardContent>
                 <TrendingDown color="error" sx={{ fontSize: 40, mb: 1 }} />
@@ -727,7 +726,7 @@ const UnpaidInvoices: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card sx={{ textAlign: 'center', height: '100%' }}>
               <CardContent>
                 <Schedule color="warning" sx={{ fontSize: 40, mb: 1 }} />
@@ -747,7 +746,7 @@ const UnpaidInvoices: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={3} alignItems="center">
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Search Patients"
@@ -763,7 +762,7 @@ const UnpaidInvoices: React.FC = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid item xs={12} md={4}>
               <FormControl fullWidth>
                 <InputLabel>Payment Status</InputLabel>
                 <Select
@@ -778,7 +777,7 @@ const UnpaidInvoices: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
+            <Grid item xs={12} md={2}>
               <Button
                 fullWidth
                 variant="contained"
@@ -911,7 +910,7 @@ const UnpaidInvoices: React.FC = () => {
                   <Pagination
                     count={totalPages}
                     page={currentPage}
-                    onChange={(event, page) => setCurrentPage(page)}
+                    onChange={(_, page) => setCurrentPage(page)}
                     color="primary"
                     showFirstButton
                     showLastButton
@@ -947,7 +946,7 @@ const UnpaidInvoices: React.FC = () => {
                 </Alert>
 
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12 }}>
+                  <Grid item xs={12}>
                     <TextField
                       fullWidth
                       label="Payment Amount"
@@ -962,7 +961,7 @@ const UnpaidInvoices: React.FC = () => {
                       helperText={`Maximum: ${formatCurrency(selectedInvoice.remaining_balance)}`}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12 }}>
+                  <Grid item xs={12}>
                     <FormControl fullWidth>
                       <InputLabel>Payment Method</InputLabel>
                       <Select
@@ -1000,7 +999,7 @@ const UnpaidInvoices: React.FC = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid size={{ xs: 12 }}>
+                  <Grid item xs={12}>
                     <TextField
                       fullWidth
                       label="Notes"

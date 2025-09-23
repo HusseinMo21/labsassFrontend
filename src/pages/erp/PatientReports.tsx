@@ -12,7 +12,6 @@ import {
   TableRow,
   Paper,
   Chip,
-  Button,
   Alert,
   CircularProgress,
   Grid,
@@ -22,8 +21,6 @@ import {
 import {
   Assessment,
   PictureAsPdf,
-  Download,
-  Visibility,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-toastify';
@@ -47,7 +44,7 @@ interface PatientReport {
 }
 
 const PatientReports: React.FC = () => {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [reports, setReports] = useState<PatientReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -197,7 +194,7 @@ const PatientReports: React.FC = () => {
         </Card>
       ) : (
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
@@ -289,4 +286,5 @@ const PatientReports: React.FC = () => {
 };
 
 export default PatientReports;
+
 

@@ -14,12 +14,10 @@ import {
   Paper,
   Chip,
   CircularProgress,
-  Alert,
   LinearProgress,
   Avatar,
   IconButton,
   Tooltip,
-  Divider,
 } from '@mui/material';
 import {
   People,
@@ -33,8 +31,6 @@ import {
   Visibility,
   Print,
   Assessment,
-  LocalShipping,
-  Notifications,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -220,7 +216,7 @@ const Dashboard: React.FC = () => {
 
       {/* Main Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4, justifyContent: 'center' }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Patients"
             value={stats.totalPatients}
@@ -230,7 +226,7 @@ const Dashboard: React.FC = () => {
             subtitle="Active patients"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Visits"
             value={stats.totalVisits}
@@ -240,7 +236,7 @@ const Dashboard: React.FC = () => {
             subtitle="This month"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Revenue"
             value={formatCurrency(stats.totalRevenue)}
@@ -250,7 +246,7 @@ const Dashboard: React.FC = () => {
             subtitle="Monthly earnings"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Tests"
             value={stats.totalTests}
@@ -264,7 +260,7 @@ const Dashboard: React.FC = () => {
 
       {/* Test Status Cards */}
       <Grid container spacing={3} sx={{ mb: 4, justifyContent: 'center' }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Pending Tests"
             value={stats.pendingTests}
@@ -273,7 +269,7 @@ const Dashboard: React.FC = () => {
             subtitle="Awaiting processing"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Under Review"
             value={stats.underReviewTests}
@@ -282,7 +278,7 @@ const Dashboard: React.FC = () => {
             subtitle="In progress"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Completed Tests"
             value={stats.completedTests}
@@ -291,7 +287,7 @@ const Dashboard: React.FC = () => {
             subtitle="Ready for delivery"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Completion Rate"
             value={`${completionRate}%`}
@@ -433,3 +429,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+

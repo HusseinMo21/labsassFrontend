@@ -25,18 +25,10 @@ import {
   Select,
   MenuItem,
   Grid,
-  Alert,
-  CircularProgress,
   IconButton,
   Tooltip,
   Tabs,
   Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Divider,
-  LinearProgress,
   Pagination,
 } from '@mui/material';
 import {
@@ -46,17 +38,14 @@ import {
   Science,
   AttachMoney,
   Description,
-  Edit,
-  Visibility,
-  PictureAsPdf,
   Image,
   CloudUpload,
   Refresh,
-  DateRange,
   Search as SearchIcon,
   Folder,
   CheckCircle,
   Person,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -166,7 +155,7 @@ const Reports: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [patientsData, setPatientsData] = useState<PatientsData | null>(null);
   const [testsData, setTestsData] = useState<TestsData | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
@@ -506,48 +495,48 @@ const Reports: React.FC = () => {
     }
   };
 
-  const handlePrintReport = async (visit: Visit) => {
-    try {
-      const response = await axios.get(`/api/visits/${visit.id}/report/pdf`, {
-        responseType: 'blob',
-      });
+  // const handlePrintReport = async (_: Visit) => {
+  //   try {
+  //     const response = await axios.get(`/api/visits/${_.id}/report/pdf`, {
+  //       responseType: 'blob',
+  //     });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-      link.setAttribute('download', `report_${visit.visit_number}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        window.URL.revokeObjectURL(url);
+  //     const url = window.URL.createObjectURL(new Blob([response.data]));
+  //           const link = document.createElement('a');
+  //           link.href = url;
+  //     link.setAttribute('download', `report_${_.visit_number}.pdf`);
+  //           document.body.appendChild(link);
+  //           link.click();
+  //           link.remove();
+  //       window.URL.revokeObjectURL(url);
 
-      toast.success('Report PDF generated successfully');
-    } catch (error) {
-      console.error('Print report error:', error);
-      toast.error('Failed to generate report PDF');
-    }
-  };
+  //     toast.success('Report PDF generated successfully');
+  //   } catch (error) {
+  //     console.error('Print report error:', error);
+  //     toast.error('Failed to generate report PDF');
+  //   }
+  // };
 
-  const getStatusColor = (status: string) => {
-    const safeStatus = status || 'pending';
-    switch (safeStatus) {
-      case 'completed': return 'success';
-      case 'pending': return 'warning';
-      case 'under_review': return 'info';
-      default: return 'default';
-    }
-  };
+  // const getStatusColor = (status: string) => {
+  //   const safeStatus = status || 'pending';
+  //   switch (safeStatus) {
+  //     case 'completed': return 'success';
+  //     case 'pending': return 'warning';
+  //     case 'under_review': return 'info';
+  //     default: return 'default';
+  //   }
+  // };
 
-  const getTestStatusChip = (status: string) => {
-    const safeStatus = status || 'pending';
-    return (
-      <Chip
-        label={safeStatus.replace('_', ' ').toUpperCase()}
-        color={getStatusColor(safeStatus) as any}
-        size="small"
-      />
-    );
-  };
+  // const getTestStatusChip = (_: string) => {
+  //   const safeStatus = _ || 'pending';
+  //   return (
+  //     <Chip
+  //       label={safeStatus.replace('_', ' ').toUpperCase()}
+  //       color={getStatusColor(safeStatus) as any}
+  //       size="small"
+  //     />
+  //   );
+  // };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -718,7 +707,7 @@ const Reports: React.FC = () => {
       {/* Report Tabs */}
       <Card>
         <CardContent>
-          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
+          <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
             <Tab label="Visits" />
             <Tab label="Enhanced Reports" />
           </Tabs>
@@ -874,7 +863,7 @@ const Reports: React.FC = () => {
           <Pagination
             count={totalPages}
             page={currentPage}
-            onChange={(event, page) => setCurrentPage(page)}
+            onChange={(_, page) => setCurrentPage(page)}
             color="primary"
           />
         </Box>
@@ -941,7 +930,7 @@ const Reports: React.FC = () => {
                                 color="primary"
                                 onClick={() => handleTestReport(visit)}
                               >
-                                <Visibility />
+                                <VisibilityIcon />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Documents">
@@ -1381,3 +1370,4 @@ const Reports: React.FC = () => {
 };
 
 export default Reports;
+

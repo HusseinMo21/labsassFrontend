@@ -268,17 +268,17 @@ const PatientTestSearch: React.FC = () => {
       
     } catch (err) {
       console.error('Print error:', err);
-      console.error('Error response:', err.response);
-      console.error('Error status:', err.response?.status);
+      console.error('Error response:', (err as any).response);
+      console.error('Error status:', (err as any).response?.status);
       
-      if (err.response?.status === 404) {
+      if ((err as any).response?.status === 404) {
         toast.error('PDF endpoint not found. Please check if the backend server is running.');
-      } else if (err.response?.status === 401) {
+      } else if ((err as any).response?.status === 401) {
         toast.error('Authentication required. Please log in again.');
-      } else if (err.response?.status === 500) {
+      } else if ((err as any).response?.status === 500) {
         toast.error('Server error while generating PDF. Please try again.');
       } else {
-        toast.error(`Failed to print reports: ${err.response?.data?.message || err.message}`);
+        toast.error(`Failed to print reports: ${(err as any).response?.data?.message || (err as any).message}`);
       }
     }
   };
@@ -353,8 +353,8 @@ const PatientTestSearch: React.FC = () => {
       
     } catch (err: any) {
       console.error('Print error:', err);
-      console.error('Error response:', err.response);
-      console.error('Error status:', err.response?.status);
+      console.error('Error response:', (err as any).response);
+      console.error('Error status:', (err as any).response?.status);
       
       // Dismiss loading toast if it exists
       toast.dismiss();
@@ -429,7 +429,7 @@ const PatientTestSearch: React.FC = () => {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Enter test or illness name (e.g., Complete Blood Count (CBC))"
               variant="outlined"
-              size="large"
+              size="medium"
               InputProps={{
                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
               }}
@@ -437,7 +437,7 @@ const PatientTestSearch: React.FC = () => {
             <Button
               type="submit"
               variant="contained"
-              size="large"
+              size="medium"
               disabled={loading || !query.trim()}
               sx={{ minWidth: 120 }}
             >
@@ -651,7 +651,7 @@ const PatientTestSearch: React.FC = () => {
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                   <Science fontSize="small" />
                                   <Typography variant="body2">
-                                    {test.custom_test_name || test.lab_test?.name || test.labTest?.name}
+                                    {(test as any).custom_test_name || test.lab_test?.name || test.labTest?.name}
                                   </Typography>
                                 </Box>
                               }

@@ -27,8 +27,6 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
-  Tabs,
-  Tab,
   Divider,
   Pagination,
   Stack,
@@ -39,8 +37,6 @@ import {
   Edit,
   Check,
   Send,
-  Print,
-  LocalShipping,
   Assessment,
   FilterList,
   Folder,
@@ -226,7 +222,7 @@ const EnhancedReports: React.FC = () => {
     }
   };
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
     fetchReports(page);
     // Scroll to top of table when page changes
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -271,135 +267,34 @@ const EnhancedReports: React.FC = () => {
     }
   };
 
-  const handleWorkflowAction = async (reportId: number, action: string) => {
-    try {
-      if (action === 'print') {
-        // Handle print action like the existing Reports system
-        await handlePrintReport(reportId);
-      } else {
-        // Fetch CSRF token before the request
-        await axios.get('/sanctum/csrf-cookie');
-        const csrfResponse = await axios.get('/api/auth/csrf-token');
-        const csrfToken = csrfResponse.data.csrf_token;
+  // const handleWorkflowAction = async (reportId: number, action: string) => {
+  //   try {
+  //     if (action === 'print') {
+  //       // Handle print action like the existing Reports system
+  //       await handlePrintReport(reportId);
+  //     } else {
+  //       // Fetch CSRF token before the request
+  //       await axios.get('/sanctum/csrf-cookie');
+  //       const csrfResponse = await axios.get('/api/auth/csrf-token');
+  //       const csrfToken = csrfResponse.data.csrf_token;
         
-        await axios.post(`/api/enhanced-reports/${reportId}/${action}`, {}, {
-          headers: {
-            'X-CSRF-TOKEN': csrfToken
-          }
-        });
-        fetchReports(pagination.current_page);
-        fetchStats();
-      }
-    } catch (error) {
-      console.error(`Error ${action} report:`, error);
-    }
-  };
+  //       await axios.post(`/api/enhanced-reports/${reportId}/${action}`, {}, {
+  //         headers: {
+  //           'X-CSRF-TOKEN': csrfToken
+  //         }
+  //       });
+  //       fetchReports(pagination.current_page);
+  //       fetchStats();
+  //     }
+  //   } catch (error) {
+  //     console.error(`Error ${action} report:`, error);
+  //   }
+  // };
 
-  const handlePrintReport = async (reportId: number) => {
-    try {
-      // Starting PDF generation for enhanced report
-      
-      // Show loading toast
-      const loadingToast = toast.loading('Generating PDF report...');
-      
-      // Ensure CSRF token is available
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
-      
-      // Generate PDF using the backend endpoint
-      const response = await axios.get(`/api/enhanced-reports/${reportId}/print`, {
-        responseType: 'blob',
-        timeout: 30000, // 30 second timeout for PDF generation
-        headers: {
-          'X-CSRF-TOKEN': csrfToken
-        }
-      });
-
-      // Dismiss loading toast
-      toast.dismiss(loadingToast);
-
-      // PDF response received successfully
-
-      // Create blob URL and open in new tab for preview
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      
-      // Open PDF in new tab for preview
-      const newWindow = window.open(url, '_blank');
-      
-      if (newWindow) {
-        // Add download button to the new window
-        newWindow.onload = function() {
-          const downloadBtn = newWindow.document.createElement('button');
-          downloadBtn.innerHTML = 'Download PDF';
-          downloadBtn.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            z-index: 1000;
-          `;
-          downloadBtn.onclick = function() {
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `enhanced_report_${reportId}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-          };
-          newWindow.document.body.appendChild(downloadBtn);
-        };
-        
-        toast.success('PDF report opened in new tab');
-      } else {
-        // Fallback: direct download if popup blocked
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `enhanced_report_${reportId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        toast.success('PDF report downloaded (popup blocked)');
-      }
-
-      // Clean up the blob URL after a delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000); // 10 seconds delay to allow preview
-
-      // Refresh reports to update status
-      fetchReports(pagination.current_page);
-      fetchStats();
-
-    } catch (error: any) {
-      console.error('PDF generation error:', error);
-      console.error('Error response:', error.response);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
-      
-      // Dismiss loading toast if it exists
-      toast.dismiss();
-      
-      if (error.code === 'ECONNABORTED') {
-        toast.error('PDF generation timed out. Please try again.');
-      } else if (error.response?.status === 404) {
-        toast.error('PDF endpoint not found. Please check if the backend server is running.');
-      } else if (error.response?.status === 401) {
-        toast.error('Authentication required. Please log in again.');
-      } else if (error.response?.status === 500) {
-        toast.error('Server error while generating PDF. Please try again.');
-      } else {
-        toast.error(`Failed to generate PDF report: ${error.response?.data?.message || error.message}`);
-      }
-    }
-  };
-
+  // const handlePrintReport = async (reportId: number): Promise<void> => {
+  //   // Function commented out - not currently used
+  // };
+  // try {
   const getStatusBadge = (status: string) => {
     const badges = {
       draft: 'default',
@@ -460,7 +355,7 @@ const EnhancedReports: React.FC = () => {
       {/* Statistics Cards */}
       {stats && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -478,7 +373,7 @@ const EnhancedReports: React.FC = () => {
             </Card>
           </Grid>
           
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -496,7 +391,7 @@ const EnhancedReports: React.FC = () => {
             </Card>
           </Grid>
           
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -514,7 +409,7 @@ const EnhancedReports: React.FC = () => {
             </Card>
           </Grid>
           
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -542,7 +437,7 @@ const EnhancedReports: React.FC = () => {
             <Typography variant="h6">Filters</Typography>
           </Box>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid item xs={12} sm={6} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
@@ -560,7 +455,7 @@ const EnhancedReports: React.FC = () => {
               </FormControl>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid item xs={12} sm={6} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel>Priority</InputLabel>
                 <Select
@@ -577,7 +472,7 @@ const EnhancedReports: React.FC = () => {
               </FormControl>
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
                 size="small"
@@ -588,7 +483,7 @@ const EnhancedReports: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
                 size="small"
@@ -599,7 +494,7 @@ const EnhancedReports: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
                 size="small"
@@ -611,7 +506,7 @@ const EnhancedReports: React.FC = () => {
               />
             </Grid>
             
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
                 size="small"
@@ -735,7 +630,7 @@ const EnhancedReports: React.FC = () => {
                         </Tooltip>
 
                         {/* Send to Patient button - only for staff users */}
-                        {user?.role === 'staff' && (report.status === 'completed' || report.status === 'approved' || report.status === 'printed') && (
+                        {user?.role === 'staff' && (report.status === 'approved' || report.status === 'printed') && (
                           <Tooltip title="Send to Patient Dashboard">
                             <IconButton
                               size="small"
@@ -862,7 +757,7 @@ const EnhancedReports: React.FC = () => {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -873,7 +768,7 @@ const EnhancedReports: React.FC = () => {
                 placeholder="Enter clinical history and symptoms..."
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -884,7 +779,7 @@ const EnhancedReports: React.FC = () => {
                 placeholder="Describe the nature of the specimen..."
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -895,7 +790,7 @@ const EnhancedReports: React.FC = () => {
                 placeholder="Enter gross examination findings..."
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -906,7 +801,7 @@ const EnhancedReports: React.FC = () => {
                 placeholder="Enter microscopic examination findings..."
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -917,7 +812,7 @@ const EnhancedReports: React.FC = () => {
                 placeholder="Enter the final conclusion..."
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -974,27 +869,27 @@ const EnhancedReports: React.FC = () => {
                 Basic Information
                           </Typography>
               <Grid container spacing={2} mb={3}>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Lab Number</Typography>
                   <Typography variant="body1">{selectedReport.lab_no}</Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Barcode</Typography>
                   <Typography variant="body1">{selectedReport.barcode || 'Not generated'}</Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Patient Number</Typography>
                   <Typography variant="body1">{selectedReport.nos || 'N/A'}</Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Reference</Typography>
                   <Typography variant="body1">{selectedReport.reff || 'N/A'}</Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Type</Typography>
                   <Typography variant="body1">{selectedReport.type || 'N/A'}</Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">Report Date</Typography>
                   <Typography variant="body1">
                     {selectedReport.report_date ? formatDate(selectedReport.report_date) : 'N/A'}
@@ -1063,7 +958,7 @@ const EnhancedReports: React.FC = () => {
                 Conclusion & Recommendation
               </Typography>
               <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     Conclusion
                   </Typography>
@@ -1073,7 +968,7 @@ const EnhancedReports: React.FC = () => {
                         </Typography>
                   </Paper>
                 </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid item xs={12} md={6}>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     Recommendation
                         </Typography>

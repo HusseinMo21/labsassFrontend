@@ -12,7 +12,6 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
-  Paper,
   Divider,
   Dialog,
   DialogTitle,
@@ -49,7 +48,7 @@ interface Visit {
 const PatientDocuments: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { } = useAuth();
   const [loading, setLoading] = useState(true);
   const [visit, setVisit] = useState<Visit | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -459,3 +458,4 @@ const PatientDocuments: React.FC = () => {
 };
 
 export default PatientDocuments;
+

@@ -597,3 +597,4 @@ const MedicalLanding = ({ heroImage }: { heroImage?: string }) => {
 };
 
 export default MedicalLanding;
+
