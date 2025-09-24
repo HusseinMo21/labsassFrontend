@@ -177,8 +177,8 @@ const Receipts: React.FC = () => {
 
   const handleViewDetails = async (receipt: Receipt) => {
     try {
-      // Fetch the proper receipt data with correct barcode URL
-      const response = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
+      // Try the new universal receipt endpoint first
+      const response = await axios.get(`/api/visits/${receipt.id}/receipt`);
       const receiptData = response.data.receipt_data;
       
       // Update the receipt with the proper receipt data
@@ -200,8 +200,8 @@ const Receipts: React.FC = () => {
 
   const handlePrint = async (receipt: Receipt) => {
     try {
-      // Fetch the proper receipt data with correct barcode URL
-      const response = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
+      // Try the new universal receipt endpoint first
+      const response = await axios.get(`/api/visits/${receipt.id}/receipt`);
       const receiptData = response.data.receipt_data;
       
       // Update the receipt with the proper receipt data

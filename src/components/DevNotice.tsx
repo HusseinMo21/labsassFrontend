@@ -10,7 +10,7 @@ const DevNotice: React.FC = () => {
     // Check if backend is available
     const checkBackend = async () => {
       try {
-        const response = await fetch('http://localhost:8000/sanctum/csrf-cookie', {
+        const response = await fetch('http://localhost:8000/api/health', {
           method: 'GET',
           mode: 'cors',
         });

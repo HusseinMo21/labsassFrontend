@@ -112,17 +112,7 @@ const Visits: React.FC = () => {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    // Fetch CSRF token when component loads
-    const initializeCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF cookie set for Visits');
-      } catch (error) {
-        console.error('Failed to set CSRF cookie:', error);
-      }
-    };
     
-    initializeCSRF();
     fetchVisits();
   }, [page, statusFilter, searchTerm]);
 
@@ -303,17 +293,9 @@ const Visits: React.FC = () => {
     try {
       console.log('Completing visit:', visitId);
       
-      // Manually fetch CSRF token before the request
-      console.log('Fetching CSRF token for visit completion...');
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
-      console.log('CSRF token received:', csrfToken);
       
-      // Make the PUT request with CSRF token
       await axios.put(`/api/visits/${visitId}/complete`, {}, {
         headers: {
-          'X-CSRF-TOKEN': csrfToken
         }
       });
       
@@ -331,17 +313,9 @@ const Visits: React.FC = () => {
       try {
         console.log('Deleting visit:', visitId);
         
-        // Manually fetch CSRF token before the request
-        console.log('Fetching CSRF token for visit deletion...');
-        await axios.get('/sanctum/csrf-cookie');
-        const csrfResponse = await axios.get('/api/auth/csrf-token');
-        const csrfToken = csrfResponse.data.csrf_token;
-        console.log('CSRF token received:', csrfToken);
         
-        // Make the DELETE request with CSRF token
         await axios.delete(`/api/visits/${visitId}`, {
           headers: {
-            'X-CSRF-TOKEN': csrfToken
           }
         });
         

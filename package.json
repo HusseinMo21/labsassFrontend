@@ -9,6 +9,8 @@
     "env:prod": "node scripts/switch-env.cjs prod",
     "env:status": "node scripts/switch-env.cjs status",
     "build": "tsc -b && vite build",
+    "build:dev": "npm run env:dev && npm run build",
+    "build:prod": "npm run env:prod && npm run build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

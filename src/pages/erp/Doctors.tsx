@@ -108,17 +108,7 @@ const Doctors: React.FC = () => {
   const [patientsLoading, setPatientsLoading] = useState(false);
 
   useEffect(() => {
-    // Fetch CSRF token when component loads
-    const initializeCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF cookie set for Doctors');
-      } catch (error) {
-        console.error('Failed to set CSRF cookie:', error);
-      }
-    };
     
-    initializeCSRF();
     fetchDoctors();
   }, [currentPage, search]);
 
@@ -234,23 +224,16 @@ const Doctors: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Manually fetch CSRF token before the request
-      console.log('Fetching CSRF token for doctor submission...');
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
 
       if (editingDoctor) {
         await axios.put(`/api/doctors/${editingDoctor.id}`, formData, {
           headers: {
-            'X-CSRF-TOKEN': csrfToken
           }
         });
         toast.success('Doctor updated successfully');
       } else {
         await axios.post('/api/doctors', formData, {
           headers: {
-            'X-CSRF-TOKEN': csrfToken
           }
         });
         toast.success('Doctor created successfully');
@@ -282,14 +265,9 @@ const Doctors: React.FC = () => {
   const handleDelete = async (doctor: Doctor) => {
     if (window.confirm(`Are you sure you want to delete ${doctor.name}?`)) {
       try {
-        // Manually fetch CSRF token before the request
-        await axios.get('/sanctum/csrf-cookie');
-        const csrfResponse = await axios.get('/api/auth/csrf-token');
-        const csrfToken = csrfResponse.data.csrf_token;
 
         await axios.delete(`/api/doctors/${doctor.id}`, {
           headers: {
-            'X-CSRF-TOKEN': csrfToken
           }
         });
         toast.success('Doctor deleted successfully');

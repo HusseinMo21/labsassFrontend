@@ -223,13 +223,9 @@ const ReportForm: React.FC = () => {
         formData.append('image', testFormData.image);
       }
 
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
       const headers: any = {
         'Content-Type': 'multipart/form-data',
       };
-      if (csrfToken) {
-        headers['X-CSRF-TOKEN'] = csrfToken;
-      }
 
       await axios.put(`/api/visits/${visit.id}`, formData, { headers });
       

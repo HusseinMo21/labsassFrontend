@@ -131,17 +131,7 @@ const SampleTracking: React.FC = () => {
   const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
 
   useEffect(() => {
-    // Fetch CSRF token when component loads
-    const initializeCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF cookie set for SampleTracking');
-      } catch (error) {
-        console.error('Failed to set CSRF cookie:', error);
-      }
-    };
     
-    initializeCSRF();
     fetchSamples();
     fetchStats();
   }, [currentPage]);
@@ -187,17 +177,9 @@ const SampleTracking: React.FC = () => {
     try {
       console.log('Updating sample status:', selectedSample?.id, statusForm);
       
-      // Manually fetch CSRF token before the request
-      console.log('Fetching CSRF token for status update...');
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
-      console.log('CSRF token received:', csrfToken);
       
-      // Make the PUT request with CSRF token
       await axios.put(`/api/sample-tracking/${selectedSample?.id}/status`, statusForm, {
         headers: {
-          'X-CSRF-TOKEN': csrfToken
         }
       });
       

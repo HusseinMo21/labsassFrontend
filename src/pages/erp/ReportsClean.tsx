@@ -259,13 +259,9 @@ const Reports: React.FC = () => {
     }
 
     try {
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
 
       await axios.delete(`/api/visits/${visit.id}/image`, {
         headers: {
-          'X-CSRF-TOKEN': csrfToken
         }
       });
 
@@ -285,13 +281,9 @@ const Reports: React.FC = () => {
       const formData = new FormData();
       formData.append('image', newImageFile);
 
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
 
       await axios.post(`/api/visits/${selectedImageVisit.id}/image`, formData, {
         headers: {
-          'X-CSRF-TOKEN': csrfToken
         }
       });
 
@@ -325,12 +317,6 @@ const Reports: React.FC = () => {
     try {
       console.log('Updating test results for visit:', selectedVisit?.id);
       
-      // Manually fetch CSRF token before the request
-      console.log('Fetching CSRF token for test results update...');
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
-      console.log('CSRF token received:', csrfToken);
       
       const visitTests = Object.keys(resultsData).map((testId) => ({
         id: parseInt(testId),
@@ -344,7 +330,6 @@ const Reports: React.FC = () => {
         visit_tests: visitTests,
       }, {
         headers: {
-          'X-CSRF-TOKEN': csrfToken
         }
       });
 

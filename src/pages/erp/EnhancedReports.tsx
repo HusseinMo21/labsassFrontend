@@ -168,17 +168,7 @@ const EnhancedReports: React.FC = () => {
   });
 
   useEffect(() => {
-    // Initialize CSRF token
-    const initializeCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-        // CSRF cookie set for Enhanced Reports
-      } catch (error) {
-        console.error('Failed to set CSRF cookie:', error);
-      }
-    };
-
-    initializeCSRF();
+    
     fetchReports(1); // Reset to first page when filters change
     fetchStats();
   }, [filters]);
@@ -230,14 +220,9 @@ const EnhancedReports: React.FC = () => {
 
   const handleCreateReport = async () => {
     try {
-      // Fetch CSRF token before the request
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
       
       const response = await axios.post('/api/enhanced-reports', newReport, {
         headers: {
-          'X-CSRF-TOKEN': csrfToken
         }
       });
       setReports([response.data.data, ...reports]);
@@ -273,14 +258,9 @@ const EnhancedReports: React.FC = () => {
   //       // Handle print action like the existing Reports system
   //       await handlePrintReport(reportId);
   //     } else {
-  //       // Fetch CSRF token before the request
-  //       await axios.get('/sanctum/csrf-cookie');
-  //       const csrfResponse = await axios.get('/api/auth/csrf-token');
-  //       const csrfToken = csrfResponse.data.csrf_token;
         
   //       await axios.post(`/api/enhanced-reports/${reportId}/${action}`, {}, {
   //         headers: {
-  //           'X-CSRF-TOKEN': csrfToken
   //         }
   //       });
   //       fetchReports(pagination.current_page);

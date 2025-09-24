@@ -224,19 +224,8 @@ const LabRequests: React.FC = () => {
   };
 
   useEffect(() => {
-    // Initialize CSRF token
-    const initCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-      } catch (error) {
-        console.error('Failed to initialize CSRF token:', error);
-      }
-    };
-    
-    initCSRF().then(() => {
-      fetchLabRequests();
-      fetchPatients();
-    });
+    fetchLabRequests();
+    fetchPatients();
   }, []);
 
   // Debounced search effect

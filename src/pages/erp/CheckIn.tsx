@@ -141,17 +141,6 @@ const CheckIn: React.FC = () => {
   ];
 
   useEffect(() => {
-    // Fetch CSRF token when component loads
-    const initializeCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF cookie set for CheckIn');
-      } catch (error) {
-        console.error('Failed to set CSRF cookie:', error);
-      }
-    };
-    
-    initializeCSRF();
     fetchTestCategories();
   }, []);
 
@@ -417,18 +406,7 @@ const CheckIn: React.FC = () => {
       console.log('Selected tests:', selectedTests);
       console.log('Tests array being sent:', visitData.tests);
       
-      // Manually fetch CSRF token before the request
-      console.log('Fetching CSRF token for visit creation...');
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
-      console.log('CSRF token received:', csrfToken);
-      
-      const response = await axios.post('/api/check-in/create-visit', visitData, {
-        headers: {
-          'X-CSRF-TOKEN': csrfToken
-        }
-      });
+      const response = await axios.post('/api/check-in/create-visit', visitData);
       console.log('Visit response:', response.data);
       console.log('Visit object:', response.data.visit);
       console.log('Visit ID:', response.data.visit?.id);

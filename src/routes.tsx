@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { config } from './config/environment';
 import { useAuth } from './contexts/AuthContext';
 import App from './App';
 import Login from './pages/auth/Login';
@@ -68,6 +69,9 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   
   return <>{children}</>;
 };
+
+// Determine basename based on environment
+const basename = config.ENVIRONMENT === 'production' ? '/dryasser' : '';
 
 const router = createBrowserRouter([
   // Public routes
@@ -454,6 +458,44 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-]);
+  // Catch-all route for 404 errors
+  {
+    path: '*',
+    element: (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        textAlign: 'center',
+        padding: '20px'
+      }}>
+        <h1 style={{ fontSize: '4rem', margin: '0', color: '#666' }}>404</h1>
+        <h2 style={{ margin: '10px 0', color: '#333' }}>Page Not Found</h2>
+        <p style={{ margin: '10px 0', color: '#666' }}>
+          The page you're looking for doesn't exist.
+        </p>
+        <button 
+          onClick={() => window.location.href = basename + '/'}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#1976d2',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            marginTop: '20px'
+          }}
+        >
+          Go Home
+        </button>
+      </div>
+    ),
+  },
+], {
+  basename: basename
+});
 
 export default router;

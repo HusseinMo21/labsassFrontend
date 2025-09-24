@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { config } from '../config/environment';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -39,14 +40,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Set up axios defaults for cookie-based authentication
   useEffect(() => {
     // Set base URL for all API calls
-    axios.defaults.baseURL = 'http://localhost:8000';
-    // Enable credentials for cookie-based authentication
-    axios.defaults.withCredentials = true;
+    axios.defaults.baseURL = config.API_ORIGIN;
+    // Disable credentials for cross-origin requests
+    axios.defaults.withCredentials = false;
   }, []);
 
   // Set axios defaults immediately when module loads (not just in useEffect)
-  axios.defaults.baseURL = 'http://localhost:8000';
-  axios.defaults.withCredentials = true;
+  axios.defaults.baseURL = config.API_ORIGIN;
+  axios.defaults.withCredentials = false; // Disable credentials for cross-origin requests
 
   // Check if user is authenticated on app load
   useEffect(() => {
@@ -57,17 +58,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storedToken) {
           setAccessToken(storedToken);
           axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+          
+          // Try to get user info with the token
+          try {
+            const response = await axios.get('/api/auth/user');
+            setUser(response.data.user);
+          } catch (tokenError) {
+            // Token is invalid, remove it
+            console.warn('Token invalid, removing from storage');
+            localStorage.removeItem('access_token');
+            delete axios.defaults.headers.common['Authorization'];
+            setAccessToken(null);
+            setUser(null);
+          }
+        } else {
+          setUser(null);
         }
-        
-        // First, get CSRF cookie
-        await axios.get('http://localhost:8000/sanctum/csrf-cookie');
-        
-        // Then check if user is authenticated
-        const response = await axios.get('/api/auth/user');
-        setUser(response.data.user);
       } catch (error) {
-        console.warn('Backend not available or auth check failed:', error);
-        // Don't show error to user, just set user as null
+        console.warn('Auth check failed:', error);
         setUser(null);
         setAccessToken(null);
         localStorage.removeItem('access_token');
@@ -82,10 +90,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (login: string, password: string) => {
     try {
-      // Get CSRF cookie first
-      await axios.get('http://localhost:8000/sanctum/csrf-cookie');
-      
-      // Then attempt login
       const response = await axios.post('/api/auth/login', {
         login,
         password,
@@ -104,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success('Login successful!');
       return { success: true, user: userData };
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Backend not available. Please start the Laravel server.';
+      const message = error.response?.data?.message || 'Login failed. Please check your credentials.';
       toast.error(message);
       return { success: false, error: message };
     }

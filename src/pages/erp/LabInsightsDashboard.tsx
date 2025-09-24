@@ -129,18 +129,7 @@ const LabInsightsDashboard: React.FC = () => {
   const [period, setPeriod] = useState('30');
 
   useEffect(() => {
-    // Initialize CSRF token and fetch data
-    const initCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-      } catch (error) {
-        console.error('Failed to initialize CSRF token:', error);
-      }
-    };
-    
-    initCSRF().then(() => {
-      fetchInsightsData();
-    });
+    fetchInsightsData();
   }, [period]);
 
   const fetchInsightsData = async () => {

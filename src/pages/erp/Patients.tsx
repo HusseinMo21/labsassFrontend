@@ -111,17 +111,6 @@ const Patients: React.FC = () => {
   });
 
   useEffect(() => {
-    // Fetch CSRF token when component loads
-    const initializeCSRF = async () => {
-      try {
-        await axios.get('/sanctum/csrf-cookie');
-        console.log('CSRF cookie set for Patients');
-      } catch (error) {
-        console.error('Failed to set CSRF cookie:', error);
-      }
-    };
-    
-    initializeCSRF();
     fetchPatients();
   }, [currentPage, search]);
 
@@ -165,17 +154,10 @@ const Patients: React.FC = () => {
 
       console.log('Submitting patient data:', patientData);
 
-      // Manually fetch CSRF token before the request
-      console.log('Fetching CSRF token for patient submission...');
-      await axios.get('/sanctum/csrf-cookie');
-      const csrfResponse = await axios.get('/api/auth/csrf-token');
-      const csrfToken = csrfResponse.data.csrf_token;
-      console.log('CSRF token received:', csrfToken);
 
       if (editingPatient) {
         await axios.put(`/api/patients/${editingPatient.id}`, patientData, {
           headers: {
-            'X-CSRF-TOKEN': csrfToken
           }
         });
         toast.success('تم تحديث بيانات المريض بنجاح');
@@ -186,7 +168,6 @@ const Patients: React.FC = () => {
       } else {
         const response = await axios.post('/api/patients', patientData, {
           headers: {
-            'X-CSRF-TOKEN': csrfToken
           }
         });
         toast.success('تم إنشاء المريض بنجاح');
