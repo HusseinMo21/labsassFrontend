@@ -205,7 +205,7 @@ const PatientDocuments: React.FC = () => {
             Patient Documents
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
-            {visit.patient.name} - Lab No: {visit.labRequest?.full_lab_no || visit.visit_number}
+            {visit.patient.name} - Lab No: {visit.labRequest?.full_lab_no || visit.patient.lab || visit.visit_number}
           </Typography>
         </Box>
       </Box>
