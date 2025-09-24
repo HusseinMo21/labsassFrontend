@@ -76,7 +76,7 @@ const basename = config.ENVIRONMENT === 'production' ? '/dryasser' : '';
 const router = createBrowserRouter([
   // Public routes
   {
-    path: '/',
+    path: '/*',
     element: <App />,
   },
   {

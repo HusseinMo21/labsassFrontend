@@ -38,6 +38,7 @@ interface Visit {
     name: string;
     age: string;
     gender: string;
+    lab?: string;
   };
   labRequest?: {
     id: number;
@@ -237,7 +238,7 @@ const PatientDocuments: React.FC = () => {
             <Grid item xs={12} sm={6} md={3}>
               <Typography variant="body2" color="text.secondary">Lab No</Typography>
               <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                {visit.labRequest?.full_lab_no || visit.visit_number}
+                {visit.labRequest?.full_lab_no || visit.patient.lab || visit.visit_number}
               </Typography>
             </Grid>
           </Grid>

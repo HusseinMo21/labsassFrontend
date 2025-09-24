@@ -192,9 +192,26 @@ const Receipts: React.FC = () => {
       setDetailsOpen(true);
     } catch (error) {
       console.error('Failed to fetch receipt details:', error);
-      // Fallback to original receipt data
-      setSelectedReceipt(receipt);
-      setDetailsOpen(true);
+      
+      // Try the check-in receipt endpoint as fallback
+      try {
+        const fallbackResponse = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
+        const fallbackData = fallbackResponse.data.receipt_data;
+        
+        const updatedReceipt = {
+          ...receipt,
+          ...fallbackData,
+          barcode: fallbackData.barcode
+        };
+        
+        setSelectedReceipt(updatedReceipt);
+        setDetailsOpen(true);
+      } catch (fallbackError) {
+        console.error('Failed to fetch receipt from fallback endpoint:', fallbackError);
+        // Use original receipt data as last resort
+        setSelectedReceipt(receipt);
+        setDetailsOpen(true);
+      }
     }
   };
 
@@ -215,9 +232,26 @@ const Receipts: React.FC = () => {
       setPrintOpen(true);
     } catch (error) {
       console.error('Failed to fetch receipt data for printing:', error);
-      // Fallback to original receipt data
-      setSelectedReceipt(receipt);
-      setPrintOpen(true);
+      
+      // Try the check-in receipt endpoint as fallback
+      try {
+        const fallbackResponse = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
+        const fallbackData = fallbackResponse.data.receipt_data;
+        
+        const updatedReceipt = {
+          ...receipt,
+          ...fallbackData,
+          barcode: fallbackData.barcode
+        };
+        
+        setSelectedReceipt(updatedReceipt);
+        setPrintOpen(true);
+      } catch (fallbackError) {
+        console.error('Failed to fetch receipt from fallback endpoint:', fallbackError);
+        // Use original receipt data as last resort
+        setSelectedReceipt(receipt);
+        setPrintOpen(true);
+      }
     }
   };
 
