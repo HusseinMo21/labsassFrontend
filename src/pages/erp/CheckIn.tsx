@@ -884,57 +884,34 @@ const CheckIn: React.FC = () => {
                             Credit/Debit Card
                           </Box>
                         </MenuItem>
-                        <MenuItem value="insurance">
+                        <MenuItem value="Fawry">
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <AccountBalance sx={{ mr: 1 }} />
-                            Insurance
+                            Fawry
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="InstaPay">
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <AccountBalance sx={{ mr: 1 }} />
+                            InstaPay
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="VodafoneCash">
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <AccountBalance sx={{ mr: 1 }} />
+                            VodafoneCash
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="Other">
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <AttachMoney sx={{ mr: 1 }} />
+                            Other
                           </Box>
                         </MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
 
-                  {/* Insurance Details - Show only when insurance is selected */}
-                  {paymentForm.payment_method === 'insurance' && (
-                    <>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Insurance Provider"
-                          value={paymentForm.insurance_provider}
-                          onChange={(e) => setPaymentForm(prev => ({
-                            ...prev,
-                            insurance_provider: e.target.value
-                          }))}
-                          sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Policy Number"
-                          value={paymentForm.insurance_policy_number}
-                          onChange={(e) => setPaymentForm(prev => ({
-                            ...prev,
-                            insurance_policy_number: e.target.value
-                          }))}
-                          sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Claim Number (Optional)"
-                          value={paymentForm.insurance_claim_number}
-                          onChange={(e) => setPaymentForm(prev => ({
-                            ...prev,
-                            insurance_claim_number: e.target.value
-                          }))}
-                          sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                        />
-                      </Grid>
-                    </>
-                  )}
 
                   {/* Discount Section */}
                   <Grid item xs={12}>

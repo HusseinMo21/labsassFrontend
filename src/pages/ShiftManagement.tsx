@@ -53,6 +53,9 @@ interface Shift {
   visits_processed: number;
   payments_processed: number;
   total_collected: number;
+  cash_collected: number;
+  other_payments_collected: number;
+  payment_breakdown: Record<string, number>;
   notes?: string;
 }
 
@@ -68,6 +71,9 @@ interface ShiftReport {
     visits_processed: number;
     payments_processed: number;
     total_collected: number;
+    cash_collected: number;
+    other_payments_collected: number;
+    payment_breakdown: Record<string, number>;
     notes?: string;
   };
   patients: Array<{
@@ -236,11 +242,33 @@ const ShiftManagement: React.FC = () => {
                     <div class="summary-value">${reportData.shift_info.payments_processed}</div>
                   </div>
                   <div class="summary-item">
+                    <div class="summary-label">Cash Collected</div>
+                    <div class="summary-value">EGP ${(parseFloat(reportData.shift_info.cash_collected) || 0).toFixed(2)}</div>
+                  </div>
+                  <div class="summary-item">
+                    <div class="summary-label">Other Payments</div>
+                    <div class="summary-value">EGP ${(parseFloat(reportData.shift_info.other_payments_collected) || 0).toFixed(2)}</div>
+                  </div>
+                  <div class="summary-item">
                     <div class="summary-label">Total Collected</div>
                     <div class="summary-value">EGP ${(parseFloat(reportData.shift_info.total_collected) || 0).toFixed(2)}</div>
                   </div>
                 </div>
               </div>
+              
+              ${reportData.shift_info.payment_breakdown && Object.keys(reportData.shift_info.payment_breakdown).length > 0 ? `
+              <div class="summary">
+                <h3>Payment Methods Breakdown</h3>
+                <div class="summary-grid">
+                  ${Object.entries(reportData.shift_info.payment_breakdown).map(([method, amount]) => `
+                    <div class="summary-item">
+                      <div class="summary-label">${method}</div>
+                      <div class="summary-value">EGP ${(parseFloat(amount) || 0).toFixed(2)}</div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+              ` : ''}
 
               <table>
                 <thead>
@@ -365,6 +393,75 @@ const ShiftManagement: React.FC = () => {
                 </Grid>
               </Grid>
               
+              {/* Payment Breakdown */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Payment Breakdown
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
+                      <Typography variant="h6" color="success.dark">
+                        {formatCurrency(currentShift.cash_collected || 0)}
+                      </Typography>
+                      <Typography variant="caption" color="success.dark">
+                        Cash Collected
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                      <Typography variant="h6" color="info.dark">
+                        {formatCurrency(currentShift.other_payments_collected || 0)}
+                      </Typography>
+                      <Typography variant="caption" color="info.dark">
+                        Other Payments
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
+                      <Typography variant="h6" color="primary.dark">
+                        {formatCurrency(currentShift.total_collected || 0)}
+                      </Typography>
+                      <Typography variant="caption" color="primary.dark">
+                        Total Collected
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                      <Typography variant="h6" color="text.primary">
+                        {Object.keys(currentShift.payment_breakdown || {}).length}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Payment Methods
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+                
+                {/* Detailed Payment Methods */}
+                {currentShift.payment_breakdown && Object.keys(currentShift.payment_breakdown).length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Payment Methods Used:
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {Object.entries(currentShift.payment_breakdown).map(([method, amount]) => (
+                        <Chip
+                          key={method}
+                          label={`${method}: ${formatCurrency(amount)}`}
+                          variant="outlined"
+                          size="small"
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Grid>
+              
               <Grid item xs={12}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   {(currentShift.status === 'open' || !currentShift.closed_at) && (
@@ -419,7 +516,9 @@ const ShiftManagement: React.FC = () => {
                   <TableCell>Patients</TableCell>
                   <TableCell>Visits</TableCell>
                   <TableCell>Payments</TableCell>
-                  <TableCell>Collected</TableCell>
+                  <TableCell>Cash</TableCell>
+                  <TableCell>Other</TableCell>
+                  <TableCell>Total</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -433,7 +532,21 @@ const ShiftManagement: React.FC = () => {
                     <TableCell>{shift.patients_served || 0}</TableCell>
                     <TableCell>{shift.visits_processed || 0}</TableCell>
                     <TableCell>{shift.payments_processed || 0}</TableCell>
-                    <TableCell>{formatCurrency(shift.total_collected || 0)}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="success.main" fontWeight="bold">
+                        {formatCurrency(shift.cash_collected || 0)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="info.main" fontWeight="bold">
+                        {formatCurrency(shift.other_payments_collected || 0)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="primary.main" fontWeight="bold">
+                        {formatCurrency(shift.total_collected || 0)}
+                      </Typography>
+                    </TableCell>
                     <TableCell>
                       <Chip 
                         label={shift.status?.toUpperCase() || 'UNKNOWN'} 
@@ -466,7 +579,7 @@ const ShiftManagement: React.FC = () => {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={9} align="center">
+                    <TableCell colSpan={11} align="center">
                       <Typography variant="body2" color="text.secondary">
                         No shift history found
                       </Typography>

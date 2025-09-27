@@ -401,14 +401,28 @@ const UnpaidInvoices: React.FC = () => {
               <span class="value">EGP ${receiptData.remaining_balance}</span>
             </div>
             <div class="row">
-              <span class="label">Method:</span>
-              <span class="value">${(receiptData.payment_method || 'N/A').toUpperCase()}</span>
-            </div>
-            <div class="row">
               <span class="label">Status:</span>
               <span class="value">${(receiptData.billing_status || 'N/A').toUpperCase()}</span>
             </div>
           </div>
+          
+          ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
+          <div class="section">
+            <h3>PAYMENT BREAKDOWN</h3>
+            ${receiptData.payment_breakdown.cash > 0 ? `
+            <div class="row">
+              <span class="label">Paid Cash:</span>
+              <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
+            </div>
+            ` : ''}
+            ${receiptData.payment_breakdown.card > 0 ? `
+            <div class="row">
+              <span class="label">Paid with ${receiptData.payment_breakdown.card_method || 'Card'}:</span>
+              <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
+            </div>
+            ` : ''}
+          </div>
+          ` : ''}
           
           ${receiptData.barcode ? `
           <div class="barcode">
@@ -610,26 +624,42 @@ const UnpaidInvoices: React.FC = () => {
         </div>
         
         <div class="section">
-          <h3>Payment Breakdown</h3>
+          <h3>Payment Summary</h3>
           <div class="payment-breakdown">
             <div class="row">
-              <span class="label">Paid Before:</span>
-              <span class="value">EGP ${receiptData?.paid_before}</span>
+              <span class="label">Total Amount:</span>
+              <span class="value">EGP ${receiptData?.total_amount}</span>
             </div>
             <div class="row">
-              <span class="label">Paid Now:</span>
+              <span class="label">Total Paid:</span>
               <span class="value">EGP ${receiptData?.paid_now}</span>
             </div>
             <div class="row">
               <span class="label">Remaining:</span>
-              <span class="value">EGP 0</span>
-            </div>
-            <div class="row">
-              <span class="label">Payment Method:</span>
-              <span class="value">${receiptData?.payment_method}</span>
+              <span class="value">EGP ${receiptData?.remaining_balance || 0}</span>
             </div>
           </div>
         </div>
+        
+        ${receiptData?.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
+        <div class="section">
+          <h3>Payment Breakdown</h3>
+          <div class="payment-breakdown">
+            ${receiptData.payment_breakdown.cash > 0 ? `
+            <div class="row">
+              <span class="label">Paid Cash:</span>
+              <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
+            </div>
+            ` : ''}
+            ${receiptData.payment_breakdown.card > 0 ? `
+            <div class="row">
+              <span class="label">Paid with ${receiptData.payment_breakdown.card_method || 'Card'}:</span>
+              <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+        ` : ''}
         
         <div class="section">
           <div class="row">
@@ -984,13 +1014,25 @@ const UnpaidInvoices: React.FC = () => {
                             Card
                           </Box>
                         </MenuItem>
-                        <MenuItem value="insurance">
+                        <MenuItem value="Fawry">
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <AccountBalance />
-                            Insurance
+                            Fawry
                           </Box>
                         </MenuItem>
-                        <MenuItem value="other">
+                        <MenuItem value="InstaPay">
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AccountBalance />
+                            InstaPay
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="VodafoneCash">
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <AccountBalance />
+                            VodafoneCash
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="Other">
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <AttachMoney />
                             Other

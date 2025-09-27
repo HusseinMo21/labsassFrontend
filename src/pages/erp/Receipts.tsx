@@ -428,7 +428,7 @@ const Receipts: React.FC = () => {
           ` : ''}
           ${receipt.payment_breakdown.card > 0 ? `
           <div class="row">
-            <span class="label">Paid with ${receipt.payment_breakdown.card_method}:</span>
+            <span class="label">Paid with ${receipt.payment_breakdown.card_method || 'Card'}:</span>
             <span class="value">${formatCurrency(receipt.payment_breakdown.card)}</span>
           </div>
           ` : ''}
