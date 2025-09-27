@@ -23,7 +23,7 @@ const StaffDashboard: React.FC = () => {
 
   const quickActions = [
     {
-      title: 'Patients',
+      title: 'Patients Search',
       description: 'Manage patient records',
       icon: <People />,
       color: '#1976d2',
@@ -49,13 +49,6 @@ const StaffDashboard: React.FC = () => {
       icon: <Science />,
       color: '#7b1fa2',
       path: '/tests',
-    },
-    {
-      title: 'Sample Tracking',
-      description: 'Track sample processing',
-      icon: <LocalShipping />,
-      color: '#d32f2f',
-      path: '/sample-tracking',
     },
     {
       title: 'Invoices',

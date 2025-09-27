@@ -70,6 +70,7 @@ interface LabRequest {
   created_at: string;
   barcode_url?: string;
   qr_code_url?: string;
+  number_of_samples?: number;
 }
 
 interface PatientDetails {
@@ -104,6 +105,7 @@ interface PatientDetails {
     insurance_coverage: string;
     billing_address?: string;
     emergency_relationship?: string;
+    organization?: string;
   };
   doctor?: {
     id: number;
@@ -578,7 +580,7 @@ const LabRequests: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {labRequest.samples.length} sample(s)
+                      {labRequest.number_of_samples || labRequest.samples.length} sample(s)
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -907,6 +909,8 @@ const LabRequests: React.FC = () => {
                     <Grid item xs={6}>
                       {patientDetails.organization ? (
                         <Typography variant="body2"><strong>Organization:</strong> {patientDetails.organization.name}</Typography>
+                      ) : patientDetails.patient.organization ? (
+                        <Typography variant="body2"><strong>Organization:</strong> {patientDetails.patient.organization}</Typography>
                       ) : (
                         <Typography variant="body2" color="text.secondary">No organization assigned</Typography>
                       )}
@@ -923,18 +927,14 @@ const LabRequests: React.FC = () => {
                     <TableHead>
                       <TableRow>
                         <TableCell>Sample Type</TableCell>
-                        <TableCell>Sample Name</TableCell>
                         <TableCell>Sample ID</TableCell>
-                        <TableCell>Notes</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {patientDetails.samples.map((sample, index) => (
                         <TableRow key={index}>
                           <TableCell>{sample.sample_type || sample.tsample || 'N/A'}</TableCell>
-                          <TableCell>{sample.case_type || sample.nsample || 'N/A'}</TableCell>
                           <TableCell>{sample.sample_size || sample.isample || 'N/A'}</TableCell>
-                          <TableCell>{sample.notes || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -949,27 +949,13 @@ const LabRequests: React.FC = () => {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Visit Date</TableCell>
-                        <TableCell>Test Name</TableCell>
-                        <TableCell>Test Code</TableCell>
-                        <TableCell>Price</TableCell>
-                        <TableCell>Status</TableCell>
+                        <TableCell>نوع العينة</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {patientDetails.all_tests.map((test, index) => (
                         <TableRow key={index}>
-                          <TableCell>{new Date(test.visit_date).toLocaleDateString()}</TableCell>
                           <TableCell>{test.test_name}</TableCell>
-                          <TableCell>{test.test_code}</TableCell>
-                          <TableCell>${test.test_price}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={test.status} 
-                              size="small" 
-                              color={test.status === 'completed' ? 'success' : 'default'}
-                            />
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1067,7 +1053,7 @@ const LabRequests: React.FC = () => {
                       <TableHead>
                         <TableRow>
                           <TableCell>Report Title</TableCell>
-                          <TableCell>Test Name</TableCell>
+                          <TableCell>نوع العينة</TableCell>
                           <TableCell>Status</TableCell>
                           <TableCell>Generated Date</TableCell>
                           <TableCell>Content Preview</TableCell>
@@ -1081,7 +1067,7 @@ const LabRequests: React.FC = () => {
                                 {report.title}
                               </Typography>
                             </TableCell>
-                            <TableCell>{report.lab_test?.name || 'N/A'}</TableCell>
+                            <TableCell>{patientDetails.all_tests && patientDetails.all_tests.length > 0 ? patientDetails.all_tests[0].test_name : 'N/A'}</TableCell>
                             <TableCell>
                               <Chip 
                                 label={report.status} 

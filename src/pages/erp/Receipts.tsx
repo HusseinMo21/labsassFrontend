@@ -52,6 +52,12 @@ interface Receipt {
   discount_amount?: number;
   barcode?: string;
   expected_delivery_date?: string;
+  payment_breakdown?: {
+    cash: number;
+    card: number;
+    card_method: string;
+  };
+  processed_by?: string;
   patient: {
     id: number;
     name: string;
@@ -134,11 +140,12 @@ const Receipts: React.FC = () => {
       const response = await axios.get('/api/visits', { params });
       
       
-      // Filter to only include visits with receipt numbers and normalize data
+      // Filter to only include visits with visit numbers (use as receipt numbers) and normalize data
       const receiptsData = response.data.data
-        .filter((visit: any) => visit.receipt_number)
+        .filter((visit: any) => visit.visit_number)
         .map((visit: any) => ({
           ...visit,
+          receipt_number: visit.visit_number, // Use visit_number as receipt_number
           visitTests: visit.visit_tests || visit.visitTests || [],
           // Ensure patient data exists
           patient: visit.patient || { id: 0, name: 'Unknown', phone: 'N/A' },
@@ -359,7 +366,7 @@ const Receipts: React.FC = () => {
       </head>
       <body>
         <div class="header">
-          <h1>PATHOLOGY LAB RECEIPT</h1>
+          <h1>${receipt.billing_status === 'paid' ? 'FINAL PAYMENT RECEIPT' : 'PATHOLOGY LAB RECEIPT'}</h1>
           <p>Date: ${new Date(receipt.visit_date).toLocaleDateString()}</p>
           <p>Receipt #: ${receipt.receipt_number}</p>
           <p>Lab #: ${receipt.lab_number || 'N/A'}</p>
@@ -410,15 +417,35 @@ const Receipts: React.FC = () => {
           </div>
         </div>
         
+        ${receipt.payment_breakdown && (receipt.payment_breakdown.cash > 0 || receipt.payment_breakdown.card > 0) ? `
         <div class="section">
+          <h3>PAYMENT BREAKDOWN</h3>
+          ${receipt.payment_breakdown.cash > 0 ? `
           <div class="row">
-            <span class="label">Method:</span>
-            <span class="value">${receipt.payment_method.toUpperCase()}</span>
+            <span class="label">Paid Cash:</span>
+            <span class="value">${formatCurrency(receipt.payment_breakdown.cash)}</span>
           </div>
+          ` : ''}
+          ${receipt.payment_breakdown.card > 0 ? `
+          <div class="row">
+            <span class="label">Paid with ${receipt.payment_breakdown.card_method}:</span>
+            <span class="value">${formatCurrency(receipt.payment_breakdown.card)}</span>
+          </div>
+          ` : ''}
+        </div>
+        ` : ''}
+        
+        <div class="section">
           <div class="row">
             <span class="label">Status:</span>
             <span class="value">${receipt.billing_status.toUpperCase()}</span>
           </div>
+          ${receipt.processed_by ? `
+          <div class="row">
+            <span class="label">Processed by:</span>
+            <span class="value">${receipt.processed_by}</span>
+          </div>
+          ` : ''}
         </div>
         
         ${receipt.barcode ? `
@@ -723,6 +750,28 @@ const Receipts: React.FC = () => {
                   <Typography variant="body2">Amount Paid:</Typography>
                   <Typography variant="body2" color="success.main">{formatCurrency(selectedReceipt.upfront_payment)}</Typography>
                 </Box>
+                
+                {/* Payment Breakdown */}
+                {selectedReceipt.payment_breakdown && (selectedReceipt.payment_breakdown.cash > 0 || selectedReceipt.payment_breakdown.card > 0) && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      Payment Breakdown:
+                    </Typography>
+                    {selectedReceipt.payment_breakdown.cash > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2">Paid Cash:</Typography>
+                        <Typography variant="body2" color="success.main">{formatCurrency(selectedReceipt.payment_breakdown.cash)}</Typography>
+                      </Box>
+                    )}
+                    {selectedReceipt.payment_breakdown.card > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2">Paid with {selectedReceipt.payment_breakdown.card_method}:</Typography>
+                        <Typography variant="body2" color="success.main">{formatCurrency(selectedReceipt.payment_breakdown.card)}</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+                
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Remaining Balance:</Typography>
                   <Typography variant="body2" color="error.main">{formatCurrency(selectedReceipt.remaining_balance)}</Typography>
@@ -731,10 +780,16 @@ const Receipts: React.FC = () => {
                   <Typography variant="body2">Payment Method:</Typography>
                   <Typography variant="body2">{selectedReceipt.payment_method}</Typography>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Billing Status:</Typography>
                   {getBillingStatusChip(selectedReceipt.billing_status)}
                 </Box>
+                {selectedReceipt.processed_by && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2">Processed by:</Typography>
+                    <Typography variant="body2">{selectedReceipt.processed_by}</Typography>
+                  </Box>
+                )}
               </Grid>
             </Grid>
           )}

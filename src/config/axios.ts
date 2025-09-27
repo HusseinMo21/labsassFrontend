@@ -8,7 +8,11 @@ axios.defaults.withCredentials = false; // Disable credentials for cross-origin 
 // Request interceptor for adding common headers
 axios.interceptors.request.use(
   (config) => {
-    // Add any common headers here if needed
+    // Add authentication token if available
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -22,7 +26,17 @@ axios.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Handle common errors here if needed
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401) {
+      // Clear the token and redirect to login
+      localStorage.removeItem('access_token');
+      delete axios.defaults.headers.common['Authorization'];
+      
+      // Only redirect if we're not already on the login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );

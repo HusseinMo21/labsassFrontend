@@ -1,1419 +1,1487 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
   TextField,
   Button,
   Grid,
-  FormControl,
-  InputLabel,
+  Card,
+  CardContent,
   Select,
   MenuItem,
-  CircularProgress,
-  InputAdornment,
-  IconButton,
+  FormControl,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Paper,
-  Divider,
+  Chip,
+  CircularProgress,
 } from '@mui/material';
 import {
-  Search,
+  Add as AddIcon,
+  Save as SaveIcon,
+  Receipt,
+  Person,
+  Science,
+  MonetizationOn,
+  Print,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from '../../config/axios';
 
-interface TestCategory {
-  id: number;
+interface PatientFormData {
   name: string;
-  description: string;
-}
-
-interface Patient {
-  id: number;
-  name: string;
+  age: string;
   phone: string;
-  age?: number;
-  gender?: string;
-  organization?: string;
-  doctor_id?: string;
-  sample_type?: string;
-  case_type?: string;
-  sample_size?: string;
-  number_of_samples?: number;
-  day_of_week?: string;
-  medical_history?: string;
-  previous_tests?: string;
-  attendance_date?: string;
-  delivery_date?: string;
-  total_amount?: number;
-  amount_paid?: number;
-  lab_number?: string;
-  lab?: string;
-  doctor?: string;
+  lab_number: string;
+  gender: string;
+  organization: string;
+  attendance_day: string;
+  delivery_day: string;
+  delivery_date: string;
+  referring_doctor: string;
+  sample_size: string;
+  number_of_samples: string;
+  attendance_date: string;
+  previous_tests: string;
+  sample_type: string;
+  medical_history: string;
+  total_amount: string;
+  amount_paid_cash: string;
+  amount_paid_card: string;
+  additional_payment_method: string;
 }
-
-interface UserCredentials {
-  username: string;
-  password: string;
-}
-
 
 const PatientRegistration: React.FC = () => {
-  const [formData, setFormData] = useState<Patient>({
-    id: 0,
+  const [formData, setFormData] = useState<PatientFormData>({
     name: '',
+    age: '',
     phone: '',
-    age: 0,
-    gender: '',
-    organization: '',
-    doctor: '',
-    sample_type: '',
-    case_type: '',
-    sample_size: '',
-    number_of_samples: 0,
-    day_of_week: '',
-    medical_history: '',
-    previous_tests: '',
-    attendance_date: '',
-    delivery_date: '',
-    total_amount: 0,
-    amount_paid: 0,
     lab_number: '',
+    gender: 'ذكر',
+    organization: '',
+    attendance_day: 'السبت',
+    delivery_day: 'السبت',
+    delivery_date: '',
+    referring_doctor: '',
+    sample_size: 'صغيرة جدا',
+    number_of_samples: '',
+    attendance_date: '',
+    previous_tests: 'نعم',
+    sample_type: 'Pathology',
+    medical_history: '',
+    total_amount: '',
+    amount_paid_cash: '',
+    amount_paid_card: '',
+    additional_payment_method: 'Fawry',
   });
 
-  const [testCategories, setTestCategories] = useState<TestCategory[]>([]);
-  const [searchType, setSearchType] = useState<'lab_number' | 'mobile' | 'name'>('lab_number');
   const [searchValue, setSearchValue] = useState('');
-  const [searchResults, setSearchResults] = useState<Patient[]>([]);
-  const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [, setSelectedPatient] = useState<Patient | null>(null);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successData, setSuccessData] = useState<{
-    labNumber: string;
-    credentials: UserCredentials;
+  const [searching, setSearching] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showSampleModal, setShowSampleModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
+  const [sampleData, setSampleData] = useState<any>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [loadingSample, setLoadingSample] = useState(false);
+  const [patientCredentials, setPatientCredentials] = useState<{
+    username: string;
+    password: string;
+    visitId?: number;
+    labNumber?: string;
   } | null>(null);
 
-  useEffect(() => {
-    fetchTestCategories();
-  }, []);
-
-  const fetchTestCategories = async () => {
-    try {
-      const response = await axios.get('/api/check-in/test-categories');
-      setTestCategories(response.data.data);
-    } catch (error) {
-      console.error('Failed to fetch test categories:', error);
-    }
-  };
-
-  const handleInputChange = (field: keyof Patient, value: any) => {
+  const handleInputChange = (field: keyof PatientFormData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
+  // Helper function to calculate total paid amount
+  const getTotalPaidAmount = () => {
+    const cash = parseFloat(formData.amount_paid_cash) || 0;
+    const card = parseFloat(formData.amount_paid_card) || 0;
+    return cash + card;
+  };
+
+  // Helper function to validate payment amounts
+  const validatePaymentAmounts = () => {
+    const totalAmount = parseFloat(formData.total_amount) || 0;
+    const totalPaid = getTotalPaidAmount();
+    
+    if (totalAmount > 0 && totalPaid > totalAmount) {
+      return 'المبلغ المدفوع أكبر من المبلغ الإجمالي';
+    }
+    
+    return null;
+  };
+
+  // Helper function to map gender for backend (Arabic to English)
+  const mapGenderForBackend = (gender: string) => {
+    if (gender === 'ذكر') return 'male';
+    if (gender === 'أنثى') return 'female';
+    return gender || 'male';
+  };
+
+  // Function to fetch receipt data
+  const handleReceiptPrint = async () => {
+    if (!patientCredentials?.visitId) return;
+    
+    setLoadingReceipt(true);
+    try {
+      const response = await axios.get(`/api/visits/${patientCredentials.visitId}/receipt`);
+      setReceiptData(response.data);
+      setShowReceiptModal(true);
+    } catch (error) {
+      console.error('Failed to fetch receipt:', error);
+      toast.error('فشل في تحميل الإيصال');
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
+
+  // Function to fetch sample data
+  const handleSamplePrint = async () => {
+    if (!patientCredentials?.visitId) return;
+    
+    setLoadingSample(true);
+    try {
+      const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/sample-label`);
+      setSampleData(response.data);
+      setShowSampleModal(true);
+    } catch (error) {
+      console.error('Failed to fetch sample label:', error);
+      toast.error('فشل في تحميل ملصق العينة');
+    } finally {
+      setLoadingSample(false);
+    }
+  };
+
+  // Helper function to get day name in Arabic from date
+  const getDayNameFromDate = (dateString: string) => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const dayNames = {
+      0: 'الأحد',    // Sunday
+      1: 'الاثنين',  // Monday
+      2: 'الثلاثاء', // Tuesday
+      3: 'الأربعاء', // Wednesday
+      4: 'الخميس',   // Thursday
+      5: 'الجمعة',   // Friday
+      6: 'السبت'     // Saturday
+    };
+    
+    return dayNames[date.getDay() as keyof typeof dayNames] || '';
+  };
+
+  // Handle date change with automatic day detection
+  const handleDateChange = (field: 'attendance_date' | 'delivery_date', value: string) => {
+    setFormData(prev => {
+      const newFormData = {
+      ...prev,
+      [field]: value
+      };
+      
+      // Auto-fill corresponding day field when date changes
+      if (field === 'attendance_date' && value) {
+        newFormData.attendance_day = getDayNameFromDate(value);
+      } else if (field === 'delivery_date' && value) {
+        newFormData.delivery_day = getDayNameFromDate(value);
+      }
+      
+      return newFormData;
+    });
+  };
+
   const handleSearch = async () => {
     if (!searchValue.trim()) {
-      toast.warning('يرجى إدخال قيمة للبحث (Please enter a search value)');
+      toast.warning('Please enter a lab number to search');
       return;
     }
 
     setSearching(true);
     try {
-      const response = await axios.get('/api/patient-registration/search', {
-        params: {
-          type: searchType,
-          value: searchValue.trim()
-        }
-      });
+      // Search for existing patient by lab number using the correct endpoint
+      const response = await axios.get(`/api/patients?search=${encodeURIComponent(searchValue)}`);
+      
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        const patient = response.data.data[0];
+        
+        // Helper function to format date for input field
+        const formatDateForInput = (dateString: string) => {
+          if (!dateString) return '';
+          try {
+            const date = new Date(dateString);
+            return date.toISOString().split('T')[0]; // Convert to yyyy-MM-dd format
+          } catch {
+            return '';
+          }
+        };
 
-      if (response.data.success) {
-        setSearchResults(response.data.data);
-        if (response.data.data.length === 0) {
-          toast.info('لم يتم العثور على نتائج (No results found)');
-        } else {
-          toast.success(`تم العثور على ${response.data.data.length} نتيجة (Found ${response.data.data.length} results)`);
-        }
+        // Helper function to map gender values
+        const mapGender = (gender: string) => {
+          if (gender === 'male') return 'ذكر';
+          if (gender === 'female') return 'أنثى';
+          return gender || 'ذكر';
+        };
+
+
+
+        // Fill the form with existing patient data
+    setFormData({
+      name: patient.name || '',
+          age: patient.age?.toString() || '',
+      phone: patient.phone || '',
+          lab_number: patient.lab || patient.lab_number || searchValue,
+          gender: mapGender(patient.gender),
+      organization: patient.organization || '',
+          attendance_day: patient.day_of_week || 'السبت',
+          delivery_day: patient.day_of_week || 'السبت',
+          delivery_date: formatDateForInput(patient.delivery_date),
+          referring_doctor: patient.doctor || '',
+          sample_size: patient.sample_size || 'صغيرة جدا',
+          number_of_samples: patient.number_of_samples?.toString() || '',
+          attendance_date: formatDateForInput(patient.attendance_date),
+          previous_tests: patient.previous_tests || 'نعم',
+          sample_type: patient.sample_type || 'Pathology',
+      medical_history: patient.medical_history || '',
+          total_amount: patient.total_amount?.toString() || '',
+          amount_paid_cash: patient.amount_paid_cash?.toString() || '',
+          amount_paid_card: patient.amount_paid_card?.toString() || '',
+          additional_payment_method: patient.additional_payment_method || 'Fawry',
+        });
+        
+        toast.success('Patient found! Form filled with existing data.');
       } else {
-        setSearchResults([]);
-        toast.error('فشل في البحث (Search failed)');
+        toast.info('No patient found with this lab number. You can proceed with new registration.');
       }
     } catch (error: any) {
-      console.error('Search failed:', error);
-      setSearchResults([]);
-      
-      if (error.response?.status === 422) {
-        toast.error('خطأ في بيانات البحث (Search data error)');
-      } else if (error.response?.status === 401) {
-        toast.error('غير مصرح لك بالوصول (Unauthorized access)');
-      } else {
-        toast.error('فشل في البحث. يرجى المحاولة مرة أخرى (Search failed. Please try again)');
-      }
+      console.error('Search error:', error);
+      toast.error('Search failed. Please check the lab number and try again.');
     } finally {
       setSearching(false);
     }
   };
 
-  const handleSelectPatient = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setFormData({
-      id: patient.id || 0,
-      name: patient.name || '',
-      phone: patient.phone || '',
-      age: patient.age || 0,
-      gender: patient.gender || '',
-      organization: patient.organization || '',
-      doctor: patient.doctor || '',
-      sample_type: patient.sample_type || '',
-      case_type: patient.case_type || '',
-      sample_size: patient.sample_size || '',
-      number_of_samples: patient.number_of_samples || 0,
-      day_of_week: patient.day_of_week || '',
-      medical_history: patient.medical_history || '',
-      previous_tests: patient.previous_tests || '',
-      attendance_date: patient.attendance_date || '',
-      delivery_date: patient.delivery_date || '',
-      total_amount: patient.total_amount || 0,
-      amount_paid: patient.amount_paid || 0,
-      lab_number: patient.lab_number || patient.lab || '',
-    });
-    setSearchResults([]);
-    setSearchValue('');
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.phone) {
-      toast.error('الاسم ورقم الموبايل مطلوبان (Name and phone are required)');
-      return;
-    }
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSubmitting(true);
+
     try {
-      const response = await axios.post('/api/patient-registration/submit', formData);
+      // Validate required fields
+      if (!formData.name || !formData.phone || !formData.age) {
+        toast.error('Please fill in all required fields (Name, Phone, Age)');
+        return;
+      }
+
+      // Validate payment amounts
+      const paymentError = validatePaymentAmounts();
+      if (paymentError) {
+        toast.error(paymentError);
+        return;
+      }
+
+      // Prepare data for submission
+      const patientData: any = {
+        name: formData.name,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        gender: mapGenderForBackend(formData.gender), // Convert Arabic to English for backend
+        organization: formData.organization,
+        doctor: formData.referring_doctor,
+        sample_type: formData.sample_type,
+        sample_size: formData.sample_size,
+        number_of_samples: parseInt(formData.number_of_samples) || 1,
+        day_of_week: formData.attendance_day,
+        medical_history: formData.medical_history,
+        previous_tests: formData.previous_tests,
+        attendance_date: formData.attendance_date,
+        delivery_date: formData.delivery_date,
+        total_amount: parseFloat(formData.total_amount) || 0,
+        amount_paid_cash: parseFloat(formData.amount_paid_cash) || 0,
+        amount_paid: getTotalPaidAmount(), // Total paid amount for backward compatibility
+        lab_number: formData.lab_number,
+      };
+
+      // Only include additional payment method and amount if they have values
+      const additionalPaymentAmount = parseFloat(formData.amount_paid_card) || 0;
+      if (additionalPaymentAmount > 0 && formData.additional_payment_method) {
+        patientData.amount_paid_card = additionalPaymentAmount;
+        patientData.additional_payment_method = formData.additional_payment_method;
+      }
+
+      console.log('Submitting patient data:', patientData);
+
+      // Submit to backend
+      const response = await axios.post('/api/patients', patientData);
       
-      if (response.data.success) {
-        // Show success modal with credentials
+      toast.success('Patient registered successfully!');
+      console.log('Patient registration response:', response.data);
+      
+      // Show credentials modal
         if (response.data.user_credentials) {
-          setSuccessData({
+        setPatientCredentials({
+          username: response.data.user_credentials.username,
+          password: response.data.user_credentials.password,
+          visitId: response.data.visit_id,
             labNumber: response.data.lab_number,
-            credentials: response.data.user_credentials
           });
-          setShowSuccessModal(true);
-        } else {
-          toast.success(`تم تسجيل المريض بنجاح! رقم المختبر: ${response.data.lab_number}`);
+        setShowCredentialsModal(true);
         }
         
         // Reset form
         setFormData({
-          id: 0,
           name: '',
+        age: '',
           phone: '',
-          age: 0,
-          gender: '',
+        lab_number: '',
+        gender: 'ذكر',
           organization: '',
-          doctor: '',
-          sample_type: '',
-          case_type: '',
-          sample_size: '',
-          number_of_samples: 0,
-          day_of_week: '',
-          medical_history: '',
-          previous_tests: '',
-          attendance_date: '',
+        attendance_day: 'السبت',
+        delivery_day: 'السبت',
           delivery_date: '',
-          total_amount: 0,
-          amount_paid: 0,
-          lab_number: '',
-        });
-        setSelectedPatient(null);
-      } else {
-        toast.error(response.data.message || 'فشل في التسجيل (Registration failed)');
-      }
+        referring_doctor: '',
+        sample_size: 'صغيرة جدا',
+        number_of_samples: '',
+        attendance_date: '',
+        previous_tests: 'نعم',
+        sample_type: 'Pathology',
+        medical_history: '',
+        total_amount: '',
+        amount_paid_cash: '',
+        amount_paid_card: '',
+        additional_payment_method: 'Fawry',
+      });
+
     } catch (error: any) {
-      console.error('Registration failed:', error);
-      
-      // Handle specific error types
-      if (error.response?.status === 422) {
-        // Validation errors
-        const errors = error.response.data.errors;
-        if (errors) {
-          Object.keys(errors).forEach(field => {
-            toast.error(`${field}: ${errors[field][0]}`);
-          });
-        } else {
-          toast.error(error.response.data.message || 'خطأ في البيانات المدخلة (Validation error)');
-        }
-      } else if (error.response?.status === 409) {
-        // Conflict errors (like duplicate lab number)
-        if (error.response.data.message?.includes('lab') || error.response.data.message?.includes('Lab')) {
-          toast.error('رقم المختبر موجود بالفعل! يرجى استخدام رقم آخر (Lab number already exists! Please use a different number)');
-        } else {
-          toast.error(error.response.data.message || 'تعارض في البيانات (Data conflict)');
-        }
-      } else if (error.response?.status === 401) {
-        toast.error('غير مصرح لك بالوصول. يرجى تسجيل الدخول مرة أخرى (Unauthorized access. Please login again)');
-      } else if (error.response?.status === 403) {
-        toast.error('ليس لديك صلاحية للقيام بهذا الإجراء (You do not have permission to perform this action)');
-      } else if (error.response?.status === 500) {
-        toast.error('خطأ في الخادم. يرجى المحاولة مرة أخرى (Server error. Please try again)');
-      } else {
-        toast.error(error.response?.data?.message || 'فشل في التسجيل. يرجى المحاولة مرة أخرى (Registration failed. Please try again)');
-      }
+      console.error('Failed to register patient:', error);
+      const message = error.response?.data?.message || 'Failed to register patient';
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleClear = () => {
-    setFormData({
-      id: 0,
-      name: '',
-      phone: '',
-      age: 0,
-      gender: '',
-      organization: '',
-      doctor: '',
-      sample_type: '',
-      case_type: '',
-      sample_size: '',
-      number_of_samples: 0,
-      day_of_week: '',
-      medical_history: '',
-      previous_tests: '',
-      attendance_date: '',
-      delivery_date: '',
-      total_amount: 0,
-      amount_paid: 0,
-      lab_number: '',
-    });
-    setSelectedPatient(null);
-    setSearchResults([]);
-    setSearchValue('');
-  };
-
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      py: 4
+      backgroundColor: '#f5f5f5',
+      py: 4,
+      px: 2
     }}>
-      <Box sx={{ maxWidth: 1200, mx: 'auto', px: 2 }}>
-        {/* Beautiful Header */}
-        <Box sx={{ 
-          mb: 4, 
-          textAlign: 'center',
-          p: 4,
-          borderRadius: 4,
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
+      <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
+        {/* Main Form Card */}
+        <Card sx={{ 
+          borderRadius: 2,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          backgroundColor: 'white'
         }}>
-          <Typography variant="h3" sx={{ 
-            fontWeight: 800, 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            mb: 2,
-            textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            Patient Entry Record +
-          </Typography>
-          <Typography variant="h6" sx={{ 
-            color: '#666',
-            fontWeight: 400,
-            opacity: 0.8
-          }}>
-            Complete patient registration with modern interface
-          </Typography>
-        </Box>
-
-
-        {/* Beautiful Search Section */}
-        <Box sx={{ 
-          mb: 4, 
-          p: 4, 
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 4,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            mb: 3,
-            p: 3,
-            background: 'linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%)',
-            borderRadius: 3,
-            boxShadow: '0 4px 15px rgba(255, 193, 7, 0.3)'
-          }}>
-            <Typography variant="h5" sx={{ 
-              fontWeight: 700, 
-              color: '#333',
-              textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-            }}>
-              🔍 Search Section
-            </Typography>
-          </Box>
-          
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} sm={3}>
-              <FormControl fullWidth>
-                <InputLabel sx={{ fontSize: '1.1rem', fontWeight: 600 }}>Search Type</InputLabel>
-                <Select
-                  value={searchType}
-                  onChange={(e) => setSearchType(e.target.value as any)}
-                  label="Search Type"
-                  sx={{
-                    borderRadius: 3,
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="lab_number">Lab Number</MenuItem>
-                  <MenuItem value="mobile">Mobile Number</MenuItem>
-                  <MenuItem value="name">Full Name</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
+          <CardContent sx={{ p: 4 }}>
+            {/* Lab Number Check Section */}
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
               <TextField
                 fullWidth
-                label={`Enter ${searchType === 'lab_number' ? 'Lab Number' : searchType === 'mobile' ? 'Mobile Number' : 'Full Name'}`}
+                placeholder="Lab Number"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton 
-                        onClick={handleSearch} 
-                        disabled={searching}
-                        sx={{
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          color: 'white',
-                          '&:hover': {
-                            background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                          }
-                        }}
-                      >
-                        {searching ? <CircularProgress size={20} color="inherit" /> : <Search />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                    borderRadius: 1,
                   }
                 }}
               />
-            </Grid>
-            
-            <Grid item xs={12} sm={3}>
               <Button
                 variant="contained"
                 onClick={handleSearch}
                 disabled={searching}
-                fullWidth
-                startIcon={searching ? <CircularProgress size={20} /> : <Search />}
                 sx={{
-                  height: 56,
-                  borderRadius: 3,
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                  backgroundColor: '#1976d2',
+                  borderRadius: 1,
+                  px: 3,
+                  py: 1.5,
+                  minWidth: 120,
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                    boxShadow: '0 6px 20px rgba(102, 126, 234, 0.6)',
+                    backgroundColor: '#1565c0',
+                  },
+                  '&:disabled': {
+                    backgroundColor: '#ccc',
                   }
                 }}
               >
-                Search
+                {searching ? 'جاري البحث...' : 'التحقق من الوجود'}
               </Button>
-            </Grid>
-          </Grid>
-
-          {/* Beautiful Search Results */}
-          {searchResults.length > 0 && (
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" gutterBottom sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                mb: 2
-              }}>
-                📋 Search Results:
-              </Typography>
-              {searchResults.map((patient) => (
-                <Box 
-                  key={patient.id} 
-                  sx={{ 
-                    mb: 2, 
-                    p: 3,
-                    background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-                    borderRadius: 3,
-                    cursor: 'pointer',
-                    border: '1px solid #e0e0e0',
-                    transition: 'all 0.3s ease',
-                    '&:hover': { 
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
-                    }
-                  }}
-                  onClick={() => handleSelectPatient(patient)}
-                >
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    <strong>{patient.name}</strong> - {patient.phone}
-                    {patient.lab && ` - Lab: ${patient.lab}`}
-                  </Typography>
-                </Box>
-              ))}
             </Box>
-          )}
+
+            {/* Title Section */}
+            <Box sx={{ mb: 4, textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 'bold',
+                color: '#333',
+                mb: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1
+              }}>
+                Patient Entry Record
+                <AddIcon sx={{ color: '#1976d2', fontSize: 32 }} />
+              </Typography>
+              <Box sx={{ 
+                height: 2,
+                backgroundColor: '#1976d2',
+                width: '100%',
+                borderRadius: 1
+              }} />
         </Box>
 
-        {/* Beautiful Patient Registration Form */}
-        <Box sx={{ 
-          p: 4, 
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 4,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
-        }}>
-          {/* Organized Form Layout */}
-          <Grid container spacing={4}>
-            {/* Personal Information Section */}
-            <Grid item xs={12}>
-              <Typography variant="h5" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                mb: 3,
-                pb: 1,
-                borderBottom: '2px solid #667eea'
-              }}>
-                👤 Personal Information
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
+
+            {/* Form Fields */}
+            <form onSubmit={handleSubmit}>
+              <Grid container spacing={3}>
+                {/* Row 1: Name, Age, Phone */}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    الاسم
+                  </Typography>
               <TextField
                 fullWidth
-                label="الاسم (Name)"
+                    placeholder="الاسم"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 required
-                placeholder="الاسم"
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
-            
-            <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    السن
+                  </Typography>
               <TextField
                 fullWidth
-                label="رقم الموبايل (Mobile Number)"
+                    placeholder="السن"
+                    value={formData.age}
+                    onChange={(e) => handleInputChange('age', e.target.value)}
+                    required
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1,
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    رقم الموبايل
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    placeholder="رقم الموبايل"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 required
-                placeholder="رقم الموبايل"
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
             
+                {/* Row 2: Organization, Gender, Lab Number */}
             <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    الجهة
+                  </Typography>
               <TextField
                 fullWidth
-                type="number"
-                label="السن (Age)"
-                value={formData.age}
-                onChange={(e) => handleInputChange('age', e.target.value)}
-                placeholder="السن"
+                    placeholder="الجهة"
+                    value={formData.organization}
+                    onChange={(e) => handleInputChange('organization', e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
-            
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2,
-                fontSize: '1.4rem',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                👤 النوع (Gender/Type)
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    النوع
               </Typography>
               <FormControl fullWidth>
                 <Select
                   value={formData.gender}
                   onChange={(e) => handleInputChange('gender', e.target.value)}
-                  displayEmpty
                   sx={{
-                    height: '56px',
-                    fontSize: '1.2rem',
-                    borderRadius: 3,
-                    '& .MuiSelect-select': {
-                      fontSize: '1.2rem',
-                      padding: '16px 14px',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>اختر النوع</em>
-                  </MenuItem>
-                  <MenuItem value="male" sx={{ fontSize: '1.2rem' }}>ذكر (Male)</MenuItem>
-                  <MenuItem value="female" sx={{ fontSize: '1.2rem' }}>أنثى (Female)</MenuItem>
-                  <MenuItem value="other" sx={{ fontSize: '1.2rem' }}>آخر (Other)</MenuItem>
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="ذكر">ذكر</MenuItem>
+                      <MenuItem value="أنثى">أنثى</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
-            
             <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    Lab no
+                  </Typography>
               <TextField
                 fullWidth
-                label="Lab no"
+                    placeholder="Lab no"
                 value={formData.lab_number}
                 onChange={(e) => handleInputChange('lab_number', e.target.value)}
-                placeholder="Lab no"
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
 
-            {/* Medical Information Section */}
-            <Grid item xs={12} sx={{ mt: 4 }}>
-              <Typography variant="h5" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                mb: 3,
-                pb: 1,
-                borderBottom: '2px solid #667eea'
-              }}>
-                🏥 Medical Information
+                {/* Row 3: Referring Doctor, Delivery Date, Delivery Day */}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    الدكتور المرسل
               </Typography>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="الجهة (Entity/Party)"
-                value={formData.organization}
-                onChange={(e) => handleInputChange('organization', e.target.value)}
-                placeholder="الجهة"
+                    placeholder="الدكتور المرسل"
+                    value={formData.referring_doctor}
+                    onChange={(e) => handleInputChange('referring_doctor', e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
-            
-            <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    ميعاد التسليم
+                  </Typography>
               <TextField
                 fullWidth
-                label="الدكتور المرسل (Referring Doctor)"
-                value={formData.doctor}
-                onChange={(e) => handleInputChange('doctor', e.target.value)}
-                placeholder="الدكتور المرسل"
+                    type="date"
+                    value={formData.delivery_date}
+                    onChange={(e) => handleDateChange('delivery_date', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    يوم التسليم
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select
+                      value={formData.delivery_day}
+                      onChange={(e) => handleInputChange('delivery_day', e.target.value)}
+                sx={{
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="السبت">السبت</MenuItem>
+                      <MenuItem value="الأحد">الأحد</MenuItem>
+                      <MenuItem value="الاثنين">الاثنين</MenuItem>
+                      <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                      <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                      <MenuItem value="الخميس">الخميس</MenuItem>
+                      <MenuItem value="الجمعة">الجمعة</MenuItem>
+                    </Select>
+                  </FormControl>
+            </Grid>
             
-            <Grid item xs={12} md={6}>
+                {/* Row 4: Attendance Date, Attendance Day, Number of Samples, Sample Size */}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    تاريخ الحضور
+                  </Typography>
               <TextField
                 fullWidth
-                label="هل يوجد تاريخ مرضي ؟ (Is there a medical history?)"
-                value={formData.medical_history}
-                onChange={(e) => handleInputChange('medical_history', e.target.value)}
-                placeholder="نعم"
+                    type="date"
+                    value={formData.attendance_date}
+                    onChange={(e) => handleDateChange('attendance_date', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="هل سبق لك تحاليل باثولوجي (Have you had pathology tests before?)"
-                value={formData.previous_tests}
-                onChange={(e) => handleInputChange('previous_tests', e.target.value)}
-                placeholder="نعم"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }
-                }}
-              />
-            </Grid>
-
-            {/* Sample Information Section */}
-            <Grid item xs={12} sx={{ mt: 4 }}>
-              <Typography variant="h5" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                mb: 3,
-                pb: 1,
-                borderBottom: '2px solid #667eea'
-              }}>
-                🧪 Sample Information
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2,
-                fontSize: '1.4rem',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                🧪 نوع العينة (Sample Type)
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    يوم الحضور
               </Typography>
               <FormControl fullWidth>
                 <Select
-                  value={formData.sample_type}
-                  onChange={(e) => handleInputChange('sample_type', e.target.value)}
-                  displayEmpty
+                      value={formData.attendance_day}
+                      onChange={(e) => handleInputChange('attendance_day', e.target.value)}
                   sx={{
-                    height: '56px',
-                    fontSize: '1.2rem',
-                    borderRadius: 3,
-                    '& .MuiSelect-select': {
-                      fontSize: '1.2rem',
-                      padding: '16px 14px',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>اختر نوع العينة</em>
-                  </MenuItem>
-                  <MenuItem value="Pathology" sx={{ fontSize: '1.2rem' }}>Pathology</MenuItem>
-                  <MenuItem value="Cytology" sx={{ fontSize: '1.2rem' }}>Cytology</MenuItem>
-                  <MenuItem value="IHC" sx={{ fontSize: '1.2rem' }}>IHC</MenuItem>
-                  <MenuItem value="Other" sx={{ fontSize: '1.2rem' }}>Other</MenuItem>
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="السبت">السبت</MenuItem>
+                      <MenuItem value="الأحد">الأحد</MenuItem>
+                      <MenuItem value="الاثنين">الاثنين</MenuItem>
+                      <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                      <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                      <MenuItem value="الخميس">الخميس</MenuItem>
+                      <MenuItem value="الجمعة">الجمعة</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2,
-                fontSize: '1.4rem',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                📊 نوع الحالة (Case Type)
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    عدد العينات
               </Typography>
               <FormControl fullWidth>
                 <Select
-                  value={formData.case_type}
-                  onChange={(e) => handleInputChange('case_type', e.target.value)}
-                  displayEmpty
+                      value={formData.number_of_samples}
+                      onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
                   sx={{
-                    height: '56px',
-                    fontSize: '1.2rem',
-                    borderRadius: 3,
-                    '& .MuiSelect-select': {
-                      fontSize: '1.2rem',
-                      padding: '16px 14px',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>اختر نوع الحالة</em>
-                  </MenuItem>
-                  {testCategories.map((category) => (
-                    <MenuItem key={category.id} value={category.name} sx={{ fontSize: '1.2rem' }}>
-                      {category.name}
-                    </MenuItem>
-                  ))}
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="1">1</MenuItem>
+                      <MenuItem value="2">2</MenuItem>
+                      <MenuItem value="3">3</MenuItem>
+                      <MenuItem value="4">4</MenuItem>
+                      <MenuItem value="5">5</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
-            
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2,
-                fontSize: '1.4rem',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                📏 حجم العينة (Sample Size)
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    حجم العينة
               </Typography>
               <FormControl fullWidth>
                 <Select
                   value={formData.sample_size}
                   onChange={(e) => handleInputChange('sample_size', e.target.value)}
-                  displayEmpty
                   sx={{
-                    height: '56px',
-                    fontSize: '1.2rem',
-                    borderRadius: 3,
-                    '& .MuiSelect-select': {
-                      fontSize: '1.2rem',
-                      padding: '16px 14px',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>اختر حجم العينة</em>
-                  </MenuItem>
-                  <MenuItem value="صغيرة جدا" sx={{ fontSize: '1.2rem' }}>صغيرة جدا (Very Small)</MenuItem>
-                  <MenuItem value="صغيرة" sx={{ fontSize: '1.2rem' }}>صغيرة (Small)</MenuItem>
-                  <MenuItem value="متوسطة" sx={{ fontSize: '1.2rem' }}>متوسطة (Medium)</MenuItem>
-                  <MenuItem value="كبيرة" sx={{ fontSize: '1.2rem' }}>كبيرة (Large)</MenuItem>
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="صغيرة جدا">صغيرة جدا</MenuItem>
+                      <MenuItem value="صغيرة">صغيرة</MenuItem>
+                      <MenuItem value="متوسطة">متوسطة</MenuItem>
+                      <MenuItem value="كبيرة">كبيرة</MenuItem>
+                      <MenuItem value="كبيرة جدا">كبيرة جدا</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             
+                {/* Row 5: Sample Type, Previous Tests, Case Type */}
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2,
-                fontSize: '1.4rem',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                🔢 عدد العينات (Number of Samples)
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    نوع العينة
               </Typography>
               <FormControl fullWidth>
                 <Select
-                  value={formData.number_of_samples}
-                  onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
-                  displayEmpty
+                      value={formData.sample_type}
+                      onChange={(e) => handleInputChange('sample_type', e.target.value)}
                   sx={{
-                    height: '56px',
-                    fontSize: '1.2rem',
-                    borderRadius: 3,
-                    '& .MuiSelect-select': {
-                      fontSize: '1.2rem',
-                      padding: '16px 14px',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>اختر عدد العينات</em>
-                  </MenuItem>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                    <MenuItem key={num} value={num.toString()} sx={{ fontSize: '1.2rem' }}>{num}</MenuItem>
-                  ))}
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="Pathology">Pathology</MenuItem>
+                      <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
+                      <MenuItem value="سائل">سائل</MenuItem>
+                      <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
+                      <MenuItem value="frozen">frozen</MenuItem>
+                      <MenuItem value="اخرى">اخرى</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
-            
             <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 2,
-                fontSize: '1.4rem',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                📅 اليوم (Day)
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    هل سبق لك تحاليل باثولوجي
               </Typography>
               <FormControl fullWidth>
                 <Select
-                  value={formData.day_of_week}
-                  onChange={(e) => handleInputChange('day_of_week', e.target.value)}
-                  displayEmpty
+                      value={formData.previous_tests}
+                      onChange={(e) => handleInputChange('previous_tests', e.target.value)}
                   sx={{
-                    height: '56px',
-                    fontSize: '1.2rem',
-                    borderRadius: 3,
-                    '& .MuiSelect-select': {
-                      fontSize: '1.2rem',
-                      padding: '16px 14px',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    <em>اختر اليوم</em>
-                  </MenuItem>
-                  <MenuItem value="السبت" sx={{ fontSize: '1.2rem' }}>السبت (Saturday)</MenuItem>
-                  <MenuItem value="الأحد" sx={{ fontSize: '1.2rem' }}>الأحد (Sunday)</MenuItem>
-                  <MenuItem value="الاثنين" sx={{ fontSize: '1.2rem' }}>الاثنين (Monday)</MenuItem>
-                  <MenuItem value="الثلاثاء" sx={{ fontSize: '1.2rem' }}>الثلاثاء (Tuesday)</MenuItem>
-                  <MenuItem value="الأربعاء" sx={{ fontSize: '1.2rem' }}>الأربعاء (Wednesday)</MenuItem>
-                  <MenuItem value="الخميس" sx={{ fontSize: '1.2rem' }}>الخميس (Thursday)</MenuItem>
-                  <MenuItem value="الجمعة" sx={{ fontSize: '1.2rem' }}>الجمعة (Friday)</MenuItem>
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="نعم">نعم</MenuItem>
+                      <MenuItem value="لا">لا</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
 
-            {/* Dates Section */}
-            <Grid item xs={12} sx={{ mt: 4 }}>
-              <Typography variant="h5" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                mb: 3,
-                pb: 1,
-                borderBottom: '2px solid #667eea'
-              }}>
-                📅 Dates & Scheduling
+                {/* Row 6: Medical History */}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    هل يوجد تاريخ مرضي ؟
               </Typography>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                type="date"
-                label="تاريخ الحضور (Attendance Date)"
-                value={formData.attendance_date}
-                onChange={(e) => handleInputChange('attendance_date', e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                    value={formData.medical_history}
+                    onChange={(e) => handleInputChange('medical_history', e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
             
-            <Grid item xs={12} md={6}>
+                {/* Row 7: Financial Information */}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    أجمالي المبلغ
+                  </Typography>
               <TextField
                 fullWidth
-                type="date"
-                label="ميعاد التسليم (Delivery Date)"
-                value={formData.delivery_date}
-                onChange={(e) => handleInputChange('delivery_date', e.target.value)}
-                InputLabelProps={{ shrink: true }}
+                    placeholder="اجمالي المبلغ"
+                    value={formData.total_amount}
+                    onChange={(e) => handleInputChange('total_amount', e.target.value)}
+                    type="number"
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
-
-            {/* Billing Section */}
-            <Grid item xs={12} sx={{ mt: 4 }}>
-              <Typography variant="h5" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                mb: 3,
-                pb: 1,
-                borderBottom: '2px solid #667eea'
-              }}>
-                💰 Billing Information
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    المبلغ المدفوع نقداً
               </Typography>
+                  <TextField
+                    fullWidth
+                    placeholder="المبلغ المدفوع نقداً"
+                    value={formData.amount_paid_cash}
+                    onChange={(e) => handleInputChange('amount_paid_cash', e.target.value)}
+                    type="number"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 1,
+                      }
+                    }}
+                  />
             </Grid>
-            
-            <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    المبلغ المدفوع ب {formData.additional_payment_method}
+                  </Typography>
               <TextField
                 fullWidth
+                    placeholder={`المبلغ المدفوع ب ${formData.additional_payment_method}`}
+                    value={formData.amount_paid_card}
+                    onChange={(e) => handleInputChange('amount_paid_card', e.target.value)}
                 type="number"
-                label="أجمالي المبلغ (Total Amount)"
-                value={formData.total_amount}
-                onChange={(e) => handleInputChange('total_amount', e.target.value)}
-                placeholder="اجمالي المبلغ"
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
                   }
                 }}
               />
             </Grid>
             
+                {/* Row 8: Payment Method and Summary */}
             <Grid item xs={12} md={6}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    طريقة الدفع الإضافية
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select
+                      value={formData.additional_payment_method}
+                      onChange={(e) => handleInputChange('additional_payment_method', e.target.value)}
+                      sx={{
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="Fawry">Fawry</MenuItem>
+                      <MenuItem value="InstaPay">InstaPay</MenuItem>
+                      <MenuItem value="VodafoneCash">VodafoneCash</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    إجمالي المدفوع
+                  </Typography>
               <TextField
                 fullWidth
-                type="number"
-                label="المبلغ المدفوع (Amount Paid)"
-                value={formData.amount_paid}
-                onChange={(e) => handleInputChange('amount_paid', e.target.value)}
-                placeholder="المبلغ المدفوع"
+                    value={`${getTotalPaidAmount().toFixed(2)} جنيه`}
+                    disabled
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    borderRadius: 3,
-                    '& fieldset': {
-                      borderColor: '#e0e0e0',
-                      borderWidth: 2,
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#667eea',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea',
-                      borderWidth: 2,
-                    },
+                        borderRadius: 1,
+                        backgroundColor: '#f5f5f5',
                   }
                 }}
               />
             </Grid>
           </Grid>
 
-          {/* Beautiful Action Buttons */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 3, 
-            justifyContent: 'center', 
-            mt: 6,
-            flexWrap: 'wrap'
-          }}>
+              {/* Submit Button */}
+              <Box sx={{ mt: 4, textAlign: 'center' }}>
             <Button
+                  type="submit"
               variant="contained"
-              onClick={handleSubmit}
               disabled={submitting}
-              size="large"
+                  startIcon={<SaveIcon />}
               sx={{ 
-                minWidth: 250,
-                height: 60,
-                fontSize: '1.2rem',
-                fontWeight: 700,
-                borderRadius: 4,
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                boxShadow: '0 8px 25px rgba(79, 172, 254, 0.4)',
+                    backgroundColor: '#d32f2f',
+                    color: 'white',
+                    borderRadius: 1,
+                    px: 6,
+                    py: 2,
+                    fontSize: '1.1rem',
+                    fontWeight: 'bold',
+                    minWidth: 200,
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #3d8bfe 0%, #00d4fe 100%)',
-                  boxShadow: '0 12px 35px rgba(79, 172, 254, 0.6)',
-                  transform: 'translateY(-2px)',
+                      backgroundColor: '#b71c1c',
                 },
                 '&:disabled': {
-                  background: '#ccc',
-                  boxShadow: 'none',
-                  transform: 'none',
+                      backgroundColor: '#ccc',
                 }
               }}
             >
-              {submitting ? <CircularProgress size={24} color="inherit" /> : '💾 الحفظ و التسجيل (Save and Register)'}
-            </Button>
-            
-            <Button
-              variant="outlined"
-              onClick={handleClear}
-              disabled={submitting}
-              size="large"
-              sx={{ 
-                minWidth: 180,
-                height: 60,
-                fontSize: '1.2rem',
-                fontWeight: 700,
-                borderRadius: 4,
-                borderColor: '#667eea',
-                borderWidth: 2,
-                color: '#667eea',
-                '&:hover': {
-                  borderColor: '#5a6fd8',
-                  backgroundColor: 'rgba(102, 126, 234, 0.04)',
-                  borderWidth: 2,
-                  transform: 'translateY(-2px)',
-                }
-              }}
-            >
-              🔄 Clear
+                  {submitting ? 'جاري الحفظ...' : 'الحفظ و التسجيل'}
             </Button>
           </Box>
+            </form>
+          </CardContent>
+        </Card>
         </Box>
-      </Box>
+        
+        {/* Credentials Modal */}
+        <Dialog open={showCredentialsModal} onClose={() => setShowCredentialsModal(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', color: '#d32f2f' }}>
+            بيانات تسجيل الدخول للمريض
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ textAlign: 'center', py: 2 }}>
+              <Typography variant="h6" sx={{ mb: 3, color: '#333' }}>
+                تم تسجيل المريض بنجاح!
+              </Typography>
+              
+              <Box sx={{ backgroundColor: '#f5f5f5', p: 3, borderRadius: 2, mb: 3 }}>
+                <Typography variant="body1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                  اسم المستخدم (Username):
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#d32f2f', fontFamily: 'monospace', mb: 3 }}>
+                  {patientCredentials?.username}
+                </Typography>
+                
+                <Typography variant="body1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                  كلمة المرور (Password):
+                </Typography>
+                <Typography variant="h6" sx={{ color: '#d32f2f', fontFamily: 'monospace' }}>
+                  {patientCredentials?.password}
+                </Typography>
+              </Box>
+              
+              <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>
+                يمكن للمريض استخدام هذه البيانات للدخول إلى النظام
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleReceiptPrint}
+              disabled={loadingReceipt}
+              sx={{ 
+                backgroundColor: '#1976d2',
+                color: 'white',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              {loadingReceipt ? 'جاري التحميل...' : 'طباعة الإيصال'}
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleSamplePrint}
+              disabled={loadingSample}
+              sx={{ 
+                backgroundColor: '#9c27b0',
+                color: 'white',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              {loadingSample ? 'جاري التحميل...' : 'طباعة العينة'}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setShowCredentialsModal(false)}
+              sx={{ 
+                borderColor: '#d32f2f',
+                color: '#d32f2f',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              إغلاق
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Success Modal */}
-      <Dialog
-        open={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          textAlign: 'center', 
-          fontSize: '1.8rem', 
-          fontWeight: 700,
-          pb: 1
-        }}>
-          ✅ تم التسجيل بنجاح!
-        </DialogTitle>
-        
-        <DialogContent sx={{ pt: 2 }}>
-          <Paper sx={{ 
-            p: 3, 
-            background: 'rgba(255, 255, 255, 0.95)', 
-            color: '#333',
-            borderRadius: 3,
-            mb: 3
-          }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 700, 
-              color: '#667eea', 
-              mb: 2,
-              textAlign: 'center'
-            }}>
-              📋 Patient Registration Details
-            </Typography>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
-                🏥 Lab Number:
-              </Typography>
-              <Typography variant="h5" sx={{ 
-                fontWeight: 700, 
-                color: '#667eea',
-                textAlign: 'center',
-                p: 2,
-                background: 'rgba(102, 126, 234, 0.1)',
-                borderRadius: 2,
-                border: '2px solid #667eea'
-              }}>
-                {successData?.labNumber}
+        {/* Receipt Modal - Same as Receipts.tsx */}
+        <Dialog open={showReceiptModal} onClose={() => setShowReceiptModal(false)} maxWidth="md" fullWidth>
+          <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Receipt sx={{ mr: 1, fontSize: 32 }} />
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Visit Receipt
               </Typography>
             </Box>
-            
-            <Divider sx={{ my: 2 }} />
-            
-            <Typography variant="h6" sx={{ 
-              fontWeight: 700, 
-              color: '#667eea', 
-              mb: 2,
-              textAlign: 'center'
-            }}>
-              🔐 Login Credentials
-            </Typography>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
-                👤 Username:
+            {receiptData && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Receipt #{receiptData.receipt_number} • {receiptData.date}
               </Typography>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                textAlign: 'center',
-                p: 1.5,
-                background: 'rgba(0, 0, 0, 0.05)',
-                borderRadius: 2,
-                fontFamily: 'monospace'
-              }}>
-                {successData?.credentials.username}
+            )}
+          </DialogTitle>
+          <DialogContent>
+            {receiptData ? (
+              <Box>
+                {/* Patient Info */}
+                <Box sx={{ mb: 4, p: 3, bgcolor: 'primary.50', borderRadius: 3, border: '1px solid', borderColor: 'primary.200' }}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+                    <Person sx={{ mr: 1 }} />
+                    Patient Information
+                  </Typography>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>Name:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                        {String(receiptData.patient_name)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>Phone:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                        {String(receiptData.patient_phone)}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                {/* Tests Ordered */}
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+                    <Science sx={{ mr: 1 }} />
+                    Tests Ordered ({receiptData.tests?.length || 0})
+                  </Typography>
+                  {receiptData.tests && receiptData.tests.length > 0 ? (
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Test Name</TableCell>
+                            <TableCell>Category</TableCell>
+                            <TableCell align="right">Price</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {receiptData.tests.map((test: any, index: number) => (
+                            <TableRow key={index}>
+                              <TableCell>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {test.name}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" color="text.secondary">
+                                  {test.category}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  EGP {test.price}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        No tests ordered
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Financial Summary */}
+                <Box sx={{ mb: 4, p: 3, bgcolor: 'success.50', borderRadius: 3, border: '1px solid', borderColor: 'success.200' }}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+                    <MonetizationOn sx={{ mr: 1 }} />
+                    Financial Summary
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Total Amount:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        EGP {receiptData.total_amount || 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Discount:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        EGP {receiptData.discount_amount || 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Final Amount:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        EGP {receiptData.final_amount || 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Total Paid:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
+                        EGP {receiptData.paid_now || 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Remaining Balance:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: receiptData.remaining_balance > 0 ? 'warning.main' : 'success.main' }}>
+                        EGP {receiptData.remaining_balance || 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Payment Method:</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {receiptData.payment_method || 'CASH'}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                  
+                  {/* Payment Breakdown */}
+                  {receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) && (
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid', borderColor: 'grey.300' }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                        Payment Breakdown:
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {receiptData.payment_breakdown.cash > 0 && (
+                          <Grid item xs={6}>
+                            <Typography variant="body2" color="text.secondary">Paid Cash:</Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              EGP {receiptData.payment_breakdown.cash}
+                            </Typography>
+                          </Grid>
+                        )}
+                        {receiptData.payment_breakdown.card > 0 && (
+                          <Grid item xs={6}>
+                            <Typography variant="body2" color="text.secondary">
+                              Paid with {receiptData.payment_breakdown.card_method}:
+                            </Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                              EGP {receiptData.payment_breakdown.card}
+                            </Typography>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Status */}
+                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.50', borderRadius: 2 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Payment Status
+                  </Typography>
+                  <Chip
+                    label={receiptData.billing_status || 'PENDING'}
+                    color={receiptData.billing_status === 'paid' ? 'success' : receiptData.billing_status === 'partial' ? 'warning' : 'default'}
+                    sx={{ fontWeight: 600, mb: 2 }}
+                  />
+                  {receiptData.processed_by && (
+                    <Typography variant="body2" color="text.secondary">
+                      Processed by: {receiptData.processed_by}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <CircularProgress sx={{ mb: 2 }} />
+                <Typography variant="body1">جاري تحميل بيانات الإيصال...</Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Print />}
+              onClick={() => {
+                if (receiptData) {
+                  // Use the same print function as Receipts.tsx
+                  const printWindow = window.open('', '_blank');
+                  if (printWindow) {
+                printWindow.document.write(`
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <title>Receipt - ${receiptData.receipt_number}</title>
+                    <style>
+                      @page { size: 80mm 200mm; margin: 5mm; }
+                      body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.2; margin: 0; padding: 0; width: 70mm; }
+                      .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+                      .header h1 { font-size: 14px; margin: 0 0 4px 0; font-weight: bold; }
+                      .header p { margin: 2px 0; font-size: 10px; }
+                      .section { margin-bottom: 8px; }
+                      .section h3 { font-size: 11px; margin: 0 0 4px 0; font-weight: bold; border-bottom: 1px dotted #000; padding-bottom: 2px; }
+                      .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
+                      .row .label { flex: 1; }
+                      .row .value { flex: 1; text-align: right; font-weight: bold; }
+                      .total { font-weight: bold; border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
+                      .total .row { font-size: 11px; }
+                      .payment-breakdown { margin-top: 4px; padding-top: 4px; border-top: 1px dotted #000; }
+                      .payment-breakdown .row { font-size: 9px; }
+                      .barcode { text-align: center; font-family: 'Courier New', monospace; font-size: 8px; margin: 4px 0; padding: 2px; background: #f0f0f0; border: 1px solid #000; }
+                      .footer { text-align: center; font-size: 8px; margin-top: 8px; border-top: 1px dotted #000; padding-top: 4px; }
+                      .test-item { margin-bottom: 1px; font-size: 9px; }
+                      .test-name { display: inline-block; width: 60%; }
+                      .test-price { display: inline-block; width: 35%; text-align: right; }
+                      @media print { body { margin: 0; padding: 0; } .no-print { display: none; } }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="header">
+                      <h1>${receiptData.billing_status === 'paid' ? 'FINAL PAYMENT RECEIPT' : 'PATHOLOGY LAB RECEIPT'}</h1>
+                      <p>Date: ${receiptData.date ? new Date(receiptData.date).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                      <p>Receipt #: ${receiptData.receipt_number || 'N/A'}</p>
+                      <p>Lab #: ${receiptData.lab_number || 'N/A'}</p>
+                    </div>
+                    
+                    <div class="section">
+                      <h3>PATIENT INFO</h3>
+                      <div class="row">
+                        <span class="label">Name:</span>
+                        <span class="value" style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${receiptData.patient_name || 'N/A'}</span>
+                      </div>
+                      <div class="row">
+                        <span class="label">Phone:</span>
+                        <span class="value">${receiptData.patient_phone || 'N/A'}</span>
+                      </div>
+                    </div>
+                    
+                    <div class="section">
+                      <h3>TESTS (${receiptData.tests?.length || 0})</h3>
+                      ${(receiptData.tests || []).map((test: any) => `
+                        <div class="test-item">
+                          <span class="test-name">${test.name || 'Unknown Test'}</span>
+                          <span class="test-price">EGP ${test.price || 0}</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                    
+                    <div class="section total">
+                      <div class="row">
+                        <span class="label">Total:</span>
+                        <span class="value">EGP ${receiptData.total_amount || 0}</span>
+                      </div>
+                      <div class="row">
+                        <span class="label">Discount:</span>
+                        <span class="value">EGP ${receiptData.discount_amount || 0}</span>
+                      </div>
+                      <div class="row">
+                        <span class="label">Final:</span>
+                        <span class="value">EGP ${receiptData.final_amount || 0}</span>
+                      </div>
+                      <div class="row">
+                        <span class="label">Paid:</span>
+                        <span class="value">EGP ${receiptData.paid_now || 0}</span>
+                      </div>
+                      <div class="row">
+                        <span class="label">Remaining:</span>
+                        <span class="value">EGP ${receiptData.remaining_balance || 0}</span>
+                      </div>
+                    </div>
+                    
+                    ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
+                      <div class="section payment-breakdown">
+                        <h3>PAYMENT BREAKDOWN</h3>
+                        ${receiptData.payment_breakdown.cash > 0 ? `
+                          <div class="row">
+                            <span class="label">Paid Cash:</span>
+                            <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
+                          </div>
+                        ` : ''}
+                        ${receiptData.payment_breakdown.card > 0 ? `
+                          <div class="row">
+                            <span class="label">Paid with ${receiptData.payment_breakdown.card_method}:</span>
+                            <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
+                          </div>
+                        ` : ''}
+                      </div>
+                    ` : ''}
+                    
+                    <div class="section">
+                      <div class="row">
+                        <span class="label">Status:</span>
+                        <span class="value">${receiptData.billing_status || 'PENDING'}</span>
+                      </div>
+                    </div>
+                    
+                    ${receiptData.barcode ? `
+                      <div class="barcode">
+                        ${receiptData.barcode}
+                      </div>
+                    ` : ''}
+                    
+                    <div class="footer">
+                      <p>Thank you for choosing our lab!</p>
+                      <p>Processed by: ${receiptData.processed_by || 'System'}</p>
+                      <p>Printed at: ${new Date().toLocaleString()}</p>
+                    </div>
+                  </body>
+                  </html>
+                `);
+                    printWindow.document.close();
+                    printWindow.print();
+                  }
+                }
+              }}
+              sx={{ 
+                backgroundColor: '#1976d2',
+                color: 'white',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              Print Receipt
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setShowReceiptModal(false)}
+              sx={{ 
+                borderColor: '#d32f2f',
+                color: '#d32f2f',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              إغلاق
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Sample Label Modal - Same as CheckIn.tsx */}
+        <Dialog open={showSampleModal} onClose={() => setShowSampleModal(false)} maxWidth="md" fullWidth>
+          <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Science sx={{ mr: 1, fontSize: 32 }} />
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Sample Labels
               </Typography>
             </Box>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
-                🔑 Password:
-              </Typography>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 700, 
-                color: '#333',
-                textAlign: 'center',
-                p: 1.5,
-                background: 'rgba(0, 0, 0, 0.05)',
-                borderRadius: 2,
-                fontFamily: 'monospace'
-              }}>
-                {successData?.credentials.password}
-              </Typography>
-            </Box>
-            
-            <Box sx={{ 
-              mt: 3, 
-              p: 2, 
-              background: 'rgba(76, 175, 80, 0.1)', 
-              borderRadius: 2,
-              border: '1px solid rgba(76, 175, 80, 0.3)'
-            }}>
-              <Typography variant="body2" sx={{ 
-                color: '#2e7d32', 
-                fontWeight: 600,
-                textAlign: 'center'
-              }}>
-                💡 Please save these credentials securely. The patient can use them to access their portal.
-              </Typography>
-            </Box>
-          </Paper>
-        </DialogContent>
-        
-        <DialogActions sx={{ p: 3, justifyContent: 'center' }}>
-          <Button
-            onClick={() => setShowSuccessModal(false)}
-            variant="contained"
-            size="large"
-            sx={{
-              minWidth: 200,
-              height: 50,
-              fontSize: '1.1rem',
-              fontWeight: 700,
-              borderRadius: 3,
-              background: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              '&:hover': {
-                background: 'rgba(255, 255, 255, 0.3)',
-                border: '2px solid rgba(255, 255, 255, 0.5)',
-                transform: 'translateY(-2px)',
-              }
-            }}
-          >
-            ✅ Got it!
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {sampleData && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {sampleData.sample_labels?.length || 0} sample label(s) generated
+          </Typography>
+        )}
+          </DialogTitle>
+          <DialogContent>
+        {sampleData ? (
+          <Box>
+            {sampleData.sample_labels && sampleData.sample_labels.length > 0 ? (
+              <Grid container spacing={2}>
+                {sampleData.sample_labels.map((sampleLabel: any, index: number) => (
+                  <Grid item xs={12} sm={6} key={index}>
+                    <Card variant="outlined" sx={{ p: 2 }}>
+                      <Box sx={{ textAlign: 'left' }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          <strong>Patient:</strong> {sampleLabel.patient_name}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Lab Number:</strong> {sampleLabel.lab_number}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Sample ID:</strong> {sampleLabel.sample_id}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Sample Type:</strong> {sampleLabel.sample_type}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Sample Size:</strong> {sampleLabel.sample_size}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Date:</strong> {sampleLabel.sample_date}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Time:</strong> {sampleLabel.sample_time}
+                        </Typography>
+                        <Box sx={{ mt: 2, p: 1, bgcolor: 'white', borderRadius: 1, border: '1px solid #ccc' }}>
+                          <div dangerouslySetInnerHTML={{ __html: sampleLabel.barcode }} />
+                        </Box>
+                      </Box>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary">
+                  No sample labels available
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <CircularProgress sx={{ mb: 2 }} />
+                <Typography variant="body1">جاري تحميل بيانات ملصق العينة...</Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<Print />}
+              onClick={() => {
+                if (sampleData && sampleData.sample_labels) {
+                  // Use the same print function as CheckIn.tsx
+                  const printWindow = window.open('', '_blank');
+                  if (printWindow) {
+                    const labelsHTML = sampleData.sample_labels.map((sampleLabel: any) => `
+                      <div style="page-break-after: always; margin-bottom: 20px;">
+                        <div style="border: 2px solid #000; padding: 10px; width: 300px; font-family: Arial, sans-serif;">
+                          <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 10px;">
+                            SAMPLE LABEL
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Patient:</strong> ${sampleLabel.patient_name}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Lab Number:</strong> ${sampleLabel.lab_number}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Sample ID:</strong> ${sampleLabel.sample_id}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Sample Type:</strong> ${sampleLabel.sample_type}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Sample Size:</strong> ${sampleLabel.sample_size}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Date:</strong> ${sampleLabel.sample_date}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Time:</strong> ${sampleLabel.sample_time}
+                          </div>
+                          <div style="margin-top: 10px; text-align: center; border: 1px solid #ccc; padding: 5px;">
+                            ${sampleLabel.barcode}
+                          </div>
+                        </div>
+                      </div>
+                    `).join('');
+                    
+                    printWindow.document.write(`
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <title>Sample Labels</title>
+                        <style>
+                          @page { size: A4; margin: 1cm; }
+                          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+                          @media print { 
+                            body { margin: 0; padding: 0; }
+                            .no-print { display: none; }
+                          }
+                        </style>
+                      </head>
+                      <body>
+                        ${labelsHTML}
+                      </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    printWindow.print();
+                  }
+                }
+              }}
+              sx={{ 
+                backgroundColor: '#9c27b0',
+                color: 'white',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              Print All Labels
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setShowSampleModal(false)}
+              sx={{ 
+                borderColor: '#d32f2f',
+                color: '#d32f2f',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 120,
+              }}
+            >
+              إغلاق
+            </Button>
+          </DialogActions>
+        </Dialog>
     </Box>
   );
 };
 
 export default PatientRegistration;
-

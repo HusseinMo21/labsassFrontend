@@ -23,7 +23,6 @@ import LabInsightsDashboard from './pages/erp/LabInsightsDashboard';
 import PatientTestSearch from './pages/erp/PatientTestSearch';
 import EnhancedReports from './pages/erp/EnhancedReports';
 import ReviewReports from './pages/erp/ReviewReports';
-import SampleTracking from './pages/erp/SampleTracking';
 import Notifications from './pages/erp/Notifications';
 import CheckIn from './pages/erp/CheckIn';
 import UnpaidInvoices from './pages/erp/UnpaidInvoices';
@@ -326,16 +325,6 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <PatientTestSearch />
-        </ERPLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/sample-tracking',
-    element: (
-      <ProtectedRoute>
-        <ERPLayout>
-          <SampleTracking />
         </ERPLayout>
       </ProtectedRoute>
     ),

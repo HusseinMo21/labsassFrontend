@@ -79,7 +79,7 @@ const navigationItems: NavigationItem[] = [
   // Staff - Limited access (including Check-In & Billing and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
   { path: '/shift-management', label: 'Shift Management', icon: <Schedule />, roles: ['staff'] },
-  { path: '/patients', label: 'Patients', icon: <People />, roles: ['staff'] },
+  { path: '/patients', label: 'Patients Search', icon: <People />, roles: ['staff'] },
   { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['staff'] },
@@ -87,14 +87,13 @@ const navigationItems: NavigationItem[] = [
   { path: '/check-in', label: 'Check-In & Billing', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/unpaid-invoices', label: 'Unpaid Invoices', icon: <CreditCard />, roles: ['staff'] },
   { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['staff'] },
-  { path: '/sample-tracking', label: 'Sample Tracking', icon: <LocalShipping />, roles: ['staff'] },
   { path: '/notifications', label: 'Notifications', icon: <Notifications />, roles: ['staff'] },
   { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['staff'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
   { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['staff'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['staff'] },
   { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['staff'] },
-  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['staff'] },
+  { path: '/enhanced-reports', label: 'Completed Reports', icon: <Assessment />, roles: ['staff'] },
 
   // Doctor - Can view and approve reports
   { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },

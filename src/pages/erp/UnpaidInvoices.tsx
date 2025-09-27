@@ -167,7 +167,7 @@ const UnpaidInvoices: React.FC = () => {
     if (!selectedInvoice) return;
 
     try {
-      const response = await axios.post(`/api/invoices/${selectedInvoice.id}/add-payment`, paymentForm);
+      const response = await axios.post(`/api/visits/${selectedInvoice.id}/add-payment`, paymentForm);
       
       // Check if this payment completes the invoice
       // const _ = response.data.remaining_balance;
@@ -175,7 +175,7 @@ const UnpaidInvoices: React.FC = () => {
       
       if (isFullyPaid) {
         // Generate final payment receipt
-        const receiptResponse = await axios.get(`/api/invoices/${selectedInvoice.id}/final-payment-receipt`);
+        const receiptResponse = await axios.get(`/api/visits/${selectedInvoice.id}/final-payment-receipt`);
         setReceiptData(receiptResponse.data);
         setShowReceiptModal(true);
         toast.success('Payment completed! Final receipt generated.');

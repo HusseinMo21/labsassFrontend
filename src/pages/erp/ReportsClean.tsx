@@ -593,7 +593,7 @@ const Reports: React.FC = () => {
         <CardContent>
           <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
             <Tab label="Visits" />
-            <Tab label="Enhanced Reports" />
+            <Tab label="Completed Reports" />
           </Tabs>
 
           {activeTab === 0 && (
@@ -730,13 +730,13 @@ const Reports: React.FC = () => {
           {activeTab === 1 && (
             <>
               <Typography variant="h6" gutterBottom>
-                Enhanced Reports
+                Completed Reports
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Manage laboratory reports with enhanced workflow
               </Typography>
               <Alert severity="info">
-                Enhanced Reports functionality will be available in the Enhanced Reports section.
+                Completed Reports functionality will be available in the Completed Reports section.
               </Alert>
             </>
           )}
