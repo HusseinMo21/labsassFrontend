@@ -263,7 +263,7 @@ const ShiftManagement: React.FC = () => {
                   ${Object.entries(reportData.shift_info.payment_breakdown).map(([method, amount]) => `
                     <div class="summary-item">
                       <div class="summary-label">${method}</div>
-                      <div class="summary-value">EGP ${(parseFloat(amount) || 0).toFixed(2)}</div>
+                      <div class="summary-value">EGP ${(parseFloat(amount as string) || 0).toFixed(2)}</div>
                     </div>
                   `).join('')}
                 </div>

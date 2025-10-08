@@ -26,44 +26,29 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   IconButton,
   Divider,
-  Autocomplete,
-  Stepper,
-  Step,
-  StepLabel,
   Avatar,
   Tooltip,
-  LinearProgress,
   InputAdornment,
-  Fade,
-  Slide,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
   Add,
-  Remove,
   Receipt,
   Print,
   CheckCircle,
   Person,
-  Science,
   AttachMoney,
   Search,
   Phone,
-  Email,
   Close,
   Payment,
-  ShoppingCart,
-  NavigateNext,
-  NavigateBefore,
-  Done,
   MonetizationOn,
   CreditCard,
   AccountBalance,
+  LocalAtm,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -72,178 +57,170 @@ interface Patient {
   id: number;
   name: string;
   phone: string;
-  email?: string;
-}
-
-interface TestCategory {
-  id: number;
-  name: string;
-  code: string;
-  description: string;
-  is_active: boolean;
-}
-
-interface CustomTest {
-  id: string; // temporary ID for frontend
-  test_category_id: number;
-  category_name: string;
-  custom_test_name: string;
-  custom_price: number;
-  discount_percentage: number;
-  final_price: number;
+  lab?: string;
+  age?: number;
+  gender?: string;
+  visits?: any[];
+  total_amount?: number;
+  amount_paid?: number;
+  remaining_balance?: number;
+  payment_status?: string;
 }
 
 const CheckIn: React.FC = () => {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
-  
-  // Patient state
-  const [patientQuery, setPatientQuery] = useState('');
-  const [patientResults, setPatientResults] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  
-  // Test state
-  const [availableCategories, setAvailableCategories] = useState<TestCategory[]>([]);
-  const [selectedTests, setSelectedTests] = useState<CustomTest[]>([]);
-  
-  // Current test form state
-  const [currentTestForm, setCurrentTestForm] = useState({
-    test_category_id: '',
-    custom_test_name: '',
-    custom_price: 0,
-    discount_percentage: 0,
-  });
-  
-  // Billing state
-  const [paymentForm, setPaymentForm] = useState({
-    upfront_payment: 0,
-    payment_method: 'cash',
-    notes: '',
-    discount_amount: 0,
-    discount_percentage: 0,
-    insurance_provider: '',
-    insurance_policy_number: '',
-    insurance_claim_number: '',
-    expected_delivery_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Tomorrow
-  });
-  
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showLabelModal, setShowLabelModal] = useState(false);
-  const [currentVisit, setCurrentVisit] = useState<any>(null);
-  const [labelData, setLabelData] = useState<any>(null);
-
-  const steps = [
-    { label: 'Patient Selection', icon: <Person />, description: 'Find or register patient' },
-    { label: 'Test Selection', icon: <Science />, description: 'Choose lab tests' },
-    { label: 'Billing & Payment', icon: <MonetizationOn />, description: 'Complete payment' },
-  ];
+  const [showExtraPaymentModal, setShowExtraPaymentModal] = useState(false);
+  const [extraPaymentAmount, setExtraPaymentAmount] = useState('');
+  const [extraPaymentMethod, setExtraPaymentMethod] = useState('cash');
+  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [itemsPerPage] = useState(15);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    fetchTestCategories();
+    fetchPatients();
+  }, [currentPage]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    const timeout = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page when searching
+      fetchPatients();
+    }, 500); // 500ms delay
+    setSearchTimeout(timeout);
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [searchQuery]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
   }, []);
 
-  useEffect(() => {
-    if (patientQuery.length >= 2) {
-      searchPatients();
-    } else {
-      setPatientResults([]);
-    }
-  }, [patientQuery]);
-
-  const fetchTestCategories = async () => {
+  const fetchPatients = async () => {
     try {
-      const response = await axios.get('/api/check-in/test-categories');
-      console.log('Categories response:', response.data);
-      if (response.data.success && response.data.data) {
-        setAvailableCategories(response.data.data);
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        per_page: itemsPerPage.toString(),
+      });
+      
+      // Add search parameter if provided
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      
+      const response = await axios.get(`/api/patients?${params.toString()}`);
+      console.log('Patients API response:', response.data);
+      
+      // Log debug info for each patient
+      if (response.data.data) {
+        response.data.data.forEach((patient: any) => {
+          if (patient.debug_info) {
+            console.log(`Debug info for patient ${patient.name} (ID: ${patient.id}):`, patient.debug_info);
+          }
+        });
+      }
+      
+      // Handle paginated response
+      if (response.data.data) {
+        setPatients(response.data.data);
+        setTotalPages(response.data.last_page || 1);
+        setTotalItems(response.data.total || 0);
+        setCurrentPage(response.data.current_page || 1);
+        
+        // Debug pagination data
+        console.log('Pagination data:', {
+          current_page: response.data.current_page,
+          last_page: response.data.last_page,
+          total: response.data.total,
+          per_page: response.data.per_page,
+          data_length: response.data.data.length
+        });
       } else {
-        setAvailableCategories([]);
+        // Fallback for non-paginated response
+        setPatients(response.data);
+        setTotalPages(1);
+        setTotalItems(response.data.length || 0);
+        setCurrentPage(1);
+        
+        console.log('Non-paginated response, using fallback');
       }
     } catch (error) {
-      console.error('Failed to fetch test categories:', error);
-      setAvailableCategories([]);
-    }
-  };
-
-  const searchPatients = async () => {
-    try {
-      setSearching(true);
-      const response = await axios.get('/api/check-in/patients/search', {
-        params: { query: patientQuery }
-      });
-      // Backend returns {patients: [...]}, so we need to access response.data.patients
-      const patients = response.data?.patients || response.data || [];
-      setPatientResults(Array.isArray(patients) ? patients : []);
-    } catch (error) {
-      console.error('Failed to search patients:', error);
-      setPatientResults([]);
-      toast.error('Failed to search patients. Please try again.');
+      console.error('Failed to fetch patients:', error);
+      toast.error('Failed to fetch patients');
     } finally {
-      setSearching(false);
+      setLoading(false);
     }
   };
 
-  const handleAddTest = () => {
-    if (!currentTestForm.test_category_id || !currentTestForm.custom_test_name || currentTestForm.custom_price <= 0) {
-      toast.error('Please fill in all test details');
+  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleAddExtraPayment = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setExtraPaymentAmount('');
+    setExtraPaymentMethod('cash');
+    setShowExtraPaymentModal(true);
+  };
+
+  const handleSubmitExtraPayment = async () => {
+    if (!selectedPatient || !extraPaymentAmount) {
+      toast.error('Please enter payment amount');
       return;
     }
 
-    const selectedCategory = availableCategories.find(cat => cat.id.toString() === currentTestForm.test_category_id);
-    if (!selectedCategory) {
-      toast.error('Please select a valid category');
+    const amount = parseFloat(extraPaymentAmount);
+    if (amount <= 0) {
+      toast.error('Payment amount must be greater than 0');
       return;
     }
 
-    const finalPrice = currentTestForm.custom_price - (currentTestForm.custom_price * currentTestForm.discount_percentage / 100);
+    setSubmitting(true);
+    try {
+      // Submit extra payment
+      const response = await axios.post(`/api/patients/${selectedPatient.id}/extra-payment`, {
+        amount: amount,
+        payment_method: extraPaymentMethod,
+        notes: `Extra payment - ${extraPaymentMethod}`,
+      });
 
-    const newTest: CustomTest = {
-      id: `temp_${Date.now()}_${Math.random()}`,
-      test_category_id: parseInt(currentTestForm.test_category_id),
-      category_name: selectedCategory.name,
-      custom_test_name: currentTestForm.custom_test_name,
-      custom_price: currentTestForm.custom_price,
-      discount_percentage: currentTestForm.discount_percentage,
-      final_price: finalPrice,
-    };
-
-    setSelectedTests([...selectedTests, newTest]);
-    
-    // Reset form
-    setCurrentTestForm({
-      test_category_id: '',
-      custom_test_name: '',
-      custom_price: 0,
-      discount_percentage: 0,
-    });
-
-    toast.success('Test added successfully');
-  };
-
-  const handleRemoveTest = (testId: string) => {
-    setSelectedTests(selectedTests.filter(test => test.id !== testId));
-  };
-
-
-
-  const calculateTotal = () => {
-    return selectedTests.reduce((sum, test) => sum + test.final_price, 0);
-  };
-
-  const calculateFinalAmount = () => {
-    const total = calculateTotal();
-    const discount = paymentForm.discount_amount || 0;
-    return Math.max(0, total - discount);
-  };
-
-  const calculateBalance = () => {
-    return calculateFinalAmount() - paymentForm.upfront_payment;
-  };
-
-  const calculateMinimumUpfront = () => {
-    return Math.ceil(calculateFinalAmount() * 0.5); // 50% minimum
+      toast.success('Extra payment added successfully');
+      setShowExtraPaymentModal(false);
+      setSelectedPatient(null);
+      setExtraPaymentAmount('');
+      
+      // Refresh patients list
+      fetchPatients();
+      
+      // Navigate to receipt if needed
+      if (response.data.receipt_data) {
+        // Handle receipt generation
+        console.log('Receipt data:', response.data.receipt_data);
+      }
+    } catch (error: any) {
+      console.error('Failed to add extra payment:', error);
+      toast.error(error.response?.data?.message || 'Failed to add extra payment');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -253,1293 +230,289 @@ const CheckIn: React.FC = () => {
     }).format(amount);
   };
 
-  const handlePrintLabel = async () => {
-    if (!currentVisit) {
-      toast.error('No visit data available');
-      return;
-    }
-    
-    console.log('Current visit object:', currentVisit);
-    console.log('Visit ID:', currentVisit.id);
-    
-    // Try different possible ID fields
-    const visitId = currentVisit.id || currentVisit.visit_id || currentVisit.visitId;
-    
-    if (!visitId) {
-      console.error('No visit ID found in currentVisit:', currentVisit);
-      toast.error('Visit ID not found');
-      return;
-    }
-    
-    try {
-      console.log(`Making request to: /api/check-in/visits/${visitId}/sample-label`);
-      const response = await axios.get(`/api/check-in/visits/${visitId}/sample-label`);
-      console.log('Sample label response:', response.data);
-      setLabelData(response.data.label_data);
-      setShowLabelModal(true);
-      toast.success('Sample labels generated successfully');
-    } catch (error) {
-      console.error('Failed to generate sample label:', (error as any));
-      console.error('Error response:', (error as any).response?.data);
-      console.error('Error status:', (error as any).response?.status);
-      toast.error(`Failed to generate sample label: ${(error as any).response?.data?.message || (error as any).message}`);
-    }
-  };
-
-  const printSampleLabel = () => {
-    if (!labelData) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Popup blocked. Please allow popups for this site.');
-      return;
-    }
-
-    const labelHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Sample Labels</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-          .label { 
-            border: 2px solid #000; 
-            padding: 15px; 
-            margin: 10px 0; 
-            width: 300px; 
-            display: inline-block;
-            vertical-align: top;
-            page-break-inside: avoid;
-          }
-          .label-header { font-weight: bold; font-size: 16px; margin-bottom: 10px; }
-          .label-row { margin: 5px 0; }
-          .barcode { 
-            font-family: 'Courier New', monospace; 
-            font-size: 14px; 
-            font-weight: bold; 
-            text-align: center; 
-            margin-top: 10px;
-            padding: 5px;
-            background: #f0f0f0;
-          }
-          @media print {
-            .label { margin: 5px; }
-          }
-        </style>
-      </head>
-      <body>
-        <h2>Sample Labels - <span style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${labelData.patient_name}</span></h2>
-        <p><strong>Date:</strong> ${labelData.visit_date} | <strong>Receipt:</strong> ${labelData.visit_id}</p>
-        
-        ${labelData.test_labels?.map((testLabel: any) => `
-          <div class="label">
-            <div class="label-header">LABORATORY SAMPLE</div>
-            <div class="label-row"><strong>Test:</strong> ${testLabel.test_name}</div>
-            <div class="label-row"><strong>Patient:</strong> <span style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${testLabel.patient_name}</span></div>
-            <div class="label-row"><strong>ID:</strong> ${testLabel.patient_id}</div>
-            <div class="label-row"><strong>Date:</strong> ${testLabel.sample_date}</div>
-            <div class="label-row"><strong>Time:</strong> ${testLabel.sample_time}</div>
-            <div class="barcode">${testLabel.barcode}</div>
-          </div>
-        `).join('')}
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(labelHTML);
-    printWindow.document.close();
-    printWindow.print();
-    printWindow.close();
-  };
-
-  const handleNavigateToReceipts = () => {
-    // Navigate to receipts page with patient filter
-    const patientId = currentVisit?.patient?.id || selectedPatient?.id;
-    if (patientId) {
-      navigate(`/receipts?patient=${patientId}`);
+  const getPaymentStatusChip = (status: string, remainingBalance: number) => {
+    if (remainingBalance <= 0) {
+      return <Chip icon={<CheckCircle />} label="Fully Paid" color="success" size="small" />;
+    } else if (status === 'partial') {
+      return <Chip label="Partial Payment" color="warning" size="small" />;
     } else {
-      navigate('/receipts');
-    }
-    setShowReceiptModal(false);
-  };
-
-
-
-  const handleNext = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      return <Chip label="Pending Payment" color="error" size="small" />;
     }
   };
 
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleCompleteVisit = async () => {
-    if (!selectedPatient || selectedTests.length === 0) {
-      toast.error('Please select a patient and at least one test');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const visitData = {
-        patient_id: selectedPatient.id,
-        tests: selectedTests.map(test => ({
-          test_category_id: test.test_category_id,
-          custom_test_name: test.custom_test_name,
-          custom_price: test.custom_price,
-          discount_percentage: test.discount_percentage
-        })),
-        upfront_payment: paymentForm.upfront_payment,
-        payment_method: paymentForm.payment_method,
-        notes: paymentForm.notes,
-        insurance_provider: paymentForm.insurance_provider,
-        insurance_policy_number: paymentForm.insurance_policy_number,
-        insurance_claim_number: paymentForm.insurance_claim_number,
-        expected_delivery_date: paymentForm.expected_delivery_date || new Date().toISOString().split('T')[0]
-      };
-
-      console.log('Sending visit data:', visitData);
-      console.log('Selected tests:', selectedTests);
-      console.log('Tests array being sent:', visitData.tests);
-      
-      const response = await axios.post('/api/check-in/create-visit', visitData);
-      console.log('Visit response:', response.data);
-      console.log('Visit object:', response.data.visit);
-      console.log('Visit ID:', response.data.visit?.id);
-      console.log('Full response structure:', JSON.stringify(response.data, null, 2));
-      
-      // Store both the visit and receipt data
-      setCurrentVisit({
-        ...response.data.visit,
-        receipt_data: response.data.receipt_data
-      });
-      setShowReceiptModal(true);
-      toast.success('Visit completed successfully!');
-      
-      // Reset form
-      setSelectedPatient(null);
-      setSelectedTests([]);
-      setPaymentForm({ 
-        upfront_payment: 0, 
-        payment_method: 'cash', 
-        notes: '',
-        discount_amount: 0,
-        discount_percentage: 0,
-        insurance_provider: '',
-        insurance_policy_number: '',
-        insurance_claim_number: '',
-        expected_delivery_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      });
-      setCurrentStep(0);
-    } catch (error) {
-      console.error('Failed to complete visit:', (error as any));
-      console.error('Error response:', (error as any).response?.data);
-      
-      if ((error as any).response?.data?.errors) {
-        const validationErrors = Object.values((error as any).response.data.errors).flat();
-        toast.error(`Validation failed: ${validationErrors.join(', ')}`);
-      } else if ((error as any).response?.data?.message) {
-        toast.error((error as any).response.data.message);
-      } else {
-        toast.error('Failed to complete visit. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const canProceedToNext = () => {
-    switch (currentStep) {
-      case 0:
-        return selectedPatient !== null;
-      case 1:
-        return selectedTests.length > 0;
-      case 2:
-        return paymentForm.upfront_payment >= calculateMinimumUpfront();
-      default:
-        return false;
-    }
-  };
-
-  const renderPatientSelection = () => (
-    <Fade in={currentStep === 0} timeout={500}>
-      <Box>
-        <Box sx={{ mb: 4, textAlign: 'center' }}>
-          <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'primary.main' }}>
-            <Person sx={{ fontSize: 40 }} />
-          </Avatar>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-            Patient Selection
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Find an existing patient or register a new one
-          </Typography>
-        </Box>
-
-        <Card sx={{ maxWidth: 600, mx: 'auto', mb: 3 }}>
-          <CardContent>
-            <Autocomplete
-              freeSolo
-              options={patientResults}
-              loading={searching}
-              value={selectedPatient}
-              filterOptions={(options) => options} // Disable built-in filtering since we do server-side filtering
-              onChange={(_, newValue) => {
-                if (typeof newValue === 'object' && newValue) {
-                  setSelectedPatient(newValue);
-                }
-              }}
-              onInputChange={(_, newInputValue) => {
-                setPatientQuery(newInputValue);
-              }}
-              getOptionLabel={(option) => {
-                if (typeof option === 'string') return option;
-                return option.name || '';
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Search for patient"
-                  placeholder="Enter patient name, phone, or email"
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search color="primary" />
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <>
-                        {searching ? <CircularProgress color="inherit" size={20} /> : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
-                />
-              )}
-              renderOption={(props, option) => {
-                const { key, ...otherProps } = props;
-                
-                if (typeof option === 'string') {
-                  return (
-                    <Box key={key} component="li" {...otherProps}>
-                      <Typography variant="body1">{option}</Typography>
-                    </Box>
-                  );
-                }
-                
-                if (!option || typeof option !== 'object' || !option.name) {
-                  return (
-                    <Box key={key} component="li" {...otherProps}>
-                      <Typography variant="body1">Invalid option</Typography>
-                    </Box>
-                  );
-                }
-                
-                return (
-                  <Box key={key} component="li" {...otherProps}>
-                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                      {String(option.name).charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {String(option.name)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        <Phone fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
-                        {String(option.phone || 'No phone')}
-                        {option.email && (
-                          <>
-                            <br />
-                            <Email fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
-                            {String(option.email)}
-                          </>
-                        )}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              }}
-            />
-          </CardContent>
-        </Card>
-
-        {selectedPatient && (
-          <Slide direction="up" in={!!selectedPatient} timeout={300}>
-            <Card sx={{ maxWidth: 600, mx: 'auto', bgcolor: 'success.50', border: '2px solid', borderColor: 'success.main' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <CheckCircle color="success" sx={{ mr: 1 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Patient Selected
-                    </Typography>
-                  </Box>
-                  <IconButton 
-                    onClick={() => setSelectedPatient(null)}
-                    size="small"
-                    sx={{ 
-                      color: 'error.main',
-                      '&:hover': { bgcolor: 'error.50' }
-                    }}
-                    title="Remove selection"
-                  >
-                    <Close />
-                  </IconButton>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                    {String(selectedPatient.name).charAt(0).toUpperCase()}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      {String(selectedPatient.name)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      <Phone fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
-                      {String(selectedPatient.phone)}
-                      {selectedPatient.email && (
-                        <>
-                          <br />
-                          <Email fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
-                          {String(selectedPatient.email)}
-                        </>
-                      )}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Slide>
-        )}
-      </Box>
-    </Fade>
+  const filteredPatients = patients.filter(patient =>
+    patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    patient.phone.includes(searchQuery) ||
+    (patient.lab && patient.lab.includes(searchQuery))
   );
 
-  const renderTestSelection = () => (
-    <Fade in={currentStep === 1} timeout={500}>
-      <Box>
-        <Box sx={{ mb: 4, textAlign: 'center' }}>
-          <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'secondary.main' }}>
-            <Science sx={{ fontSize: 40 }} />
-          </Avatar>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-            Test Selection
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Choose the lab tests for this visit
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={8}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Science sx={{ mr: 1 }} />
-                  Add New Test
-                </Typography>
-                
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Test Category</InputLabel>
-                      <Select
-                        value={currentTestForm.test_category_id}
-                        onChange={(e) => setCurrentTestForm({...currentTestForm, test_category_id: e.target.value})}
-                        label="Test Category"
-                      >
-                        {availableCategories.map((category) => (
-                          <MenuItem key={category.id} value={category.id.toString()}>
-                            <Box>
-                              <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                {category.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {category.description}
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Test Name"
-                      value={currentTestForm.custom_test_name}
-                      onChange={(e) => setCurrentTestForm({...currentTestForm, custom_test_name: e.target.value})}
-                      placeholder="e.g., Breast Biopsy, Pap Smear"
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      fullWidth
-                      label="Test Price"
-                      type="number"
-                      value={currentTestForm.custom_price}
-                      onChange={(e) => setCurrentTestForm({...currentTestForm, custom_price: parseFloat(e.target.value) || 0})}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                      }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      fullWidth
-                      label="Discount %"
-                      type="number"
-                      value={currentTestForm.discount_percentage}
-                      onChange={(e) => setCurrentTestForm({...currentTestForm, discount_percentage: parseFloat(e.target.value) || 0})}
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                      }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={4}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={handleAddTest}
-                        startIcon={<Add />}
-                        fullWidth
-                        sx={{ height: '56px' }}
-                      >
-                        Add Test
-                      </Button>
-                    </Box>
-                  </Grid>
-                </Grid>
-                
-                {currentTestForm.custom_price > 0 && (
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Final Price: {formatCurrency(currentTestForm.custom_price - (currentTestForm.custom_price * currentTestForm.discount_percentage / 100))}
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card sx={{ position: 'sticky', top: 20 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ShoppingCart sx={{ mr: 1 }} />
-                  Selected Tests ({selectedTests.length})
-                </Typography>
-                
-                {selectedTests.length === 0 ? (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    No tests selected yet
-                  </Alert>
-                ) : (
-                  <List dense>
-                    {selectedTests.map((test, index) => (
-                      <ListItem 
-                        key={test.id} 
-                        divider={index < selectedTests.length - 1}
-                        sx={{ px: 0 }}
-                      >
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {test.custom_test_name}
-                            </Typography>
-                          }
-                          secondary={
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Chip 
-                                label={test.category_name} 
-                                size="small" 
-                                variant="outlined"
-                                sx={{ fontSize: '0.7rem' }}
-                              />
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {formatCurrency(test.final_price)}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                        <ListItemSecondaryAction>
-                          <Tooltip title="Remove test">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleRemoveTest(test.id)}
-                              color="error"
-                            >
-                              <Remove />
-                            </IconButton>
-                          </Tooltip>
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-
-                {selectedTests.length > 0 && (
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.50', borderRadius: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, textAlign: 'center' }}>
-                      Total: {formatCurrency(calculateTotal())}
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Box>
-    </Fade>
-  );
-
-  const renderBillingPayment = () => (
-    <Fade in={currentStep === 2} timeout={500}>
-      <Box>
-        <Box sx={{ mb: 4, textAlign: 'center' }}>
-          <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: 'success.main' }}>
-            <MonetizationOn sx={{ fontSize: 40 }} />
-          </Avatar>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-            Billing & Payment
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Complete payment and finalize the visit
-          </Typography>
-        </Box>
-
-        <Grid container spacing={4}>
-          <Grid item xs={12} lg={8}>
-            <Card sx={{ mb: 4, height: 'fit-content' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                  <Payment sx={{ mr: 2, fontSize: 28 }} />
-                  Payment Details
-                </Typography>
-                
-                <Grid container spacing={4}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Upfront Payment"
-                      type="number"
-                      value={paymentForm.upfront_payment}
-                      onChange={(e) => setPaymentForm(prev => ({
-                        ...prev,
-                        upfront_payment: parseFloat(e.target.value) || 0
-                      }))}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Button
-                              size="small"
-                              onClick={() => setPaymentForm(prev => ({
-                                ...prev,
-                                upfront_payment: calculateMinimumUpfront()
-                              }))}
-                              variant="outlined"
-                              sx={{ minWidth: 60 }}
-                            >
-                              Min
-                            </Button>
-                          </InputAdornment>
-                        ),
-                      }}
-                      helperText={`Minimum required: ${formatCurrency(calculateMinimumUpfront())} (50% of total)`}
-                      error={paymentForm.upfront_payment < calculateMinimumUpfront() && paymentForm.upfront_payment > 0}
-                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth sx={{ '& .MuiInputBase-root': { height: 56 } }}>
-                      <InputLabel>Payment Method</InputLabel>
-                      <Select
-                        value={paymentForm.payment_method}
-                        onChange={(e) => setPaymentForm(prev => ({
-                          ...prev,
-                          payment_method: e.target.value
-                        }))}
-                      >
-                        <MenuItem value="cash">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <AttachMoney sx={{ mr: 1 }} />
-                            Cash
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="card">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <CreditCard sx={{ mr: 1 }} />
-                            Credit/Debit Card
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="Fawry">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <AccountBalance sx={{ mr: 1 }} />
-                            Fawry
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="InstaPay">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <AccountBalance sx={{ mr: 1 }} />
-                            InstaPay
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="VodafoneCash">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <AccountBalance sx={{ mr: 1 }} />
-                            VodafoneCash
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="Other">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <AttachMoney sx={{ mr: 1 }} />
-                            Other
-                          </Box>
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-
-                  {/* Discount Section */}
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 2 }}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Discount
-                      </Typography>
-                    </Divider>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Discount Amount"
-                      type="number"
-                      value={paymentForm.discount_amount}
-                      onChange={(e) => {
-                        const amount = parseFloat(e.target.value) || 0;
-                        const total = calculateTotal();
-                        const percentage = total > 0 ? (amount / total) * 100 : 0;
-                        setPaymentForm(prev => ({
-                          ...prev,
-                          discount_amount: amount,
-                          discount_percentage: percentage
-                        }));
-                      }}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                      }}
-                      helperText={`${paymentForm.discount_percentage.toFixed(1)}% of total`}
-                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Discount Percentage"
-                      type="number"
-                      value={paymentForm.discount_percentage}
-                      onChange={(e) => {
-                        const percentage = parseFloat(e.target.value) || 0;
-                        const total = calculateTotal();
-                        const amount = (total * percentage) / 100;
-                        setPaymentForm(prev => ({
-                          ...prev,
-                          discount_percentage: percentage,
-                          discount_amount: amount
-                        }));
-                      }}
-                      InputProps={{
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                      }}
-                      helperText={`EGP ${paymentForm.discount_amount.toFixed(2)} off`}
-                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                    />
-                  </Grid>
-
-                  {/* Delivery Date */}
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 2 }}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Delivery Information
-                      </Typography>
-                    </Divider>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Expected Delivery Date"
-                      type="date"
-                      value={paymentForm.expected_delivery_date}
-                      onChange={(e) => setPaymentForm(prev => ({
-                        ...prev,
-                        expected_delivery_date: e.target.value
-                      }))}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                      helperText="When will the results be ready?"
-                      sx={{ '& .MuiInputBase-root': { height: 56 } }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Notes (Optional)"
-                      multiline
-                      rows={4}
-                      value={paymentForm.notes}
-                      onChange={(e) => setPaymentForm(prev => ({
-                        ...prev,
-                        notes: e.target.value
-                      }))}
-                      placeholder="Add any special instructions or notes..."
-                      sx={{ '& .MuiInputBase-root': { minHeight: 120 } }}
-                    />
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} lg={4}>
-            <Card sx={{ position: 'sticky', top: 20, height: 'fit-content' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                  <Receipt sx={{ mr: 2, fontSize: 28 }} />
-                  Billing Summary
-                </Typography>
-
-                {/* Patient Info */}
-                {selectedPatient && (
-                  <Box sx={{ mb: 4, p: 3, bgcolor: 'primary.50', borderRadius: 3, border: '1px solid', borderColor: 'primary.200' }}>
-                    <Typography variant="subtitle1" color="primary.main" gutterBottom sx={{ fontWeight: 600 }}>
-                      Patient Information
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 500, mb: 1 }}>
-                      {String(selectedPatient.name)}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Phone sx={{ mr: 1, fontSize: 18 }} />
-                      {String(selectedPatient.phone)}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Tests Summary */}
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-                    Selected Tests ({selectedTests.length})
-                  </Typography>
-                  <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
-                    {selectedTests.map((test) => (
-                      <Box key={test.id} sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center',
-                        mb: 2,
-                        p: 2,
-                        bgcolor: 'grey.50',
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: 'grey.200'
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                          <Science color="primary" sx={{ mr: 1, fontSize: 20 }} />
-                          <Box>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {test.custom_test_name}
-                            </Typography>
-                            <Chip 
-                              label={test.category_name} 
-                              size="small" 
-                              variant="outlined"
-                              sx={{ fontSize: '0.7rem', mt: 0.5 }}
-                            />
-                          </Box>
-                        </Box>
-                        <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                            {formatCurrency(test.final_price)}
-                          </Typography>
-                          {test.discount_percentage > 0 && (
-                            <Typography variant="caption" color="text.secondary">
-                              {test.discount_percentage}% off
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-                
-                {/* Payment Breakdown */}
-                <Box sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 3, border: '1px solid', borderColor: 'grey.200' }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-                    Payment Breakdown
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="body1">Subtotal:</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(calculateTotal())}
-                    </Typography>
-                  </Box>
-                  
-                  {paymentForm.discount_amount > 0 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                      <Typography variant="body1">Discount:</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
-                        -{formatCurrency(paymentForm.discount_amount)}
-                      </Typography>
-                    </Box>
-                  )}
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>Final Amount:</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(calculateFinalAmount())}
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="body1">Upfront Payment:</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
-                      -{formatCurrency(paymentForm.upfront_payment)}
-                    </Typography>
-                  </Box>
-                  
-                  {paymentForm.upfront_payment < calculateMinimumUpfront() && (
-                    <Alert severity="warning" sx={{ mb: 2, py: 1 }}>
-                      <Typography variant="body2">
-                        Minimum upfront payment required: {formatCurrency(calculateMinimumUpfront())}
-                      </Typography>
-                    </Alert>
-                  )}
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      Remaining Due:
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: calculateBalance() > 0 ? 'error.main' : 'success.main' }}>
-                      {formatCurrency(calculateBalance())}
-                    </Typography>
-                  </Box>
-
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    size="large"
-                    onClick={handleCompleteVisit}
-                    disabled={loading || selectedTests.length === 0 || paymentForm.upfront_payment < calculateMinimumUpfront()}
-                    startIcon={loading ? <CircularProgress size={20} /> : <Done />}
-                    sx={{ 
-                      py: 2,
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      borderRadius: 2
-                    }}
-                  >
-                    {loading ? 'Processing...' : 'Complete Visit'}
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Box>
-    </Fade>
-  );
-
-  const renderReceiptModal = () => {
-    // Get receipt data from current visit or use form data as fallback
-    const receiptData = currentVisit?.receipt_data || {
-      patient_name: selectedPatient?.name || 'N/A',
-      patient_phone: selectedPatient?.phone || 'N/A',
-      tests: selectedTests.map(test => ({
-        name: test.custom_test_name,
-        category: test.category_name,
-        price: test.final_price
-      })),
-      total_amount: calculateTotal(),
-      final_amount: calculateTotal(),
-      upfront_payment: paymentForm.upfront_payment,
-      remaining_balance: calculateBalance(),
-      payment_method: paymentForm.payment_method,
-      receipt_number: currentVisit?.visit?.visit_number || 'N/A',
-      date: new Date().toLocaleDateString(),
-      check_in_by: 'Staff Member',
-      check_in_at: new Date().toLocaleString()
-    };
-
+  if (loading) {
     return (
-      <Dialog
-        open={showReceiptModal}
-        onClose={() => setShowReceiptModal(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Receipt sx={{ mr: 1, fontSize: 32 }} />
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Visit Receipt
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Receipt #{receiptData.receipt_number} • {receiptData.date}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Box>
-            {/* Patient Info */}
-            <Box sx={{ mb: 4, p: 3, bgcolor: 'primary.50', borderRadius: 3, border: '1px solid', borderColor: 'primary.200' }}>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
-                <Person sx={{ mr: 1 }} />
-                Patient Information
-              </Typography>
-              <Grid container spacing={3}>
-                      <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>Name:</Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                    {String(receiptData.patient_name)}
-                  </Typography>
-                </Grid>
-                      <Grid item xs={12} sm={6}>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>Phone:</Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                    {String(receiptData.patient_phone)}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
-
-            {/* Tests Ordered */}
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, mb: 2 }}>
-                <Science sx={{ mr: 1 }} />
-                Tests Ordered ({receiptData.tests?.length || 0})
-              </Typography>
-              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Test Name</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Price</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(receiptData.tests || selectedTests).map((test: any, index: number) => (
-                      <TableRow key={test.id || index}>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Science color="primary" sx={{ mr: 1, fontSize: 20 }} />
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {String(test.name || 'Unknown Test')}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={test.category} 
-                            size="small" 
-                            variant="outlined" 
-                            color="primary"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                            {formatCurrency(Number(test.price) || 0)}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-
-            {/* Payment Summary */}
-            <Box sx={{ p: 3, bgcolor: 'success.50', borderRadius: 3, border: '1px solid', borderColor: 'success.200' }}>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600, mb: 2 }}>
-                <Payment sx={{ mr: 1 }} />
-                Payment Summary
-              </Typography>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="body1">Total Amount:</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(receiptData.total_amount || calculateTotal())}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="body1">Payment Method:</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, textTransform: 'capitalize' }}>
-                  {String(receiptData.payment_method || paymentForm.payment_method)}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="body1">Amount Paid:</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
-                  {formatCurrency(receiptData.upfront_payment || paymentForm.upfront_payment)}
-                </Typography>
-              </Box>
-              
-              <Divider sx={{ my: 2 }} />
-              
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  Remaining Due:
-                </Typography>
-                <Typography variant="h5" sx={{ 
-                  fontWeight: 700, 
-                  color: (receiptData.remaining_balance || calculateBalance()) > 0 ? 'error.main' : 'success.main' 
-                }}>
-                  {formatCurrency(receiptData.remaining_balance || calculateBalance())}
-                </Typography>
-              </Box>
-
-              {/* Additional Info */}
-              <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'success.300' }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Checked in by:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {receiptData.check_in_by || 'Staff Member'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">Date & Time:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {receiptData.check_in_at || new Date().toLocaleString()}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 1 }}>
-          <Button
-            onClick={handleNavigateToReceipts}
-            startIcon={<Receipt />}
-            variant="contained"
-            color="primary"
-            size="large"
-          >
-            View in Receipts
-          </Button>
-          <Button
-            onClick={handlePrintLabel}
-            startIcon={<Science />}
-            variant="outlined"
-            color="secondary"
-            size="large"
-          >
-            Print Sample
-          </Button>
-          <Button
-            onClick={() => setShowReceiptModal(false)}
-            variant="outlined"
-            startIcon={<Done />}
-            size="large"
-          >
-            Done
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
     );
-  };
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Header */}
-      <Box sx={{ mb: 4, textAlign: 'center' }}>
-        <Typography variant="h3" gutterBottom sx={{ fontWeight: 700, color: 'primary.main' }}>
-          Check-In & Billing
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          Extra Payments Management
         </Typography>
-        <Typography variant="h6" color="text.secondary">
-          Streamline patient registration and test ordering process
+        <Typography variant="body2" color="text.secondary">
+          Add additional payments for patients with extra lab costs
         </Typography>
       </Box>
 
-      {/* Progress Stepper */}
-      <Card sx={{ mb: 4 }}>
+      {/* Search */}
+      <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Stepper activeStep={currentStep} alternativeLabel>
-            {steps.map((step, index) => (
-              <Step key={step.label}>
-                <StepLabel
-                  icon={
-                    <Avatar
-                      sx={{
-                        bgcolor: index <= currentStep ? 'primary.main' : 'grey.300',
-                        color: index <= currentStep ? 'white' : 'grey.600',
-                      }}
-                    >
-                      {step.icon}
-                    </Avatar>
-                  }
-                >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    {step.label}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {step.description}
-                  </Typography>
-                </StepLabel>
-              </Step>
-            ))}
-          </Stepper>
+          <TextField
+            fullWidth
+            placeholder="Search patients by name, phone, or lab number..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+            }}
+          />
         </CardContent>
       </Card>
 
-      {/* Step Content */}
-      <Box sx={{ minHeight: 500 }}>
-        {currentStep === 0 && renderPatientSelection()}
-        {currentStep === 1 && renderTestSelection()}
-        {currentStep === 2 && renderBillingPayment()}
-      </Box>
-
-      {/* Navigation */}
-      <Card sx={{ mt: 4 }}>
+      {/* Patients Table */}
+      <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Button
-              onClick={handleBack}
-              disabled={currentStep === 0}
-              startIcon={<NavigateBefore />}
-              variant="outlined"
-              size="large"
-            >
-              Back
-            </Button>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Step {currentStep + 1} of {steps.length}
+          <TableContainer component={Paper} variant="outlined">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Patient</TableCell>
+                  <TableCell>Lab Number</TableCell>
+                  <TableCell>Total Amount</TableCell>
+                  <TableCell>Amount Paid</TableCell>
+                  <TableCell>Remaining Balance</TableCell>
+                  <TableCell>Payment Status</TableCell>
+                  <TableCell align="center">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredPatients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Alert severity="info">No patients found</Alert>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPatients.map((patient) => (
+                    <TableRow key={patient.id} hover>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ bgcolor: 'primary.main' }}>
+                            {patient.name.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {patient.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              <Phone fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                              {patient.phone}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ 
+                          fontFamily: 'monospace', 
+                          fontWeight: 'bold',
+                          color: 'primary.main'
+                        }}>
+                          {patient.lab || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(patient.total_amount || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
+                          {formatCurrency(patient.amount_paid || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body1" sx={{ 
+                          fontWeight: 600, 
+                          color: (patient.remaining_balance || 0) > 0 ? 'error.main' : 'success.main'
+                        }}>
+                          {formatCurrency(patient.remaining_balance || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {getPaymentStatusChip(patient.payment_status || 'unpaid', patient.remaining_balance || 0)}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          variant="contained"
+                          startIcon={<Add />}
+                          onClick={() => handleAddExtraPayment(patient)}
+                          sx={{ 
+                            backgroundColor: '#1976d2',
+                            '&:hover': { backgroundColor: '#1565c0' }
+                          }}
+                        >
+                          Add Extra Payment
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          {/* Pagination */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Stack spacing={2}>
+              {totalPages > 1 && (
+                <Pagination
+                  count={totalPages}
+                  page={currentPage}
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                />
+              )}
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} patients
+                {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
               </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={((currentStep + 1) / steps.length) * 100}
-                sx={{ width: 100 }}
-              />
-            </Box>
-
-            {currentStep < steps.length - 1 ? (
-              <Button
-                onClick={handleNext}
-                disabled={!canProceedToNext()}
-                endIcon={<NavigateNext />}
-                variant="contained"
-                size="large"
-              >
-                Next
-              </Button>
-            ) : (
-              <Button
-                onClick={handleCompleteVisit}
-                disabled={!canProceedToNext() || loading}
-                startIcon={loading ? <CircularProgress size={20} /> : <Done />}
-                variant="contained"
-                size="large"
-              >
-                {loading ? 'Processing...' : 'Complete Visit'}
-              </Button>
-            )}
+            </Stack>
           </Box>
         </CardContent>
       </Card>
 
-      {/* Receipt Modal */}
-      {renderReceiptModal()}
-
-      {/* Sample Label Modal */}
-      <Dialog open={showLabelModal} onClose={() => setShowLabelModal(false)} maxWidth="md" fullWidth>
+      {/* Extra Payment Modal */}
+      <Dialog open={showExtraPaymentModal} onClose={() => setShowExtraPaymentModal(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Science color="secondary" />
-            Sample Labels
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AttachMoney color="primary" />
+            Add Extra Payment
           </Box>
         </DialogTitle>
         <DialogContent>
-          {labelData && (
-            <Box>
-              <Alert severity="info" sx={{ mb: 3 }}>
-                <Typography variant="subtitle2">
-                  <strong>Patient:</strong> {labelData.patient_name} | 
-                  <strong> Date:</strong> {labelData.visit_date} | 
-                  <strong> Receipt:</strong> {labelData.visit_id}
-                </Typography>
-              </Alert>
-              
+          {selectedPatient && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Patient: {selectedPatient.name}
+              </Typography>
               <Grid container spacing={2}>
-                {labelData.test_labels?.map((testLabel: any, index: number) => (
-                  <Grid item xs={12} sm={6} key={index}>
-                    <Card variant="outlined" sx={{ p: 2 }}>
-                      <Box sx={{ textAlign: 'left' }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          <strong>Test:</strong> {testLabel.test_name}
-                        </Typography>
-                        <Typography variant="body2" gutterBottom>
-                          <strong>Patient:</strong> {testLabel.patient_name}
-                        </Typography>
-                        <Typography variant="body2" gutterBottom>
-                          <strong>ID:</strong> {testLabel.patient_id}
-                        </Typography>
-                        <Typography variant="body2" gutterBottom>
-                          <strong>Date:</strong> {testLabel.sample_date}
-                        </Typography>
-                        <Typography variant="body2" gutterBottom>
-                          <strong>Time:</strong> {testLabel.sample_time}
-                        </Typography>
-                        <Typography variant="body2" gutterBottom>
-                          <strong>Sample ID:</strong> {testLabel.sample_id}
-                        </Typography>
-                        <Box sx={{ mt: 2, p: 1, bgcolor: 'white', borderRadius: 1, border: '1px solid #ccc' }}>
-                          <div dangerouslySetInnerHTML={{ __html: testLabel.barcode }} />
-                        </Box>
-                      </Box>
-                    </Card>
-                  </Grid>
-                ))}
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Lab Number:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {selectedPatient.lab || 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Phone:</Typography>
+                  <Typography variant="body1">{selectedPatient.phone}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Total Amount:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {formatCurrency(selectedPatient.total_amount || 0)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Amount Paid:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
+                    {formatCurrency(selectedPatient.amount_paid || 0)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Remaining Balance:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'error.main' }}>
+                    {formatCurrency(selectedPatient.remaining_balance || 0)}
+                  </Typography>
+                </Grid>
               </Grid>
-              
-              <Box sx={{ textAlign: 'center', mt: 3 }}>
-                <Button 
-                  variant="contained" 
-                  onClick={printSampleLabel}
-                  startIcon={<Print />}
-                  size="large"
-                >
-                  Print All Labels
-                </Button>
-              </Box>
             </Box>
           )}
+
+          <Divider sx={{ my: 2 }} />
+
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Extra Payment Amount"
+                type="number"
+                value={extraPaymentAmount}
+                onChange={(e) => setExtraPaymentAmount(e.target.value)}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">EGP</InputAdornment>,
+                }}
+                placeholder="Enter additional amount"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Payment Method</InputLabel>
+                <Select
+                  value={extraPaymentMethod}
+                  onChange={(e) => setExtraPaymentMethod(e.target.value)}
+                >
+                  <MenuItem value="cash">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <LocalAtm />
+                      Cash
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="Fawry">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <AccountBalance />
+                      Fawry
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="InstaPay">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CreditCard />
+                      InstaPay
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="VodafoneCash">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Payment />
+                      VodafoneCash
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="Other">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <MonetizationOn />
+                      Other
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowLabelModal(false)}>Close</Button>
+          <Button onClick={() => setShowExtraPaymentModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitExtraPayment}
+            disabled={submitting || !extraPaymentAmount}
+            startIcon={submitting ? <CircularProgress size={20} /> : <Payment />}
+          >
+            {submitting ? 'Processing...' : 'Add Payment'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

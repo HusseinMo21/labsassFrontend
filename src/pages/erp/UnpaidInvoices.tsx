@@ -105,6 +105,11 @@ interface ReceiptData {
     username: string;
     password: string;
   };
+  payment_breakdown?: {
+    cash: number;
+    card: number;
+    card_method?: string;
+  };
 }
 
 const UnpaidInvoices: React.FC = () => {
@@ -632,7 +637,7 @@ const UnpaidInvoices: React.FC = () => {
             </div>
             <div class="row">
               <span class="label">Total Paid:</span>
-              <span class="value">EGP ${receiptData?.paid_now}</span>
+              <span class="value">EGP ${(receiptData?.payment_breakdown?.cash || 0) + (receiptData?.payment_breakdown?.card || 0)}</span>
             </div>
             <div class="row">
               <span class="label">Remaining:</span>
@@ -780,7 +785,7 @@ const UnpaidInvoices: React.FC = () => {
               <TextField
                 fullWidth
                 label="Search Patients"
-                placeholder="Search by patient name, phone, or email..."
+                placeholder="Search by patient name, phone, email, or lab number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 InputProps={{
@@ -840,6 +845,7 @@ const UnpaidInvoices: React.FC = () => {
                     <TableRow>
                       <TableCell><strong>Invoice #</strong></TableCell>
                       <TableCell><strong>Patient</strong></TableCell>
+                      <TableCell><strong>Lab Number</strong></TableCell>
                       <TableCell><strong>Visit Date</strong></TableCell>
                       <TableCell><strong>Total Amount</strong></TableCell>
                       <TableCell><strong>Paid Amount</strong></TableCell>
@@ -865,6 +871,15 @@ const UnpaidInvoices: React.FC = () => {
                               {invoice.visit?.patient?.phone}
                             </Typography>
                           </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ 
+                            fontFamily: 'monospace',
+                            fontWeight: 'bold',
+                            color: 'primary.main'
+                          }}>
+                            {invoice.visit?.patient?.lab || '-'}
+                          </Typography>
                         </TableCell>
                         <TableCell>{formatDate(invoice.visit?.visit_date || '')}</TableCell>
                         <TableCell>

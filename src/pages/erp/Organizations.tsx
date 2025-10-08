@@ -56,8 +56,12 @@ interface Patient {
   visits_count: number;
   visits?: Visit[];
   total_paid?: number;
+  total_amount?: number;
+  remaining_balance?: number;
   total_tests?: number;
   lab_numbers?: string[];
+  attendance_dates?: string[];
+  delivery_dates?: string[];
 }
 
 interface Visit {
@@ -500,9 +504,13 @@ const Organizations: React.FC = () => {
                     <TableCell>WhatsApp</TableCell>
                     <TableCell>Gender</TableCell>
                     <TableCell>Visits</TableCell>
+                    <TableCell>Total Amount</TableCell>
                     <TableCell>Total Paid</TableCell>
+                    <TableCell>Remaining</TableCell>
                     <TableCell>Tests</TableCell>
                     <TableCell>Lab Numbers</TableCell>
+                    <TableCell>تاريخ الحضور</TableCell>
+                    <TableCell>تاريخ الاستلام</TableCell>
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -548,9 +556,22 @@ const Organizations: React.FC = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          EGP {(Number(patient.total_amount) || 0).toFixed(2)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
                         <Chip 
                           label={`EGP ${(Number(patient.total_paid) || 0).toFixed(2)}`}
                           color="success"
+                          variant="outlined"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={`EGP ${(Number(patient.remaining_balance) || 0).toFixed(2)}`}
+                          color={Number(patient.remaining_balance) > 0 ? "error" : "success"}
                           variant="outlined"
                           size="small"
                         />
@@ -586,6 +607,66 @@ const Organizations: React.FC = () => {
                           {patient.lab_numbers && patient.lab_numbers.length > 2 && (
                             <Chip 
                               label={`+${patient.lab_numbers.length - 2}`}
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {patient.attendance_dates && patient.attendance_dates.length > 0 ? (
+                            patient.attendance_dates.slice(0, 2).map((date, index) => (
+                              <Chip 
+                                key={index}
+                                label={new Date(date).toLocaleDateString('ar-EG')}
+                                color="info"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))
+                          ) : (
+                            <Chip 
+                              label="No dates"
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                          {patient.attendance_dates && patient.attendance_dates.length > 2 && (
+                            <Chip 
+                              label={`+${patient.attendance_dates.length - 2}`}
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {patient.delivery_dates && patient.delivery_dates.length > 0 ? (
+                            patient.delivery_dates.slice(0, 2).map((date, index) => (
+                              <Chip 
+                                key={index}
+                                label={new Date(date).toLocaleDateString('ar-EG')}
+                                color="warning"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))
+                          ) : (
+                            <Chip 
+                              label="No dates"
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                          {patient.delivery_dates && patient.delivery_dates.length > 2 && (
+                            <Chip 
+                              label={`+${patient.delivery_dates.length - 2}`}
                               color="default"
                               variant="outlined"
                               size="small"

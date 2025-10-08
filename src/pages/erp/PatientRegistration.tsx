@@ -572,47 +572,6 @@ const PatientRegistration: React.FC = () => {
             </Grid>
                 <Grid item xs={12} md={4}>
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    ميعاد التسليم
-                  </Typography>
-              <TextField
-                fullWidth
-                    type="date"
-                    value={formData.delivery_date}
-                    onChange={(e) => handleDateChange('delivery_date', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    يوم التسليم
-                  </Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      value={formData.delivery_day}
-                      onChange={(e) => handleInputChange('delivery_day', e.target.value)}
-                sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="السبت">السبت</MenuItem>
-                      <MenuItem value="الأحد">الأحد</MenuItem>
-                      <MenuItem value="الاثنين">الاثنين</MenuItem>
-                      <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
-                      <MenuItem value="الأربعاء">الأربعاء</MenuItem>
-                      <MenuItem value="الخميس">الخميس</MenuItem>
-                      <MenuItem value="الجمعة">الجمعة</MenuItem>
-                    </Select>
-                  </FormControl>
-            </Grid>
-            
-                {/* Row 4: Attendance Date, Attendance Day, Number of Samples, Sample Size */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
                     تاريخ الحضور
                   </Typography>
               <TextField
@@ -647,6 +606,47 @@ const PatientRegistration: React.FC = () => {
                       <MenuItem value="الأربعاء">الأربعاء</MenuItem>
                       <MenuItem value="الخميس">الخميس</MenuItem>
                       <MenuItem value="الجمعة">الجمعة</MenuItem>
+                    </Select>
+                  </FormControl>
+            </Grid>
+            
+                {/* Row 4: Delivery Date, Delivery Day, Number of Samples, Sample Size */}
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    ميعاد التسليم
+                  </Typography>
+              <TextField
+                fullWidth
+                    type="date"
+                    value={formData.delivery_date}
+                    onChange={(e) => handleDateChange('delivery_date', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                        borderRadius: 1,
+                  }
+                }}
+              />
+            </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
+                    يوم التسليم
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select
+                      value={formData.delivery_day}
+                      onChange={(e) => handleInputChange('delivery_day', e.target.value)}
+                sx={{
+                        borderRadius: 1,
+                      }}
+                    >
+                      <MenuItem value="السبت">السبت</MenuItem>
+                      <MenuItem value="الأحد">الأحد</MenuItem>
+                      <MenuItem value="الاثنين">الاثنين</MenuItem>
+                      <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                      <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                      <MenuItem value="الخميس">الخميس</MenuItem>
+                      <MenuItem value="الجمعة">الجمعة</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -654,21 +654,18 @@ const PatientRegistration: React.FC = () => {
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
                     عدد العينات
               </Typography>
-              <FormControl fullWidth>
-                <Select
-                      value={formData.number_of_samples}
-                      onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
-                  sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="1">1</MenuItem>
-                      <MenuItem value="2">2</MenuItem>
-                      <MenuItem value="3">3</MenuItem>
-                      <MenuItem value="4">4</MenuItem>
-                      <MenuItem value="5">5</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                type="number"
+                value={formData.number_of_samples}
+                onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
+                inputProps={{ min: 1, max: 10 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 1,
+                  }
+                }}
+              />
             </Grid>
             <Grid item xs={12} md={4}>
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
@@ -1075,7 +1072,7 @@ const PatientRegistration: React.FC = () => {
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary">Total Paid:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
-                        EGP {receiptData.paid_now || 0}
+                        EGP {(receiptData.payment_breakdown?.cash || 0) + (receiptData.payment_breakdown?.card || 0)}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -1228,8 +1225,8 @@ const PatientRegistration: React.FC = () => {
                         <span class="value">EGP ${receiptData.final_amount || 0}</span>
                       </div>
                       <div class="row">
-                        <span class="label">Paid:</span>
-                        <span class="value">EGP ${receiptData.paid_now || 0}</span>
+                        <span class="label">Total Paid:</span>
+                        <span class="value">EGP ${(receiptData.payment_breakdown?.cash || 0) + (receiptData.payment_breakdown?.card || 0)}</span>
                       </div>
                       <div class="row">
                         <span class="label">Remaining:</span>

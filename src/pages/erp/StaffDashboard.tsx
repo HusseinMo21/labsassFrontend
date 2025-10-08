@@ -13,7 +13,6 @@ import {
   PersonAdd,
   CreditCard,
   Science,
-  LocalShipping,
   Receipt,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';

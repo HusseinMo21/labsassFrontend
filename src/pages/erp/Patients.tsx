@@ -82,6 +82,8 @@ const Patients: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{username: string, password: string} | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,7 +104,6 @@ const Patients: React.FC = () => {
     whatsapp_number: '',
     sender: '', // Doctor name
     // Keep existing fields for compatibility
-    birth_date: '',
     address: '',
     emergency_contact: '',
     emergency_phone: '',
@@ -113,6 +114,38 @@ const Patients: React.FC = () => {
   useEffect(() => {
     fetchPatients();
   }, [currentPage, search]);
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      setSearch(searchInput);
+      setCurrentPage(1); // Reset to first page when searching
+    }, 500); // Wait 500ms after user stops typing
+    
+    setSearchTimeout(timeout);
+    
+    // Cleanup function
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [searchInput]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, []);
 
   const fetchPatients = async () => {
     try {
@@ -132,24 +165,24 @@ const Patients: React.FC = () => {
     try {
       // Map Arabic form fields to backend expected fields
       const patientData = {
-        name: formData.name,
-        gender: formData.gender,
-        birth_date: formData.birth_date || (formData.age ? new Date(new Date().getFullYear() - parseInt(formData.age), 0, 1).toISOString().split('T')[0] : null),
-        phone: formData.phone,
+        name: formData.name || null,
+        gender: formData.gender || null,
+        birth_date: null, // We only use age, not birth_date
+        phone: formData.phone || null,
         whatsapp_number: formData.whatsapp_number || null,
-        address: formData.address_required || formData.address,
-        emergency_contact: '',
-        emergency_phone: '',
-        medical_history: `Doctor: ${formData.doctor}, Organization: ${formData.organization}, Status: ${formData.status}`,
-        allergies: '', // Not in Arabic form
+        address: formData.address_required || formData.address || null,
+        emergency_contact: null,
+        emergency_phone: null,
+        medical_history: formData.doctor || formData.organization || formData.status ? `Doctor: ${formData.doctor || ''}, Organization: ${formData.organization || ''}, Status: ${formData.status || ''}` : null,
+        allergies: null,
         // Additional fields for the new Arabic form
-        doctor: formData.doctor,
-        age: formData.age,
-        address_required: formData.address_required,
-        address_optional: formData.address_optional,
-        organization: formData.organization,
-        status: formData.status,
-        sender: formData.sender, // Doctor name from sender field
+        doctor: formData.doctor || null,
+        age: formData.age || null,
+        address_required: formData.address_required || null,
+        address_optional: formData.address_optional || null,
+        organization: formData.organization || null,
+        status: formData.status || null,
+        sender: formData.sender || null, // Doctor name from sender field
       };
 
       console.log('Submitting patient data:', patientData);
@@ -211,9 +244,8 @@ const Patients: React.FC = () => {
       });
     }
     
-    // Calculate age from birth_date
-    const age = patient.birth_date ? 
-      new Date().getFullYear() - new Date(patient.birth_date).getFullYear() : '';
+    // Use age directly from patient data
+    const age = patient.age || '';
     
     setFormData({
       name: patient.name,
@@ -228,7 +260,6 @@ const Patients: React.FC = () => {
       whatsapp_number: patient.whatsapp_number || '',
       sender: patient.sender || patient.doctor_name || '', // Use sender field as doctor name
       // Keep existing fields for compatibility
-      birth_date: patient.birth_date || '',
       address: patient.address,
       emergency_contact: patient.emergency_contact || '',
       emergency_phone: patient.emergency_phone || '',
@@ -252,7 +283,6 @@ const Patients: React.FC = () => {
       whatsapp_number: '',
       sender: '', // Doctor name
       // Keep existing fields for compatibility
-      birth_date: '',
       address: '',
       emergency_contact: '',
       emergency_phone: '',
@@ -370,9 +400,9 @@ const Patients: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               fullWidth
-              placeholder="Search patients..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, phone, or lab number..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               InputProps={{
                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
               }}
@@ -389,8 +419,9 @@ const Patients: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>
+                  <TableCell>Lab Number</TableCell>
                   <TableCell>Gender</TableCell>
-                  <TableCell>Birth Date</TableCell>
+                  <TableCell>Age</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Address</TableCell>
                   <TableCell>Doctor</TableCell>
@@ -401,7 +432,7 @@ const Patients: React.FC = () => {
               <TableBody>
                 {patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={9} align="center">
                       <Alert severity="info">No patients found</Alert>
                     </TableCell>
                   </TableRow>
@@ -414,13 +445,22 @@ const Patients: React.FC = () => {
                           {patient.name}
                         </Box>
                       </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body2" sx={{ 
+                            fontFamily: 'monospace', 
+                            fontWeight: 'bold',
+                            color: 'primary.main'
+                          }}>
+                            {patient.lab || '-'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
                       <TableCell>{getGenderChip(patient.gender)}</TableCell>
                       <TableCell>
-                        {patient.birth_date ? 
-                          new Date(patient.birth_date).toLocaleDateString() : 
-                          patient.age ? 
-                            `Age: ${patient.age}` : 
-                            '-'
+                        {patient.age ? 
+                          `Age: ${patient.age}` : 
+                          '-'
                         }
                       </TableCell>
                       <TableCell>
@@ -547,12 +587,11 @@ const Patients: React.FC = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="العنوان (مطلوب) *"
+                  label="العنوان"
                   value={formData.address_required}
                   onChange={(e) => setFormData({ ...formData, address_required: e.target.value })}
                   multiline
                   rows={2}
-                  required
                   sx={{ '& .MuiInputBase-input': { direction: 'rtl' } }}
                 />
               </Grid>
@@ -618,16 +657,6 @@ const Patients: React.FC = () => {
               </Grid>
               
               {/* Additional fields for compatibility */}
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Birth Date (for system compatibility)"
-                  type="date"
-                  value={formData.birth_date}
-                  onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
             </Grid>
           </DialogContent>
           <DialogActions>

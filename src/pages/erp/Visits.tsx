@@ -71,6 +71,7 @@ interface Visit {
     name: string;
     phone: string;
     email: string;
+    lab?: string;
   };
   visitTests: Array<{
     id: number;
@@ -405,7 +406,7 @@ const Visits: React.FC = () => {
                 label="Search visits"
                 value={searchTerm}
                 onChange={handleSearch}
-                placeholder="Search by visit number, patient name, phone, or email"
+                placeholder="Search by visit number, patient name, phone, email, or lab number"
                 InputProps={{
                   startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
                   endAdornment: searchTerm && (
@@ -536,6 +537,7 @@ const Visits: React.FC = () => {
                 <TableRow>
                   <TableCell>Visit #</TableCell>
                   <TableCell>Patient</TableCell>
+                  <TableCell>Lab Number</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell>Tests</TableCell>
                   <TableCell>Status</TableCell>
@@ -563,6 +565,15 @@ const Visits: React.FC = () => {
                             {visit.patient?.phone || 'No phone'}
                           </Typography>
                         </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ 
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          color: 'primary.main'
+                        }}>
+                          {visit.patient?.lab || '-'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">

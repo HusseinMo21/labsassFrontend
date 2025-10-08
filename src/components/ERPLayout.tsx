@@ -29,7 +29,6 @@ import {
   Assessment,
   BarChart,
   Search,
-  LocalShipping,
   Notifications,
   PersonAdd,
   CreditCard,
@@ -76,7 +75,7 @@ const navigationItems: NavigationItem[] = [
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
   { path: '/patient-test-search', label: 'Patient Test Search', icon: <Search />, roles: ['admin'] },
 
-  // Staff - Limited access (including Check-In & Billing and Unpaid Invoices)
+  // Staff - Limited access (including Extra Payments Management and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
   { path: '/shift-management', label: 'Shift Management', icon: <Schedule />, roles: ['staff'] },
   { path: '/patients', label: 'Patients Search', icon: <People />, roles: ['staff'] },
@@ -84,7 +83,7 @@ const navigationItems: NavigationItem[] = [
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['staff'] },
   { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['staff'] },
-  { path: '/check-in', label: 'Check-In & Billing', icon: <PersonAdd />, roles: ['staff'] },
+  { path: '/check-in', label: 'Extra Payments Management', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/unpaid-invoices', label: 'Unpaid Invoices', icon: <CreditCard />, roles: ['staff'] },
   { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['staff'] },
   { path: '/notifications', label: 'Notifications', icon: <Notifications />, roles: ['staff'] },
