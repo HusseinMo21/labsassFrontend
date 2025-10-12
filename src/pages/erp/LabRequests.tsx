@@ -528,7 +528,6 @@ const LabRequests: React.FC = () => {
                 <TableCell>Lab No</TableCell>
                 <TableCell>Patient</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Samples</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -577,11 +576,6 @@ const LabRequests: React.FC = () => {
                       color={statusColors[labRequest.status]}
                       size="small"
                     />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {labRequest.number_of_samples || labRequest.samples.length} sample(s)
-                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">

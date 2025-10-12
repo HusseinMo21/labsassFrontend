@@ -140,8 +140,25 @@ const Receipts: React.FC = () => {
       const response = await axios.get('/api/visits', { params });
       
       
+      // Handle the response structure - receipt_data contains the paginated data
+      let receiptsData = [];
+      let totalPages = 1;
+      
+      if (response.data.receipt_data) {
+        // Check if receipt_data has pagination structure
+        if (response.data.receipt_data.data) {
+          // Paginated response
+          receiptsData = response.data.receipt_data.data;
+          totalPages = response.data.receipt_data.last_page || 1;
+        } else if (Array.isArray(response.data.receipt_data)) {
+          // Direct array response
+          receiptsData = response.data.receipt_data;
+          totalPages = 1;
+        }
+      }
+      
       // Filter to only include visits with visit numbers (use as receipt numbers) and normalize data
-      const receiptsData = response.data.data
+      const filteredReceipts = receiptsData
         .filter((visit: any) => visit.visit_number)
         .map((visit: any) => ({
           ...visit,
@@ -151,8 +168,8 @@ const Receipts: React.FC = () => {
           patient: visit.patient || { id: 0, name: 'Unknown', phone: 'N/A' },
         }));
       
-      setReceipts(receiptsData);
-      setTotalPages(response.data.last_page || 1);
+      setReceipts(filteredReceipts);
+      setTotalPages(totalPages);
     } catch (error) {
       console.error('Failed to fetch receipts:', error);
     } finally {

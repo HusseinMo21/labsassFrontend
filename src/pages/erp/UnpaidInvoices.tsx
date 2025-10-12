@@ -64,6 +64,7 @@ interface Invoice {
       name: string;
       phone: string;
       email?: string;
+      lab?: string;
     };
   };
 }

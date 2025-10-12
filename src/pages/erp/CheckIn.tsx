@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,24 +25,18 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton,
   Divider,
   Avatar,
-  Tooltip,
   InputAdornment,
   Pagination,
   Stack,
 } from '@mui/material';
 import {
   Add,
-  Receipt,
-  Print,
   CheckCircle,
-  Person,
   AttachMoney,
   Search,
   Phone,
-  Close,
   Payment,
   MonetizationOn,
   CreditCard,
@@ -68,7 +61,6 @@ interface Patient {
 }
 
 const CheckIn: React.FC = () => {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -81,7 +73,7 @@ const CheckIn: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(15);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPatients();
@@ -127,16 +119,6 @@ const CheckIn: React.FC = () => {
       }
       
       const response = await axios.get(`/api/patients?${params.toString()}`);
-      console.log('Patients API response:', response.data);
-      
-      // Log debug info for each patient
-      if (response.data.data) {
-        response.data.data.forEach((patient: any) => {
-          if (patient.debug_info) {
-            console.log(`Debug info for patient ${patient.name} (ID: ${patient.id}):`, patient.debug_info);
-          }
-        });
-      }
       
       // Handle paginated response
       if (response.data.data) {
@@ -145,14 +127,6 @@ const CheckIn: React.FC = () => {
         setTotalItems(response.data.total || 0);
         setCurrentPage(response.data.current_page || 1);
         
-        // Debug pagination data
-        console.log('Pagination data:', {
-          current_page: response.data.current_page,
-          last_page: response.data.last_page,
-          total: response.data.total,
-          per_page: response.data.per_page,
-          data_length: response.data.data.length
-        });
       } else {
         // Fallback for non-paginated response
         setPatients(response.data);
@@ -160,17 +134,15 @@ const CheckIn: React.FC = () => {
         setTotalItems(response.data.length || 0);
         setCurrentPage(1);
         
-        console.log('Non-paginated response, using fallback');
       }
     } catch (error) {
-      console.error('Failed to fetch patients:', error);
       toast.error('Failed to fetch patients');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     setCurrentPage(page);
   };
 
@@ -213,10 +185,8 @@ const CheckIn: React.FC = () => {
       // Navigate to receipt if needed
       if (response.data.receipt_data) {
         // Handle receipt generation
-        console.log('Receipt data:', response.data.receipt_data);
       }
     } catch (error: any) {
-      console.error('Failed to add extra payment:', error);
       toast.error(error.response?.data?.message || 'Failed to add extra payment');
     } finally {
       setSubmitting(false);

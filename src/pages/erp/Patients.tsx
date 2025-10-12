@@ -34,7 +34,6 @@ import {
   Search,
   Person,
   Phone,
-  LocationOn,
   WhatsApp,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
@@ -83,7 +82,8 @@ const Patients: React.FC = () => {
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{username: string, password: string} | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -122,11 +122,25 @@ const Patients: React.FC = () => {
       clearTimeout(searchTimeout);
     }
     
+    // Show searching indicator if user is typing
+    if (searchInput !== search) {
+      setIsSearching(true);
+    }
+    
+    // If search input is empty, search immediately
+    if (searchInput === '') {
+      setSearch('');
+      setCurrentPage(1);
+      setIsSearching(false);
+      return;
+    }
+    
     // Set new timeout for debounced search
     const timeout = setTimeout(() => {
       setSearch(searchInput);
       setCurrentPage(1); // Reset to first page when searching
-    }, 500); // Wait 500ms after user stops typing
+      setIsSearching(false);
+    }, 1500); // Wait 1.5 seconds after user stops typing
     
     setSearchTimeout(timeout);
     
@@ -136,7 +150,7 @@ const Patients: React.FC = () => {
         clearTimeout(timeout);
       }
     };
-  }, [searchInput]);
+  }, [searchInput, search]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -151,12 +165,14 @@ const Patients: React.FC = () => {
     try {
       setLoading(true);
       const response = await axios.get(`/api/patients?page=${currentPage}&search=${search}`);
+      console.log('Fetched patients data:', response.data.data);
       setPatients(response.data.data);
       setTotalPages(response.data.last_page);
     } catch (error) {
       toast.error('Failed to fetch patients');
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -177,7 +193,7 @@ const Patients: React.FC = () => {
         allergies: null,
         // Additional fields for the new Arabic form
         doctor: formData.doctor || null,
-        age: formData.age || null,
+        age: formData.age && formData.age.trim() !== '' ? parseInt(formData.age, 10) : null,
         address_required: formData.address_required || null,
         address_optional: formData.address_optional || null,
         organization: formData.organization || null,
@@ -186,6 +202,8 @@ const Patients: React.FC = () => {
       };
 
       console.log('Submitting patient data:', patientData);
+      console.log('Form data age:', formData.age);
+      console.log('Parsed age:', formData.age ? parseInt(formData.age, 10) : null);
 
 
       if (editingPatient) {
@@ -400,12 +418,21 @@ const Patients: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               fullWidth
-              placeholder="Search by name, phone, or lab number..."
+              placeholder="Search by name, phone, or lab number... (wait 1.5 seconds after typing)"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               InputProps={{
-                startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+                startAdornment: (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {isSearching ? (
+                      <CircularProgress size={20} sx={{ color: 'primary.main' }} />
+                    ) : (
+                      <Search sx={{ color: 'text.secondary' }} />
+                    )}
+                  </Box>
+                ),
               }}
+              helperText={isSearching ? "Searching..." : searchInput !== search ? "Type to search..." : ""}
             />
           </Box>
         </CardContent>
@@ -423,16 +450,14 @@ const Patients: React.FC = () => {
                   <TableCell>Gender</TableCell>
                   <TableCell>Age</TableCell>
                   <TableCell>Phone</TableCell>
-                  <TableCell>Address</TableCell>
                   <TableCell>Doctor</TableCell>
-                  <TableCell>Emergency Contact</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center">
+                    <TableCell colSpan={7} align="center">
                       <Alert severity="info">No patients found</Alert>
                     </TableCell>
                   </TableRow>
@@ -458,10 +483,29 @@ const Patients: React.FC = () => {
                       </TableCell>
                       <TableCell>{getGenderChip(patient.gender)}</TableCell>
                       <TableCell>
-                        {patient.age ? 
-                          `Age: ${patient.age}` : 
-                          '-'
-                        }
+                        {(() => {
+                          // If age is directly available, use it
+                          if (patient.age && patient.age > 0) {
+                            return patient.age;
+                          }
+                          
+                          // If birth_date is available, calculate age from it
+                          if (patient.birth_date) {
+                            const birthDate = new Date(patient.birth_date);
+                            const today = new Date();
+                            let age = today.getFullYear() - birthDate.getFullYear();
+                            const monthDiff = today.getMonth() - birthDate.getMonth();
+                            
+                            // Adjust if birthday hasn't occurred this year
+                            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                              age--;
+                            }
+                            
+                            return age > 0 ? age : 'N/A';
+                          }
+                          
+                          return 'N/A';
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -471,19 +515,9 @@ const Patients: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <LocationOn fontSize="small" color="action" />
-                          {patient.address || '-'}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Person fontSize="small" color="action" />
                           {patient.doctor_name || patient.sender || '-'}
                         </Box>
-                      </TableCell>
-                      <TableCell>
-                        {patient.emergency_contact || '-'} 
-                        {patient.emergency_phone && ` (${patient.emergency_phone})`}
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
