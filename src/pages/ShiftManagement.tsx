@@ -111,8 +111,13 @@ const ShiftManagement: React.FC = () => {
       if (response.data.success) {
         setCurrentShift(response.data.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch current shift:', error);
+      if (error.response?.status === 403) {
+        toast.error('Access denied: You need staff or admin role to access shift management');
+      } else {
+        toast.error('Failed to fetch current shift: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
@@ -122,8 +127,13 @@ const ShiftManagement: React.FC = () => {
       if (response.data.success) {
         setShiftHistory(response.data.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch shift history:', error);
+      if (error.response?.status === 403) {
+        toast.error('Access denied: You need staff or admin role to access shift history');
+      } else {
+        toast.error('Failed to fetch shift history: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 

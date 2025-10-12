@@ -47,9 +47,14 @@ import {
   Business,
   AttachMoney,
   History,
+  Print,
+  FileDownload,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface Account {
   id: number;
@@ -127,6 +132,10 @@ const Accounts: React.FC = () => {
   });
 
   const [saving, setSaving] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [showPDFPreview, setShowPDFPreview] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfFilename, setPdfFilename] = useState('');
 
   useEffect(() => {
     fetchAccounts();
@@ -279,8 +288,16 @@ const Accounts: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return `EGP ${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | string | null | undefined) => {
+    // Convert to number and handle edge cases
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    // Check if the value is a valid number
+    if (isNaN(numAmount) || numAmount === null || numAmount === undefined) {
+      return 'EGP 0.00';
+    }
+    
+    return `EGP ${numAmount.toFixed(2)}`;
   };
 
   const getStatusChip = (status: string) => {
@@ -302,6 +319,254 @@ const Accounts: React.FC = () => {
 
     const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.purchase;
     return <Chip label={config.label} color={config.color} size="small" />;
+  };
+
+
+  const handleExportAccountDetails = (account: Account) => {
+    // Prepare detailed data for the specific account with proper formatting
+    const accountData = [{
+      'Account Name': account.name,
+      'Description': account.description || '',
+      'Total Amount (EGP)': Number(account.total_amount),
+      'Paid Amount (EGP)': Number(account.total_paid),
+      'Remaining Balance (EGP)': Number(account.remaining_balance),
+      'Status': account.status.charAt(0).toUpperCase() + account.status.slice(1),
+      'Created Date': new Date(account.created_at),
+      'Updated Date': new Date(account.updated_at),
+    }];
+
+    // Add transaction details if available
+    if (account.transactions && account.transactions.length > 0) {
+      accountData.push({}); // Empty row separator
+      accountData.push({
+        'Account Name': 'TRANSACTION HISTORY',
+        'Description': '',
+        'Total Amount (EGP)': '',
+        'Paid Amount (EGP)': '',
+        'Remaining Balance (EGP)': '',
+        'Status': '',
+        'Created Date': '',
+        'Updated Date': '',
+      });
+
+      account.transactions.forEach(transaction => {
+        accountData.push({
+          'Account Name': transaction.description || `${transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)} Transaction`,
+          'Description': transaction.notes || '',
+          'Total Amount (EGP)': Number(transaction.amount),
+          'Paid Amount (EGP)': Number(transaction.paid_amount),
+          'Remaining Balance (EGP)': Number(transaction.remaining_amount),
+          'Status': transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1),
+          'Created Date': new Date(transaction.transaction_date),
+          'Updated Date': new Date(transaction.created_at),
+        });
+      });
+    }
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.json_to_sheet(accountData);
+    
+    // Set column widths for better readability
+    const colWidths = [
+      { wch: 25 }, // Account Name
+      { wch: 35 }, // Description
+      { wch: 15 }, // Total Amount
+      { wch: 15 }, // Paid Amount
+      { wch: 18 }, // Remaining Balance
+      { wch: 12 }, // Status
+      { wch: 12 }, // Created Date
+      { wch: 12 }, // Updated Date
+    ];
+    ws['!cols'] = colWidths;
+
+    // Add header styling
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "366092" } },
+      alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    // Apply header styling to first row
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!ws[cellAddress]) ws[cellAddress] = { v: '' };
+      ws[cellAddress].s = headerStyle;
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `${account.name} Details`);
+
+    // Generate filename with account name and current date
+    const currentDate = new Date().toISOString().split('T')[0];
+    const filename = `account_${account.name.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate}.xlsx`;
+
+    // Save file
+    XLSX.writeFile(wb, filename);
+
+    toast.success(`Account details for "${account.name}" exported successfully`);
+  };
+
+  const handlePrintAccountDetails = async (account: Account) => {
+    console.log('PDF generation started for account:', account.name);
+    toast.info('Starting PDF generation...');
+    setGeneratingPDF(true);
+    
+    try {
+      // Create a temporary div element to hold the content with Arabic support
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '-9999px';
+      tempDiv.style.width = '210mm'; // A4 width
+      tempDiv.style.backgroundColor = 'white';
+      tempDiv.style.padding = '20mm';
+      tempDiv.style.fontFamily = 'Arial, "Amiri", "Noto Sans Arabic", sans-serif';
+      tempDiv.style.fontSize = '12px';
+      tempDiv.style.lineHeight = '1.4';
+      tempDiv.style.color = '#333';
+      tempDiv.style.direction = 'ltr'; // Keep overall direction LTR for layout
+
+      const currentDate = new Date().toLocaleDateString();
+
+      tempDiv.innerHTML = `
+        <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px;">
+          <h1 style="font-size: 24px; margin: 0 0 10px 0; font-weight: bold;">Account Details Report</h1>
+          <p style="margin: 5px 0; font-size: 14px;">Generated on: ${currentDate}</p>
+          <p style="margin: 5px 0; font-size: 14px;">Account: ${account.name}</p>
+        </div>
+
+        <div style="background: #f5f5f5; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Account Name:</span>
+            <span style="flex: 1; text-align: right;">${account.name}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Description:</span>
+            <span style="flex: 1; text-align: right; font-family: 'Amiri', 'Noto Sans Arabic', Arial, sans-serif;">${account.description || 'N/A'}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Total Amount:</span>
+            <span style="flex: 1; text-align: right;">${formatCurrency(account.total_amount)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Paid Amount:</span>
+            <span style="flex: 1; text-align: right;">${formatCurrency(account.total_paid)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Remaining Balance:</span>
+            <span style="flex: 1; text-align: right;">${formatCurrency(account.remaining_balance)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Status:</span>
+            <span style="flex: 1; text-align: right;">${account.status.charAt(0).toUpperCase() + account.status.slice(1)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Created Date:</span>
+            <span style="flex: 1; text-align: right;">${new Date(account.created_at).toLocaleDateString()}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 5px 0;">
+            <span style="font-weight: bold; width: 150px;">Last Updated:</span>
+            <span style="flex: 1; text-align: right;">${new Date(account.updated_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+
+        ${account.transactions && account.transactions.length > 0 ? `
+        <div style="margin-top: 20px;">
+          <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Transaction History (${account.transactions.length} transactions)</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Date</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Description</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Type</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Amount</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Paid</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Remaining</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; font-size: 13px;">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${account.transactions.map(transaction => `
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px;">${new Date(transaction.transaction_date).toLocaleDateString()}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; font-family: 'Amiri', 'Noto Sans Arabic', Arial, sans-serif;">${transaction.description || 'N/A'}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px;">${transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px;">${formatCurrency(transaction.amount)}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px;">${formatCurrency(transaction.paid_amount)}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px;">${formatCurrency(transaction.remaining_amount)}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; font-family: 'Amiri', 'Noto Sans Arabic', Arial, sans-serif;">${transaction.notes || 'N/A'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : `
+        <div style="margin-top: 20px;">
+          <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Transaction History</h3>
+          <p>No transactions found for this account.</p>
+        </div>
+        `}
+
+        <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; font-size: 10px; color: #666;">
+          <p>This report was generated automatically by the Accounts Management System</p>
+          <p>For any questions, please contact the system administrator</p>
+        </div>
+      `;
+
+      // Add the temporary div to the document
+      document.body.appendChild(tempDiv);
+
+      // Generate PDF using html2canvas and jsPDF
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // Remove the temporary div
+      document.body.removeChild(tempDiv);
+
+      // Create PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Generate PDF blob for preview
+      const filename = `account_${account.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const pdfBlob = pdf.output('blob');
+      
+      // Set the PDF data for preview
+      setPdfBlob(pdfBlob);
+      setPdfFilename(filename);
+      setShowPDFPreview(true);
+
+      toast.success(`PDF preview generated successfully`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF: ' + (error as Error).message);
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   return (
@@ -528,6 +793,25 @@ const Accounts: React.FC = () => {
                               color="info"
                             >
                               <History />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Preview & Generate PDF">
+                            <IconButton
+                              size="small"
+                              onClick={() => handlePrintAccountDetails(account)}
+                              color="info"
+                              disabled={generatingPDF}
+                            >
+                              {generatingPDF ? <CircularProgress size={16} /> : <Print />}
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Export Account Details">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleExportAccountDetails(account)}
+                              color="secondary"
+                            >
+                              <FileDownload />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Add Transaction">
@@ -849,8 +1133,77 @@ const Accounts: React.FC = () => {
           <Button onClick={() => setShowHistoryDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* PDF Preview Dialog */}
+      <Dialog 
+        open={showPDFPreview} 
+        onClose={() => setShowPDFPreview(false)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{
+          sx: { height: '90vh' }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">PDF Preview - {pdfFilename}</Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<FileDownload />}
+              onClick={() => {
+                if (pdfBlob) {
+                  const url = URL.createObjectURL(pdfBlob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = pdfFilename;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                  toast.success('PDF downloaded successfully');
+                }
+              }}
+            >
+              Download PDF
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Print />}
+              onClick={() => {
+                if (pdfBlob) {
+                  const url = URL.createObjectURL(pdfBlob);
+                  const printWindow = window.open(url, '_blank');
+                  if (printWindow) {
+                    printWindow.onload = () => {
+                      printWindow.print();
+                    };
+                  }
+                  toast.success('PDF sent to printer');
+                }
+              }}
+            >
+              Print PDF
+            </Button>
+            <Button onClick={() => setShowPDFPreview(false)}>Close</Button>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, height: '100%' }}>
+          {pdfBlob && (
+            <iframe
+              src={URL.createObjectURL(pdfBlob)}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none'
+              }}
+              title="PDF Preview"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };
 
 export default Accounts;
+

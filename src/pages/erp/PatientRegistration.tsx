@@ -157,6 +157,7 @@ const PatientRegistration: React.FC = () => {
     setLoadingSample(true);
     try {
       const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/sample-label`);
+      console.log('Sample label API response:', response.data);
       setSampleData(response.data);
       setShowSampleModal(true);
     } catch (error) {
@@ -1321,16 +1322,16 @@ const PatientRegistration: React.FC = () => {
             </Box>
         {sampleData && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {sampleData.sample_labels?.length || 0} sample label(s) generated
+            {sampleData.sample_data?.sample_labels?.length || 0} sample label(s) generated
           </Typography>
         )}
           </DialogTitle>
           <DialogContent>
         {sampleData ? (
           <Box>
-            {sampleData.sample_labels && sampleData.sample_labels.length > 0 ? (
+            {sampleData.sample_data?.sample_labels && sampleData.sample_data.sample_labels.length > 0 ? (
               <Grid container spacing={2}>
-                {sampleData.sample_labels.map((sampleLabel: any, index: number) => (
+                {sampleData.sample_data.sample_labels.map((sampleLabel: any, index: number) => (
                   <Grid item xs={12} sm={6} key={index}>
                     <Card variant="outlined" sx={{ p: 2 }}>
                       <Box sx={{ textAlign: 'left' }}>
@@ -1384,11 +1385,11 @@ const PatientRegistration: React.FC = () => {
               color="secondary"
               startIcon={<Print />}
               onClick={() => {
-                if (sampleData && sampleData.sample_labels) {
+                if (sampleData && sampleData.sample_data?.sample_labels) {
                   // Use the same print function as CheckIn.tsx
                   const printWindow = window.open('', '_blank');
                   if (printWindow) {
-                    const labelsHTML = sampleData.sample_labels.map((sampleLabel: any) => `
+                    const labelsHTML = sampleData.sample_data.sample_labels.map((sampleLabel: any) => `
                       <div style="page-break-after: always; margin-bottom: 20px;">
                         <div style="border: 2px solid #000; padding: 10px; width: 300px; font-family: Arial, sans-serif;">
                           <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 10px;">
