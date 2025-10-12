@@ -19,7 +19,6 @@ import {
   TextField,
   Chip,
   IconButton,
-  Alert,
   CircularProgress,
   Grid,
   Tooltip,
@@ -33,19 +32,15 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Fab,
 } from '@mui/material';
 import {
   Add,
-  Edit,
   Delete,
-  Visibility,
   Payment,
   CheckCircle,
   Search,
   Refresh,
   Business,
-  AttachMoney,
   History,
   Print,
   FileDownload,
@@ -101,7 +96,6 @@ const Accounts: React.FC = () => {
 
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showTransactionDialog, setShowTransactionDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
@@ -186,7 +180,7 @@ const Accounts: React.FC = () => {
 
     setSaving(true);
     try {
-      const response = await axios.post('/api/accounts', formData);
+      await axios.post('/api/accounts', formData);
       toast.success('Account created successfully');
       setShowCreateDialog(false);
       setFormData({ name: '', description: '', initial_amount: '', initial_paid: '' });
@@ -210,7 +204,7 @@ const Accounts: React.FC = () => {
 
     setSaving(true);
     try {
-      const response = await axios.post(`/api/accounts/${selectedAccount.id}/transactions`, transactionData);
+      await axios.post(`/api/accounts/${selectedAccount.id}/transactions`, transactionData);
       toast.success('Transaction added successfully');
       setShowTransactionDialog(false);
       setTransactionData({
@@ -241,7 +235,7 @@ const Accounts: React.FC = () => {
 
     setSaving(true);
     try {
-      const response = await axios.post(`/api/accounts/${selectedAccount.id}/payments`, paymentData);
+      await axios.post(`/api/accounts/${selectedAccount.id}/payments`, paymentData);
       toast.success('Payment added successfully');
       setShowPaymentDialog(false);
       setPaymentData({
@@ -293,7 +287,7 @@ const Accounts: React.FC = () => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     
     // Check if the value is a valid number
-    if (isNaN(numAmount) || numAmount === null || numAmount === undefined) {
+    if (numAmount === null || numAmount === undefined || isNaN(numAmount)) {
       return 'EGP 0.00';
     }
     
@@ -337,16 +331,25 @@ const Accounts: React.FC = () => {
 
     // Add transaction details if available
     if (account.transactions && account.transactions.length > 0) {
-      accountData.push({}); // Empty row separator
+      accountData.push({
+        'Account Name': '',
+        'Description': '',
+        'Total Amount (EGP)': 0,
+        'Paid Amount (EGP)': 0,
+        'Remaining Balance (EGP)': 0,
+        'Status': '',
+        'Created Date': new Date(),
+        'Updated Date': new Date(),
+      }); // Empty row separator
       accountData.push({
         'Account Name': 'TRANSACTION HISTORY',
         'Description': '',
-        'Total Amount (EGP)': '',
-        'Paid Amount (EGP)': '',
-        'Remaining Balance (EGP)': '',
+        'Total Amount (EGP)': 0,
+        'Paid Amount (EGP)': 0,
+        'Remaining Balance (EGP)': 0,
         'Status': '',
-        'Created Date': '',
-        'Updated Date': '',
+        'Created Date': new Date(),
+        'Updated Date': new Date(),
       });
 
       account.transactions.forEach(transaction => {

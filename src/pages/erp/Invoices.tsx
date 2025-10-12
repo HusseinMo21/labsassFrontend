@@ -548,7 +548,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
-                          {invoice.visit?.patient?.lab || 'N/A'}
+                          {'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -588,7 +588,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {invoice.visit?.visit_date ? new Date(invoice.visit.visit_date).toLocaleDateString() : 'N/A'}
+                          {invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
