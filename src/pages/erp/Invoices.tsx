@@ -111,7 +111,7 @@ const Invoices: React.FC = () => {
         params.search = searchTerm.trim();
       }
 
-      const response = await axios.get('/api/invoices', { params });
+      const response = await axios.get('/api/unpaid-invoices/search', { params });
       setInvoices(response.data.data || []);
       setTotalPages(response.data.last_page || 1);
     } catch (error) {
@@ -150,56 +150,209 @@ const Invoices: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleOpenInvoicePreview = async (invoiceId: number) => {
-    try {
-      const response = await axios.get(`/api/invoices/${invoiceId}/download`, {
-        responseType: 'blob',
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const newWindow = window.open(url, '_blank');
-      
-      if (newWindow) {
-        newWindow.onload = function() {
-          const downloadBtn = newWindow.document.createElement('button');
-          downloadBtn.innerHTML = 'Download PDF';
-          downloadBtn.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
+  const generateReceiptHtml = (receiptData: any) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt - ${receiptData.receipt_number}</title>
+        <style>
+          @page { 
+            size: 80mm 200mm; 
+            margin: 5mm; 
+          }
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: bold;
+          }
+          .section {
+            margin-bottom: 15px;
+          }
+          .section h3 {
+            margin: 0 0 8px 0;
             font-size: 14px;
-            z-index: 1000;
-          `;
-          downloadBtn.onclick = function() {
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `invoice_${invoiceId}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-          };
-          newWindow.document.body.appendChild(downloadBtn);
-        };
-        toast.success('Invoice opened in new tab');
-      } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `invoice_${invoiceId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        toast.success('Invoice downloaded (popup blocked)');
+            font-weight: bold;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 3px;
+          }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+          }
+          .label {
+            font-weight: bold;
+          }
+          .value {
+            text-align: right;
+          }
+          .test-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            padding: 2px 0;
+            border-bottom: 1px dotted #ccc;
+          }
+          .test-name {
+            flex: 1;
+          }
+          .test-price {
+            font-weight: bold;
+          }
+          .barcode {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            font-size: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>PATHOLOGY LAB RECEIPT</h1>
+          <p>Date: ${receiptData.date}</p>
+          <p>Receipt #: ${receiptData.receipt_number}</p>
+          <p>Lab #: ${receiptData.lab_number || 'N/A'}</p>
+        </div>
+        
+        <div class="section">
+          <h3>Patient Information</h3>
+          <div class="row">
+            <span class="label">Name:</span>
+            <span class="value">${receiptData.patient_name}</span>
+          </div>
+          <div class="row">
+            <span class="label">Age:</span>
+            <span class="value">${receiptData.patient_age}</span>
+          </div>
+          <div class="row">
+            <span class="label">Phone:</span>
+            <span class="value">${receiptData.patient_phone}</span>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h3>Tests (${receiptData.tests?.length || 0})</h3>
+          ${(receiptData.tests || []).map((test: any) => `
+              <div class="test-item">
+                <span class="test-name">${test.name}</span>
+                <span class="test-price">EGP ${test.price}</span>
+              </div>
+            `).join('')}
+        </div>
+        
+        <div class="section">
+          <h3>Financial Summary</h3>
+          <div class="row">
+            <span class="label">Total:</span>
+            <span class="value">EGP ${receiptData.total_amount}</span>
+          </div>
+          <div class="row">
+            <span class="label">Discount:</span>
+            <span class="value">EGP ${receiptData.discount_amount || 0}</span>
+          </div>
+          <div class="row">
+            <span class="label">Final:</span>
+            <span class="value">EGP ${receiptData.final_amount}</span>
+          </div>
+          <div class="row">
+            <span class="label">Paid:</span>
+            <span class="value">EGP ${receiptData.upfront_payment}</span>
+          </div>
+          <div class="row">
+            <span class="label">Remaining:</span>
+            <span class="value">EGP ${receiptData.remaining_balance}</span>
+          </div>
+          <div class="row">
+            <span class="label">Status:</span>
+            <span class="value">${(receiptData.billing_status || 'N/A').toUpperCase()}</span>
+          </div>
+        </div>
+        
+        ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
+        <div class="section">
+          <h3>PAYMENT BREAKDOWN</h3>
+          ${receiptData.payment_breakdown.cash > 0 ? `
+          <div class="row">
+            <span class="label">Paid Cash:</span>
+            <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
+          </div>
+          ` : ''}
+          ${receiptData.payment_breakdown.card > 0 ? `
+          <div class="row">
+            <span class="label">Paid with ${receiptData.payment_breakdown.card_method || 'Card'}:</span>
+            <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
+          </div>
+          ` : ''}
+        </div>
+        ` : ''}
+        
+        ${receiptData.barcode ? `
+        <div class="barcode">
+          ${receiptData.barcode.includes('<svg') ? 
+            receiptData.barcode : 
+            `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />`
+          }
+          <div style="font-size: 8px; margin-top: 2px;">${receiptData.barcode_text || receiptData.lab_number}</div>
+        </div>
+        ` : ''}
+        
+        <div class="footer">
+          <p>Thank you for choosing our lab!</p>
+          <p>Printed by: ${receiptData.printed_by || 'System'}</p>
+          <p>Printed at: ${receiptData.printed_at || new Date().toLocaleString()}</p>
+          <p>Visit ID: ${receiptData.visit_id || 'N/A'}</p>
+        </div>
+      </body>
+    </html>
+    `;
+  };
+
+  const handleOpenInvoicePreview = async (invoice: any) => {
+    try {
+      // Use the visit ID to get the receipt
+      const visitId = invoice.visit?.id;
+      if (!visitId) {
+        toast.error('Visit ID not found');
+        return;
       }
       
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
+      const response = await axios.get(`/api/check-in/visits/${visitId}/receipt`);
+      const receiptData = response.data.receipt_data;
+      
+      // Generate receipt HTML
+      const receiptHtml = generateReceiptHtml(receiptData);
+      
+      // Open in new window
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(receiptHtml);
+        newWindow.document.close();
+        newWindow.print();
+        toast.success('Receipt opened in new tab');
+      }
     } catch (error) {
       console.error('Failed to open invoice:', error);
       toast.error('Failed to open invoice');
@@ -395,7 +548,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
-                          {invoice.lab_number || 'N/A'}
+                          {invoice.visit?.patient?.lab || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -408,7 +561,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {invoice.visit?.visit_number || 'N/A'}
+                          {invoice.invoice_number || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
@@ -435,7 +588,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {new Date(invoice.invoice_date).toLocaleDateString()}
+                          {invoice.visit?.visit_date ? new Date(invoice.visit.visit_date).toLocaleDateString() : 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
@@ -452,7 +605,7 @@ const Invoices: React.FC = () => {
                           <Tooltip title="Preview PDF">
                             <IconButton
                               size="small"
-                              onClick={() => handleOpenInvoicePreview(invoice.id)}
+                              onClick={() => handleOpenInvoicePreview(invoice)}
                               color="secondary"
                             >
                               <PictureAsPdf />

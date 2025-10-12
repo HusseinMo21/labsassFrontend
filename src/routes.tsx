@@ -28,6 +28,7 @@ import CheckIn from './pages/erp/CheckIn';
 import UnpaidInvoices from './pages/erp/UnpaidInvoices';
 import LabRequests from './pages/erp/LabRequests';
 import StaffDashboard from './pages/erp/StaffDashboard';
+import Accounts from './pages/erp/Accounts';
 import DoctorDashboard from './pages/erp/DoctorDashboard';
 import PatientReports from './pages/erp/PatientReports';
 import PatientVisits from './pages/erp/PatientVisits';
@@ -355,6 +356,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <UnpaidInvoices />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/accounts',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <Accounts />
         </ERPLayout>
       </ProtectedRoute>
     ),
