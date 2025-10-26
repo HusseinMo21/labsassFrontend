@@ -140,7 +140,8 @@ const PatientRegistration: React.FC = () => {
     setLoadingReceipt(true);
     try {
       const response = await axios.get(`/api/visits/${patientCredentials.visitId}/receipt`);
-      setReceiptData(response.data);
+      // The API returns data wrapped in 'receipt_data'
+      setReceiptData(response.data.receipt_data || response.data);
       setShowReceiptModal(true);
     } catch (error) {
       console.error('Failed to fetch receipt:', error);
@@ -968,7 +969,7 @@ const PatientRegistration: React.FC = () => {
             </Box>
             {receiptData && (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Receipt #{receiptData.receipt_number} • {receiptData.date}
+                Receipt #{receiptData.receipt_number || 'N/A'} • {receiptData.date || receiptData.visit_date || new Date().toLocaleDateString()}
               </Typography>
             )}
           </DialogTitle>
@@ -985,13 +986,13 @@ const PatientRegistration: React.FC = () => {
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary" gutterBottom>Name:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                        {String(receiptData.patient_name)}
+                        {receiptData.patient_name || receiptData.patient?.name || 'N/A'}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary" gutterBottom>Phone:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                        {String(receiptData.patient_phone)}
+                        {receiptData.patient_phone || receiptData.patient?.phone || 'N/A'}
                       </Typography>
                     </Grid>
                   </Grid>
@@ -1001,9 +1002,9 @@ const PatientRegistration: React.FC = () => {
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
                     <Science sx={{ mr: 1 }} />
-                    Tests Ordered ({receiptData.tests?.length || 0})
+                    Tests Ordered ({receiptData.tests?.length || receiptData.visitTests?.length || 0})
                   </Typography>
-                  {receiptData.tests && receiptData.tests.length > 0 ? (
+                  {(receiptData.tests && receiptData.tests.length > 0) || (receiptData.visitTests && receiptData.visitTests.length > 0) ? (
                     <TableContainer component={Paper} variant="outlined">
                       <Table>
                         <TableHead>
@@ -1014,21 +1015,21 @@ const PatientRegistration: React.FC = () => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {receiptData.tests.map((test: any, index: number) => (
+                          {(receiptData.tests || receiptData.visitTests || []).map((test: any, index: number) => (
                             <TableRow key={index}>
                               <TableCell>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {test.name}
+                                  {test.name || test.custom_test_name || (test.labTest?.name) || (test.lab_test?.name) || 'Unknown Test'}
                                 </Typography>
                               </TableCell>
                               <TableCell>
                                 <Typography variant="body2" color="text.secondary">
-                                  {test.category}
+                                  {test.category || test.testCategory?.name || 'Unknown'}
                                 </Typography>
                               </TableCell>
                               <TableCell align="right">
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  EGP {test.price}
+                                  EGP {test.price || test.final_price || (test.labTest?.price) || (test.lab_test?.price) || 0}
                                 </Typography>
                               </TableCell>
                             </TableRow>
@@ -1073,7 +1074,7 @@ const PatientRegistration: React.FC = () => {
                     <Grid item xs={6}>
                       <Typography variant="body2" color="text.secondary">Total Paid:</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
-                        EGP {(receiptData.payment_breakdown?.cash || 0) + (receiptData.payment_breakdown?.card || 0)}
+                        EGP {receiptData.paid_now || receiptData.upfront_payment || (receiptData.payment_breakdown?.cash || 0) + (receiptData.payment_breakdown?.card || 0) || 0}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
@@ -1126,8 +1127,8 @@ const PatientRegistration: React.FC = () => {
                     Payment Status
                   </Typography>
                   <Chip
-                    label={receiptData.billing_status || 'PENDING'}
-                    color={receiptData.billing_status === 'paid' ? 'success' : receiptData.billing_status === 'partial' ? 'warning' : 'default'}
+                    label={(receiptData.billing_status || receiptData.payment_status || receiptData.status || 'PENDING').toUpperCase()}
+                    color={(receiptData.billing_status || receiptData.payment_status || receiptData.status) === 'paid' ? 'success' : (receiptData.billing_status || receiptData.payment_status || receiptData.status) === 'partial' ? 'warning' : 'default'}
                     sx={{ fontWeight: 600, mb: 2 }}
                   />
                   {receiptData.processed_by && (
