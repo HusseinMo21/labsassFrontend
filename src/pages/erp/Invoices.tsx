@@ -64,10 +64,12 @@ interface Invoice {
   visit: {
     id: number;
     visit_number: string;
+    visit_date?: string;
     patient: {
       id: number;
       name: string;
       phone: string;
+      lab?: string;
     };
   };
   payments: Payment[];
@@ -150,184 +152,381 @@ const Invoices: React.FC = () => {
     setShowModal(true);
   };
 
-  const generateReceiptHtml = (receiptData: any) => {
+  const generateTaxInvoiceHtml = (receiptData: any) => {
+    const currentDate = new Date().toLocaleDateString('ar-EG');
+    const taxRate = 14; // 14% VAT rate for Egypt
+    const subtotal = receiptData.total_amount || 0;
+    const taxAmount = (subtotal * taxRate) / 100;
+    const totalWithTax = subtotal + taxAmount;
+    
     return `
       <!DOCTYPE html>
-      <html>
+      <html dir="rtl" lang="ar">
       <head>
-        <title>Receipt - ${receiptData.receipt_number}</title>
+        <meta charset="UTF-8">
+        <title>فاتورة ضريبية - ${receiptData.receipt_number}</title>
         <style>
           @page { 
-            size: 80mm 200mm; 
-            margin: 5mm; 
+            size: A4; 
+            margin: 20mm; 
           }
           body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
+            font-family: 'Arial', 'Tahoma', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
             margin: 0;
             padding: 0;
             color: #333;
+            direction: rtl;
+          }
+          .invoice-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border: 1px solid #ddd;
           }
           .header {
             text-align: center;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+            border-bottom: 3px solid #2c5aa0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
           }
           .header h1 {
             margin: 0;
-            font-size: 16px;
+            font-size: 28px;
             font-weight: bold;
+            color: #2c5aa0;
+            margin-bottom: 10px;
           }
-          .section {
-            margin-bottom: 15px;
+          .header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #666;
+            font-weight: normal;
           }
-          .section h3 {
-            margin: 0 0 8px 0;
+          .company-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+          }
+          .company-details h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #2c5aa0;
+          }
+          .company-details p {
+            margin: 5px 0;
             font-size: 14px;
-            font-weight: bold;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 3px;
           }
-          .row {
+          .invoice-details {
+            text-align: left;
+          }
+          .invoice-details h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #2c5aa0;
+          }
+          .invoice-details p {
+            margin: 5px 0;
+            font-size: 14px;
+          }
+          .patient-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+          }
+          .patient-info h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #2c5aa0;
+            border-bottom: 2px solid #2c5aa0;
+            padding-bottom: 10px;
+          }
+          .patient-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+          }
+          .patient-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 4px;
-          }
-          .label {
-            font-weight: bold;
-          }
-          .value {
-            text-align: right;
-          }
-          .test-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 3px;
-            padding: 2px 0;
+            padding: 8px 0;
             border-bottom: 1px dotted #ccc;
           }
-          .test-name {
-            flex: 1;
+          .patient-label {
+            font-weight: bold;
+            color: #555;
           }
-          .test-price {
+          .patient-value {
+            color: #333;
+          }
+          .services-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          .services-table th {
+            background: #2c5aa0;
+            color: white;
+            padding: 15px;
+            text-align: center;
             font-weight: bold;
           }
-          .barcode {
+          .services-table td {
+            padding: 12px 15px;
             text-align: center;
-            margin: 15px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
+            border-bottom: 1px solid #eee;
+          }
+          .services-table tr:nth-child(even) {
+            background: #f8f9fa;
+          }
+          .service-name {
+            text-align: right;
+            font-weight: bold;
+          }
+          .totals-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+          }
+          .totals-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #2c5aa0;
+            border-bottom: 2px solid #2c5aa0;
+            padding-bottom: 10px;
+          }
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dotted #ccc;
+          }
+          .total-label {
+            font-weight: bold;
+            color: #555;
+          }
+          .total-value {
+            font-weight: bold;
+            color: #333;
+          }
+          .grand-total {
+            background: #2c5aa0;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+          }
+          .grand-total .total-row {
+            border-bottom: none;
+            font-size: 18px;
+          }
+          .payment-info {
+            background: #e8f4fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-right: 4px solid #2c5aa0;
+          }
+          .payment-info h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #2c5aa0;
           }
           .footer {
             text-align: center;
-            margin-top: 20px;
-            padding-top: 10px;
-            border-top: 1px solid #ccc;
-            font-size: 10px;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #2c5aa0;
+            color: #666;
+          }
+          .footer p {
+            margin: 5px 0;
+          }
+          .barcode {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+          }
+          .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+          }
+          .status-paid {
+            background: #d4edda;
+            color: #155724;
+          }
+          .status-partial {
+            background: #fff3cd;
+            color: #856404;
+          }
+          .status-pending {
+            background: #f8d7da;
+            color: #721c24;
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>PATHOLOGY LAB RECEIPT</h1>
-          <p>Date: ${receiptData.date}</p>
-          <p>Receipt #: ${receiptData.receipt_number}</p>
-          <p>Lab #: ${receiptData.lab_number || 'N/A'}</p>
-        </div>
-        
-        <div class="section">
-          <h3>Patient Information</h3>
-          <div class="row">
-            <span class="label">Name:</span>
-            <span class="value">${receiptData.patient_name}</span>
+        <div class="invoice-container">
+          <div class="header">
+            <h1>فاتورة ضريبية</h1>
+            <h2>Tax Invoice</h2>
           </div>
-          <div class="row">
-            <span class="label">Age:</span>
-            <span class="value">${receiptData.patient_age}</span>
+          
+          <div class="company-info">
+            <div class="company-details">
+              <h3>معلومات المختبر</h3>
+              <p><strong>اسم المختبر:</strong> مختبر التحاليل الطبية</p>
+              <p><strong>العنوان:</strong> القاهرة، مصر</p>
+              <p><strong>الهاتف:</strong> +20 123 456 7890</p>
+              <p><strong>البريد الإلكتروني:</strong> info@lab.com</p>
+              <p><strong>الرقم الضريبي:</strong> 123456789012345</p>
+            </div>
+            <div class="invoice-details">
+              <h3>تفاصيل الفاتورة</h3>
+              <p><strong>رقم الفاتورة:</strong> ${receiptData.receipt_number}</p>
+              <p><strong>تاريخ الفاتورة:</strong> ${receiptData.date}</p>
+              <p><strong>رقم المختبر:</strong> ${receiptData.lab_number || 'N/A'}</p>
+              <p><strong>رقم الزيارة:</strong> ${receiptData.visit_number}</p>
+            </div>
           </div>
-          <div class="row">
-            <span class="label">Phone:</span>
-            <span class="value">${receiptData.patient_phone}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>Tests (${receiptData.tests?.length || 0})</h3>
-          ${(receiptData.tests || []).map((test: any) => `
-              <div class="test-item">
-                <span class="test-name">${test.name}</span>
-                <span class="test-price">EGP ${test.price}</span>
+          
+          <div class="patient-info">
+            <h3>معلومات المريض</h3>
+            <div class="patient-grid">
+              <div class="patient-item">
+                <span class="patient-label">الاسم:</span>
+                <span class="patient-value">${receiptData.patient_name}</span>
               </div>
-            `).join('')}
-        </div>
-        
-        <div class="section">
-          <h3>Financial Summary</h3>
-          <div class="row">
-            <span class="label">Total:</span>
-            <span class="value">EGP ${receiptData.total_amount}</span>
+              <div class="patient-item">
+                <span class="patient-label">العمر:</span>
+                <span class="patient-value">${receiptData.patient_age || 'N/A'}</span>
+              </div>
+              <div class="patient-item">
+                <span class="patient-label">الهاتف:</span>
+                <span class="patient-value">${receiptData.patient_phone}</span>
+              </div>
+              <div class="patient-item">
+                <span class="patient-label">الحالة:</span>
+                <span class="patient-value">
+                  <span class="status-badge status-${(receiptData.billing_status || receiptData.payment_status || 'pending').toLowerCase()}">
+                    ${(receiptData.billing_status || receiptData.payment_status || 'PENDING').toUpperCase()}
+                  </span>
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="row">
-            <span class="label">Discount:</span>
-            <span class="value">EGP ${receiptData.discount_amount || 0}</span>
+          
+          <table class="services-table">
+            <thead>
+              <tr>
+                <th style="width: 60%;">الخدمة / Service</th>
+                <th style="width: 20%;">السعر / Price</th>
+                <th style="width: 20%;">المجموع / Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(receiptData.tests || []).map((test: any) => `
+                <tr>
+                  <td class="service-name">${test.name || 'Unknown Test'}</td>
+                  <td>${formatCurrency(test.price || 0)}</td>
+                  <td>${formatCurrency(test.price || 0)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="totals-section">
+            <h3>تفاصيل المبلغ</h3>
+            <div class="total-row">
+              <span class="total-label">المجموع الفرعي:</span>
+              <span class="total-value">${formatCurrency(subtotal)}</span>
+            </div>
+            <div class="total-row">
+              <span class="total-label">الخصم:</span>
+              <span class="total-value">${formatCurrency(receiptData.discount_amount || 0)}</span>
+            </div>
+            <div class="total-row">
+              <span class="total-label">الضريبة (${taxRate}%):</span>
+              <span class="total-value">${formatCurrency(taxAmount)}</span>
+            </div>
+            <div class="grand-total">
+              <div class="total-row">
+                <span class="total-label">المجموع الكلي:</span>
+                <span class="total-value">${formatCurrency(totalWithTax)}</span>
+              </div>
+            </div>
           </div>
-          <div class="row">
-            <span class="label">Final:</span>
-            <span class="value">EGP ${receiptData.final_amount}</span>
+          
+          <div class="payment-info">
+            <h3>معلومات الدفع</h3>
+            <div class="total-row">
+              <span class="total-label">المبلغ المدفوع:</span>
+              <span class="total-value">${formatCurrency(receiptData.paid_now || receiptData.upfront_payment || 0)}</span>
+            </div>
+            <div class="total-row">
+              <span class="total-label">المبلغ المتبقي:</span>
+              <span class="total-value">${formatCurrency(receiptData.remaining_balance || 0)}</span>
+            </div>
+            ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
+            <div style="margin-top: 15px;">
+              <h4>تفاصيل الدفع:</h4>
+              ${receiptData.payment_breakdown.cash > 0 ? `
+              <div class="total-row">
+                <span class="total-label">نقداً:</span>
+                <span class="total-value">${formatCurrency(receiptData.payment_breakdown.cash)}</span>
+              </div>
+              ` : ''}
+              ${receiptData.payment_breakdown.card > 0 ? `
+              <div class="total-row">
+                <span class="total-label">بطاقة (${receiptData.payment_breakdown.card_method || 'Card'}):</span>
+                <span class="total-value">${formatCurrency(receiptData.payment_breakdown.card)}</span>
+              </div>
+              ` : ''}
+            </div>
+            ` : ''}
           </div>
-          <div class="row">
-            <span class="label">Paid:</span>
-            <span class="value">EGP ${receiptData.upfront_payment}</span>
-          </div>
-          <div class="row">
-            <span class="label">Remaining:</span>
-            <span class="value">EGP ${receiptData.remaining_balance}</span>
-          </div>
-          <div class="row">
-            <span class="label">Status:</span>
-            <span class="value">${(receiptData.billing_status || 'N/A').toUpperCase()}</span>
-          </div>
-        </div>
-        
-        ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
-        <div class="section">
-          <h3>PAYMENT BREAKDOWN</h3>
-          ${receiptData.payment_breakdown.cash > 0 ? `
-          <div class="row">
-            <span class="label">Paid Cash:</span>
-            <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
+          
+          ${receiptData.barcode ? `
+          <div class="barcode">
+            <p><strong>باركود المختبر:</strong></p>
+            ${receiptData.barcode.includes('<svg') ? 
+              receiptData.barcode : 
+              `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 300px; height: auto;" />`
+            }
           </div>
           ` : ''}
-          ${receiptData.payment_breakdown.card > 0 ? `
-          <div class="row">
-            <span class="label">Paid with ${receiptData.payment_breakdown.card_method || 'Card'}:</span>
-            <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
+          
+          <div class="footer">
+            <p><strong>شكراً لاختياركم مختبرنا</strong></p>
+            <p>Thank you for choosing our lab!</p>
+            <p>تاريخ الطباعة: ${currentDate}</p>
+            <p>Printed by: ${receiptData.processed_by || 'System'}</p>
+            <p>Visit ID: ${receiptData.visit_id}</p>
           </div>
-          ` : ''}
-        </div>
-        ` : ''}
-        
-        ${receiptData.barcode ? `
-        <div class="barcode">
-          ${receiptData.barcode.includes('<svg') ? 
-            receiptData.barcode : 
-            `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />`
-          }
-          <div style="font-size: 8px; margin-top: 2px;">${receiptData.barcode_text || receiptData.lab_number}</div>
-        </div>
-        ` : ''}
-        
-        <div class="footer">
-          <p>Thank you for choosing our lab!</p>
-          <p>Printed by: ${receiptData.printed_by || 'System'}</p>
-          <p>Printed at: ${receiptData.printed_at || new Date().toLocaleString()}</p>
-          <p>Visit ID: ${receiptData.visit_id || 'N/A'}</p>
         </div>
       </body>
     </html>
     `;
+  };
+
+  const generateReceiptHtml = (receiptData: any) => {
+    return generateTaxInvoiceHtml(receiptData);
   };
 
   const handleOpenInvoicePreview = async (invoice: any) => {
@@ -548,7 +747,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
-                          {'N/A'}
+                          {invoice.lab_number || invoice.visit?.patient?.lab || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -561,7 +760,7 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {invoice.invoice_number || 'N/A'}
+                          {invoice.visit?.visit_number || invoice.invoice_number || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
@@ -588,7 +787,8 @@ const Invoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'N/A'}
+                          {invoice.visit?.visit_date ? new Date(invoice.visit.visit_date).toLocaleDateString() : 
+                           invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">

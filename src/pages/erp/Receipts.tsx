@@ -42,6 +42,7 @@ interface Receipt {
   visit_number: string;
   visit_date: string;
   visit_time: string;
+  date?: string;
   total_amount: number;
   final_amount: number;
   upfront_payment: number;
@@ -49,6 +50,7 @@ interface Receipt {
   payment_method: string;
   billing_status: string;
   status: string;
+  payment_status?: string;
   discount_amount?: number;
   barcode?: string;
   expected_delivery_date?: string;
@@ -64,6 +66,14 @@ interface Receipt {
     phone: string;
     email?: string;
   };
+  patient_name?: string;
+  patient_age?: number;
+  patient_phone?: string;
+  tests?: Array<{
+    name: string;
+    price: number;
+  }>;
+  paid_now?: number;
   visitTests: Array<{
     id: number;
     labTest?: {
@@ -384,7 +394,7 @@ const Receipts: React.FC = () => {
       <body>
         <div class="header">
           <h1>${receipt.billing_status === 'paid' ? 'FINAL PAYMENT RECEIPT' : 'PATHOLOGY LAB RECEIPT'}</h1>
-          <p>Date: ${new Date(receipt.visit_date).toLocaleDateString()}</p>
+          <p>Date: ${receipt.date}</p>
           <p>Receipt #: ${receipt.receipt_number}</p>
           <p>Lab #: ${receipt.lab_number || 'N/A'}</p>
         </div>
@@ -393,20 +403,26 @@ const Receipts: React.FC = () => {
           <h3>PATIENT INFO</h3>
           <div class="row">
             <span class="label">Name:</span>
-            <span class="value" style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${receipt.patient.name}</span>
+            <span class="value" style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${receipt.patient_name}</span>
           </div>
+          ${receipt.patient_age ? `
+          <div class="row">
+            <span class="label">Age:</span>
+            <span class="value">${receipt.patient_age}</span>
+          </div>
+          ` : ''}
           <div class="row">
             <span class="label">Phone:</span>
-            <span class="value">${receipt.patient.phone}</span>
+            <span class="value">${receipt.patient_phone}</span>
           </div>
         </div>
         
         <div class="section">
-          <h3>TESTS (${receipt.visitTests?.length || 0})</h3>
-          ${(receipt.visitTests || []).map((test) => `
+          <h3>TESTS (${receipt.tests?.length || 0})</h3>
+          ${(receipt.tests || []).map((test: any) => `
             <div class="test-item">
-              <span class="test-name">${(test as any).custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</span>
-              <span class="test-price">${formatCurrency((test as any).final_price || (test.labTest || test.lab_test)?.price || 0)}</span>
+              <span class="test-name">${test.name || 'Unknown Test'}</span>
+              <span class="test-price">${formatCurrency(test.price || 0)}</span>
             </div>
           `).join('')}
         </div>
@@ -426,7 +442,7 @@ const Receipts: React.FC = () => {
           </div>
           <div class="row">
             <span class="label">Paid:</span>
-            <span class="value">${formatCurrency(receipt.upfront_payment)}</span>
+            <span class="value">${formatCurrency(receipt.paid_now || receipt.upfront_payment)}</span>
           </div>
           <div class="row">
             <span class="label">Remaining:</span>
@@ -455,7 +471,7 @@ const Receipts: React.FC = () => {
         <div class="section">
           <div class="row">
             <span class="label">Status:</span>
-            <span class="value">${receipt.billing_status.toUpperCase()}</span>
+            <span class="value">${(receipt.billing_status || receipt.payment_status || 'PENDING').toUpperCase()}</span>
           </div>
           ${receipt.processed_by ? `
           <div class="row">
