@@ -20,7 +20,6 @@ import AccountantDashboard from './pages/erp/AccountantDashboard';
 import PatientDashboard from './pages/erp/PatientDashboard';
 import BarcodeDemo from './pages/BarcodeDemo';
 import LabInsightsDashboard from './pages/erp/LabInsightsDashboard';
-import PatientTestSearch from './pages/erp/PatientTestSearch';
 import EnhancedReports from './pages/erp/EnhancedReports';
 import ReviewReports from './pages/erp/ReviewReports';
 import Notifications from './pages/erp/Notifications';
@@ -316,16 +315,6 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <ReviewReports />
-        </ERPLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/patient-test-search',
-    element: (
-      <ProtectedRoute>
-        <ERPLayout>
-          <PatientTestSearch />
         </ERPLayout>
       </ProtectedRoute>
     ),

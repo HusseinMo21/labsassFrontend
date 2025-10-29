@@ -142,6 +142,8 @@ const PathologyRecordForm: React.FC = () => {
       const visitData = response.data;
       setVisit(visitData);
       
+      console.log('Visit data loaded:', visitData);
+      console.log('Lab request reports:', visitData.labRequest?.reports);
       
       // Load report data if available
       let reportData = {};
@@ -178,15 +180,32 @@ const PathologyRecordForm: React.FC = () => {
         reports = visitData.labRequest.reports;
       }
       
+      console.log('Found reports:', reports);
+      
       if (reports.length > 0) {
-        const report = reports[0];
+        // Get the latest completed report, or fall back to the latest report
+        let report = reports
+          .filter(r => r.status === 'completed')
+          .sort((a, b) => b.id - a.id)[0];
+        
+        if (!report) {
+          // Fall back to the latest report if no completed report found
+          report = reports.sort((a, b) => b.id - a.id)[0];
+        }
+        
+        console.log('Selected report:', report);
+        console.log('Report status:', report.status);
+        console.log('Report content:', report.content);
         
         try {
           reportData = JSON.parse(report.content || '{}');
+          console.log('Parsed report data:', reportData);
         } catch (e) {
           console.warn('Failed to parse report content:', e);
         }
       } else {
+        console.log('No reports found in visit data, trying fallback methods...');
+        
         // Try to find reports in any possible structure
         if (visitData.labRequest && visitData.labRequest.reports) {
           // If it's an object with data property
@@ -209,12 +228,26 @@ const PathologyRecordForm: React.FC = () => {
         } else {
           // Try to fetch reports directly if labRequest is not available
           if (visitData.lab_request_id) {
+            console.log('Fetching reports directly for lab_request_id:', visitData.lab_request_id);
             try {
               const reportsResponse = await axios.get(`/api/reports?lab_request_id=${visitData.lab_request_id}`);
+              console.log('Direct reports response:', reportsResponse.data);
               if (reportsResponse.data && reportsResponse.data.length > 0) {
-                const report = reportsResponse.data[0];
+                // Get the latest completed report, or fall back to the latest report
+                let report = reportsResponse.data
+                  .filter(r => r.status === 'completed')
+                  .sort((a, b) => b.id - a.id)[0];
+                
+                if (!report) {
+                  // Fall back to the latest report if no completed report found
+                  report = reportsResponse.data.sort((a, b) => b.id - a.id)[0];
+                }
+                
+                console.log('Selected report from direct API call:', report);
+                
                 try {
                   reportData = JSON.parse(report.content || '{}');
+                  console.log('Loaded report data from direct API call:', reportData);
                 } catch (e) {
                   console.warn('Failed to parse direct report content:', e);
                 }
@@ -228,6 +261,8 @@ const PathologyRecordForm: React.FC = () => {
       
       // Populate form with existing data
       const today = new Date().toISOString().split('T')[0];
+      
+      console.log('Setting form data with reportData:', reportData);
       
       setFormData({
         // Patient Information
@@ -251,6 +286,15 @@ const PathologyRecordForm: React.FC = () => {
         type_of_analysis: (reportData as any).type_of_analysis || 'Pathology',
         test_status: visitData.test_status || 'pending',
         image: null,
+      });
+      
+      console.log('Final form data set:', {
+        clinical_data: (reportData as any).clinical_data || visitData.clinical_data || '',
+        nature_of_specimen: (reportData as any).nature_of_specimen || visitData.specimen_information || '',
+        gross_pathology: (reportData as any).gross_pathology || visitData.gross_examination || '',
+        microscopic_examination: (reportData as any).microscopic_examination || visitData.microscopic_description || '',
+        conclusion: (reportData as any).conclusion || visitData.diagnosis || '',
+        recommendations: (reportData as any).recommendations || visitData.recommendations || '',
       });
       
     } catch (error) {
@@ -356,6 +400,16 @@ const PathologyRecordForm: React.FC = () => {
         }
       });
 
+      // Set status to completed when "Record Now" is pressed
+      formDataToSend.set('test_status', 'completed');
+
+      // Debug: Log the form data being sent
+      console.log('Form data being sent:', formData);
+      console.log('FormDataToSend entries:');
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`${key}: ${value}`);
+      }
+
       // Add image if selected
       if (formData.image) {
         formDataToSend.append('image', formData.image);
@@ -367,8 +421,8 @@ const PathologyRecordForm: React.FC = () => {
         },
       });
 
-      toast.success('Report saved successfully!');
-      navigate('/reports');
+      toast.success('Report saved and completed successfully!');
+      navigate('/enhanced-reports');
     } catch (error) {
       console.error('Failed to save report:', error);
       toast.error('Failed to save report');

@@ -27,8 +27,6 @@ import {
   Grid,
   IconButton,
   Tooltip,
-  Tabs,
-  Tab,
   Pagination,
   CircularProgress,
 } from '@mui/material';
@@ -155,7 +153,6 @@ interface FinancialData {
 const Reports: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [patientsData, setPatientsData] = useState<PatientsData | null>(null);
   const [testsData, setTestsData] = useState<TestsData | null>(null);
@@ -710,19 +707,12 @@ const Reports: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Report Tabs */}
+      {/* Visit Reports */}
       <Card>
         <CardContent>
-          <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
-            <Tab label="Visits" />
-            <Tab label="Enhanced Reports" />
-          </Tabs>
-
-          {activeTab === 0 && (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Visit Reports
-              </Typography>
+          <Typography variant="h6" gutterBottom>
+            Visit Reports
+          </Typography>
               
               <TableContainer component={Paper}>
               <Table>
@@ -873,90 +863,6 @@ const Reports: React.FC = () => {
             color="primary"
           />
         </Box>
-        </>
-      )}
-
-          {activeTab === 1 && (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Enhanced Reports
-                  </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Manage laboratory reports with enhanced workflow
-                  </Typography>
-              
-              <TableContainer component={Paper}>
-                <Table>
-                      <TableHead>
-                        <TableRow>
-                      <TableCell>Lab No</TableCell>
-                      <TableCell>Patient</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Created By</TableCell>
-                      <TableCell>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                    {visits.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()).map((visit) => (
-                      <TableRow key={visit.id}>
-                            <TableCell>
-                          <Typography variant="body2" fontWeight="bold">
-                            {visit.lab_number || visit.labRequest?.full_lab_no || visit.visit_number}
-                  </Typography>
-                            </TableCell>
-                            <TableCell>
-    <Box>
-                            <Typography variant="body2" fontWeight="bold">
-                              {visit.patient?.name || 'Unknown Patient'}
-                  </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              #{visit.patient?.id || 'N/A'} • {visit.patient?.phone || 'N/A'}
-                  </Typography>
-                          </Box>
-                            </TableCell>
-                            <TableCell>
-                          <Chip label="Pathology" color="primary" size="small" />
-                            </TableCell>
-                            <TableCell>
-                          <Typography variant="body2">
-                            {new Date(visit.visit_date).toLocaleDateString()}
-                          </Typography>
-                            </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            N/A
-                  </Typography>
-                        </TableCell>
-                            <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <Tooltip title="View Report">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handleTestReport(visit)}
-                              >
-                                <VisibilityIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Documents">
-                              <IconButton
-                                size="small"
-                                color="secondary"
-                                onClick={() => handleViewDocuments(visit)}
-                              >
-                                <Folder />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-            </>
-          )}
                 </CardContent>
               </Card>
 

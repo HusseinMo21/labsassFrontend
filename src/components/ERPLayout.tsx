@@ -74,7 +74,6 @@ const navigationItems: NavigationItem[] = [
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['admin'] },
   { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['admin'] },
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
-  { path: '/patient-test-search', label: 'Patient Test Search', icon: <Search />, roles: ['admin'] },
 
   // Staff - Limited access (including Extra Payments Management and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
