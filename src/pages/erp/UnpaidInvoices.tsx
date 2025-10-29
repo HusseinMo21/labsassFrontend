@@ -59,6 +59,7 @@ interface Invoice {
   remaining_balance: number;
   patient_name: string;
   patient_phone: string;
+  date: string; // Add date field
   created_at: string;
   visit: {
     id: number;
@@ -310,11 +311,11 @@ const UnpaidInvoices: React.FC = () => {
       
       // Open PDF in new tab for viewing
       const printWindow = window.open(url, '_blank');
-      if (!printWindow) {
-        alert('Popup blocked. Please allow popups for this site.');
-        return;
-      }
-      
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups for this site.');
+      return;
+    }
+
       // Clean up the URL after a delay
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
@@ -382,8 +383,8 @@ const UnpaidInvoices: React.FC = () => {
       <Paper sx={{ width: '100%', overflow: 'hidden' }}>
         <TableContainer sx={{ maxHeight: 600 }}>
           <Table stickyHeader>
-            <TableHead>
-              <TableRow>
+                  <TableHead>
+                    <TableRow>
                 <TableCell>Invoice #</TableCell>
                 <TableCell>Patient</TableCell>
                 <TableCell>Date</TableCell>
@@ -392,98 +393,98 @@ const UnpaidInvoices: React.FC = () => {
                 <TableCell>Remaining</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id} hover>
-                  <TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id} hover>
+                        <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {invoice.invoice_number}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box>
+                            {invoice.invoice_number}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {invoice.patient_name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {invoice.patient_phone}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
+                        {invoice.patient_name || 'N/A'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                        {invoice.visit?.patient?.phone || 'N/A'}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
                     <Typography variant="body2">
-                      {new Date(invoice.created_at).toLocaleDateString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
+                      {invoice.date || 'N/A'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {formatCurrency(invoice.total_amount)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
+                            {formatCurrency(invoice.total_amount)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                     <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
-                      {formatCurrency(invoice.amount_paid)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
+                            {formatCurrency(invoice.amount_paid)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                     <Typography variant="body2" color="error.main" sx={{ fontWeight: 500 }}>
-                      {formatCurrency(invoice.remaining_balance)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
+                            {formatCurrency(invoice.remaining_balance)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                     {getStatusChip(invoice)}
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Tooltip title="Add Payment">
                         <IconButton
-                          size="small"
+                                size="small"
                           color="primary"
-                          onClick={() => openPaymentModal(invoice)}
+                                onClick={() => openPaymentModal(invoice)}
                           disabled={invoice.remaining_balance <= 0}
                         >
                           <Add />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Print Original Receipt">
-                        <IconButton
-                          size="small"
+                            <Tooltip title="Print Original Receipt">
+                              <IconButton
+                                size="small"
                           color="secondary"
-                          onClick={() => handlePrintOriginalReceipt(invoice)}
-                        >
-                          <Receipt />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Print Final Payment Receipt">
-                        <IconButton
-                          size="small"
-                          color="success"
-                          onClick={() => {
-                            // Fetch final payment receipt data and print
-                            axios.get(`/api/invoices/${invoice.id}/final-payment-receipt`)
-                              .then(response => {
-                                setReceiptData(response.data);
-                                setShowReceiptModal(true);
-                              })
+                                onClick={() => handlePrintOriginalReceipt(invoice)}
+                              >
+                                <Receipt />
+                              </IconButton>
+                            </Tooltip>
+                              <Tooltip title="Print Final Payment Receipt">
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={() => {
+                                    // Fetch final payment receipt data and print
+                                    axios.get(`/api/invoices/${invoice.id}/final-payment-receipt`)
+                                      .then(response => {
+                                        setReceiptData(response.data);
+                                        setShowReceiptModal(true);
+                                      })
                               .catch((error: any) => {
-                                console.error('Error fetching final payment receipt:', error);
-                                toast.error('Failed to fetch final payment receipt');
-                              });
-                          }}
+                                        console.error('Error fetching final payment receipt:', error);
+                                        toast.error('Failed to fetch final payment receipt');
+                                      });
+                                  }}
                           disabled={invoice.remaining_balance > 0}
-                        >
+                                >
                           <CheckCircle />
-                        </IconButton>
-                      </Tooltip>
+                                </IconButton>
+                              </Tooltip>
                     </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
       </Paper>
 
       {/* Payment Modal */}
@@ -504,7 +505,7 @@ const UnpaidInvoices: React.FC = () => {
                     Remaining Balance: {formatCurrency(selectedInvoice.remaining_balance)}
                   </Typography>
                 </Alert>
-                
+
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <TextField
@@ -526,9 +527,12 @@ const UnpaidInvoices: React.FC = () => {
                         label="Payment Method"
                       >
                         <MenuItem value="cash">Cash</MenuItem>
-                        <MenuItem value="card">Card</MenuItem>
-                        <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+                        <MenuItem value="visa">Visa</MenuItem>
+                        <MenuItem value="instapay">InstaPay</MenuItem>
                         <MenuItem value="fawry">Fawry</MenuItem>
+                        <MenuItem value="vodafoneCash">Vodafone Cash</MenuItem>
+                        <MenuItem value="card">Card</MenuItem>
+                        <MenuItem value="other">Other</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -563,26 +567,26 @@ const UnpaidInvoices: React.FC = () => {
             <CheckCircle color="success" sx={{ fontSize: 64, mb: 2 }} />
             <Typography variant="h5" sx={{ mb: 2 }}>
               Payment Completed Successfully!
-            </Typography>
+                </Typography>
             <Typography variant="body1" sx={{ mb: 3 }}>
               Final payment receipt has been generated for this invoice.
-            </Typography>
-            <Button
-              variant="contained"
+                </Typography>
+                  <Button
+                    variant="contained"
               color="primary"
-              startIcon={<Print />}
-              onClick={printFinalPaymentReceipt}
+                    startIcon={<Print />}
+                    onClick={printFinalPaymentReceipt}
               sx={{ mr: 2 }}
-            >
-              Print Final Receipt
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => setShowReceiptModal(false)}
-            >
-              Close
-            </Button>
-          </Box>
+                  >
+                    Print Final Receipt
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setShowReceiptModal(false)}
+                  >
+                    Close
+                  </Button>
+              </Box>
         </DialogContent>
       </Dialog>
     </Box>

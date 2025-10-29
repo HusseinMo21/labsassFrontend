@@ -35,6 +35,10 @@ import {
   Person,
   Phone,
   WhatsApp,
+  Assignment,
+  Science,
+  CheckCircle,
+  Pending,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
@@ -73,6 +77,15 @@ interface Patient {
   doctor?: any;
   organization?: any;
   doctor_name?: string; // Computed doctor name from sender field
+  // Delivery tracking fields
+  report_delivered?: boolean;
+  report_delivery_date?: string;
+  report_delivery_notes?: string;
+  report_delivered_by?: string;
+  wax_blocks_delivered?: boolean;
+  wax_blocks_delivery_date?: string;
+  wax_blocks_delivery_notes?: string;
+  wax_blocks_delivered_by?: string;
 }
 
 const Patients: React.FC = () => {
@@ -91,6 +104,11 @@ const Patients: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Delivery tracking modals
+  const [reportDeliveryModalOpen, setReportDeliveryModalOpen] = useState(false);
+  const [waxBlocksModalOpen, setWaxBlocksModalOpen] = useState(false);
+  const [selectedPatientForDelivery, setSelectedPatientForDelivery] = useState<Patient | null>(null);
+  const [deliveryType, setDeliveryType] = useState<'report' | 'wax_blocks'>('report');
   const [formData, setFormData] = useState({
     name: '',
     doctor: '',
@@ -109,6 +127,13 @@ const Patients: React.FC = () => {
     emergency_phone: '',
     medical_history: '',
     allergies: '',
+  });
+
+  const [deliveryFormData, setDeliveryFormData] = useState({
+    delivered: false,
+    delivery_date: '',
+    notes: '',
+    delivered_by: '',
   });
 
   useEffect(() => {
@@ -371,6 +396,83 @@ const Patients: React.FC = () => {
     setPatientToDelete(null);
   };
 
+  // Delivery tracking functions
+  const openDeliveryModal = (patient: Patient, type: 'report' | 'wax_blocks') => {
+    setSelectedPatientForDelivery(patient);
+    setDeliveryType(type);
+    
+    // Pre-fill form with existing data
+    if (type === 'report') {
+      setDeliveryFormData({
+        delivered: patient.report_delivered || false,
+        delivery_date: patient.report_delivery_date || '',
+        notes: patient.report_delivery_notes || '',
+        delivered_by: patient.report_delivered_by || '',
+      });
+      setReportDeliveryModalOpen(true);
+    } else {
+      setDeliveryFormData({
+        delivered: patient.wax_blocks_delivered || false,
+        delivery_date: patient.wax_blocks_delivery_date || '',
+        notes: patient.wax_blocks_delivery_notes || '',
+        delivered_by: patient.wax_blocks_delivered_by || '',
+      });
+      setWaxBlocksModalOpen(true);
+    }
+  };
+
+  const handleDeliverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatientForDelivery) return;
+
+    try {
+      const updateData: any = {};
+      
+      if (deliveryType === 'report') {
+        updateData.report_delivered = deliveryFormData.delivered;
+        updateData.report_delivery_date = deliveryFormData.delivery_date || null;
+        updateData.report_delivery_notes = deliveryFormData.notes || null;
+        updateData.report_delivered_by = deliveryFormData.delivered_by || null;
+      } else {
+        updateData.wax_blocks_delivered = deliveryFormData.delivered;
+        updateData.wax_blocks_delivery_date = deliveryFormData.delivery_date || null;
+        updateData.wax_blocks_delivery_notes = deliveryFormData.notes || null;
+        updateData.wax_blocks_delivered_by = deliveryFormData.delivered_by || null;
+      }
+
+      await axios.put(`/api/patients/${selectedPatientForDelivery.id}`, updateData);
+      
+      const itemName = deliveryType === 'report' ? 'Report' : 'Wax Blocks (بلوكات الشمع)';
+      toast.success(`${itemName} delivery status updated successfully`);
+      
+      // Close modal and refresh data
+      setReportDeliveryModalOpen(false);
+      setWaxBlocksModalOpen(false);
+      setSelectedPatientForDelivery(null);
+      resetDeliveryForm();
+      fetchPatients();
+    } catch (error: any) {
+      console.error('Delivery update error:', error);
+      toast.error('Failed to update delivery status');
+    }
+  };
+
+  const resetDeliveryForm = () => {
+    setDeliveryFormData({
+      delivered: false,
+      delivery_date: '',
+      notes: '',
+      delivered_by: '',
+    });
+  };
+
+  const closeDeliveryModal = () => {
+    setReportDeliveryModalOpen(false);
+    setWaxBlocksModalOpen(false);
+    setSelectedPatientForDelivery(null);
+    resetDeliveryForm();
+  };
+
   const getGenderChip = (gender: string) => {
     // Handle Arabic gender values
     const isMale = gender === 'male' || gender === 'ذكر';
@@ -451,13 +553,15 @@ const Patients: React.FC = () => {
                   <TableCell>Age</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Doctor</TableCell>
+                  <TableCell align="center">Report Status</TableCell>
+                  <TableCell align="center">Wax Blocks Status</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={9} align="center">
                       <Alert severity="info">No patients found</Alert>
                     </TableCell>
                   </TableRow>
@@ -517,6 +621,40 @@ const Patients: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Person fontSize="small" color="action" />
                           {patient.doctor_name || patient.sender || '-'}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                          <Chip
+                            icon={patient.report_delivered ? <CheckCircle /> : <Pending />}
+                            label={patient.report_delivered ? 'Delivered' : 'Pending'}
+                            color={patient.report_delivered ? 'success' : 'warning'}
+                            size="small"
+                            onClick={() => openDeliveryModal(patient, 'report')}
+                            sx={{ cursor: 'pointer' }}
+                          />
+                          {patient.report_delivery_date && (
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(patient.report_delivery_date).toLocaleDateString()}
+                            </Typography>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                          <Chip
+                            icon={patient.wax_blocks_delivered ? <CheckCircle /> : <Pending />}
+                            label={patient.wax_blocks_delivered ? 'Delivered' : 'Pending'}
+                            color={patient.wax_blocks_delivered ? 'success' : 'warning'}
+                            size="small"
+                            onClick={() => openDeliveryModal(patient, 'wax_blocks')}
+                            sx={{ cursor: 'pointer' }}
+                          />
+                          {patient.wax_blocks_delivery_date && (
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(patient.wax_blocks_delivery_date).toLocaleDateString()}
+                            </Typography>
+                          )}
                         </Box>
                       </TableCell>
                       <TableCell align="center">
@@ -812,6 +950,147 @@ const Patients: React.FC = () => {
             {deleting ? 'Deleting...' : 'Delete Patient'}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Report Delivery Tracking Modal */}
+      <Dialog open={reportDeliveryModalOpen} onClose={closeDeliveryModal} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Assignment color="primary" />
+            Report Delivery Status - {selectedPatientForDelivery?.name}
+          </Box>
+        </DialogTitle>
+        <form onSubmit={handleDeliverySubmit}>
+          <DialogContent>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Delivery Status</InputLabel>
+                  <Select
+                    value={deliveryFormData.delivered ? 'delivered' : 'pending'}
+                    onChange={(e) => setDeliveryFormData({ ...deliveryFormData, delivered: e.target.value === 'delivered' })}
+                    label="Delivery Status"
+                  >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="delivered">Delivered</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              {deliveryFormData.delivered && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Delivery Date"
+                      type="date"
+                      value={deliveryFormData.delivery_date}
+                      onChange={(e) => setDeliveryFormData({ ...deliveryFormData, delivery_date: e.target.value })}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Delivered By (Who received it?)"
+                      value={deliveryFormData.delivered_by}
+                      onChange={(e) => setDeliveryFormData({ ...deliveryFormData, delivered_by: e.target.value })}
+                      placeholder="e.g., Patient's brother, Sister, etc."
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Notes"
+                      multiline
+                      rows={3}
+                      value={deliveryFormData.notes}
+                      onChange={(e) => setDeliveryFormData({ ...deliveryFormData, notes: e.target.value })}
+                      placeholder="Additional notes about the delivery..."
+                    />
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeDeliveryModal}>Cancel</Button>
+            <Button type="submit" variant="contained">Update Status</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Wax Blocks Delivery Tracking Modal */}
+      <Dialog open={waxBlocksModalOpen} onClose={closeDeliveryModal} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Science color="primary" />
+            Wax Blocks (بلوكات الشمع) Delivery Status - {selectedPatientForDelivery?.name}
+          </Box>
+        </DialogTitle>
+        <form onSubmit={handleDeliverySubmit}>
+          <DialogContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Note:</strong> Wax blocks are kept for 3 years only. Track delivery to avoid unnecessary requests.
+              </Typography>
+            </Alert>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Delivery Status</InputLabel>
+                  <Select
+                    value={deliveryFormData.delivered ? 'delivered' : 'pending'}
+                    onChange={(e) => setDeliveryFormData({ ...deliveryFormData, delivered: e.target.value === 'delivered' })}
+                    label="Delivery Status"
+                  >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="delivered">Delivered</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              {deliveryFormData.delivered && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Delivery Date"
+                      type="date"
+                      value={deliveryFormData.delivery_date}
+                      onChange={(e) => setDeliveryFormData({ ...deliveryFormData, delivery_date: e.target.value })}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Delivered By (Who received it?)"
+                      value={deliveryFormData.delivered_by}
+                      onChange={(e) => setDeliveryFormData({ ...deliveryFormData, delivered_by: e.target.value })}
+                      placeholder="e.g., Patient's brother, Sister, etc."
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Notes"
+                      multiline
+                      rows={3}
+                      value={deliveryFormData.notes}
+                      onChange={(e) => setDeliveryFormData({ ...deliveryFormData, notes: e.target.value })}
+                      placeholder="Additional notes about the delivery..."
+                    />
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeDeliveryModal}>Cancel</Button>
+            <Button type="submit" variant="contained">Update Status</Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </Box>
   );
