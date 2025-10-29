@@ -110,6 +110,13 @@ const Organizations: React.FC = () => {
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    open: false,
+    oldName: '',
+    newName: '',
+    affectedCount: 0,
+    organizationId: 0
+  });
 
   useEffect(() => {
     
@@ -214,17 +221,29 @@ const Organizations: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-
       if (editingOrganization) {
-        await axios.put(`/api/organizations/${editingOrganization.id}`, formData, {
-          headers: {
-          }
+        // First attempt to update organization
+        const response = await axios.put(`/api/organizations/${editingOrganization.id}`, formData, {
+          headers: {}
         });
-        toast.success('Organization updated successfully');
+        
+        // Check if confirmation is required
+        if (response.data.confirmation_required) {
+          // Show confirmation dialog instead of browser alert
+          setConfirmationDialog({
+            open: true,
+            oldName: response.data.old_name,
+            newName: response.data.new_name,
+            affectedCount: response.data.affected_patients_count,
+            organizationId: editingOrganization.id
+          });
+          return; // Don't close the form yet
+        } else {
+          toast.success('Organization updated successfully');
+        }
       } else {
         await axios.post('/api/organizations', formData, {
-          headers: {
-          }
+          headers: {}
         });
         toast.success('Organization created successfully');
       }
@@ -242,6 +261,47 @@ const Organizations: React.FC = () => {
         toast.error('Failed to save organization');
       }
     }
+  };
+
+  const handleConfirmUpdate = async () => {
+    try {
+      // Send confirmed update
+      await axios.put(`/api/organizations/${confirmationDialog.organizationId}`, {
+        ...formData,
+        confirmed: true
+      }, {
+        headers: {}
+      });
+      
+      toast.success(`Organization updated successfully. ${confirmationDialog.affectedCount} patients updated.`);
+      
+      // Close both dialogs and reset form
+      setConfirmationDialog({
+        open: false,
+        oldName: '',
+        newName: '',
+        affectedCount: 0,
+        organizationId: 0
+      });
+      setOpen(false);
+      setEditingOrganization(null);
+      resetForm();
+      fetchOrganizations();
+    } catch (error) {
+      console.error('Failed to confirm organization update:', error);
+      toast.error('Failed to update organization');
+    }
+  };
+
+  const handleCancelUpdate = () => {
+    setConfirmationDialog({
+      open: false,
+      oldName: '',
+      newName: '',
+      affectedCount: 0,
+      organizationId: 0
+    });
+    // Keep the form open so user can make changes
   };
 
   const handleEdit = (organization: Organization) => {
@@ -699,6 +759,85 @@ const Organizations: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPatientsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog for Organization Name Update */}
+      <Dialog 
+        open={confirmationDialog.open} 
+        onClose={handleCancelUpdate}
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          bgcolor: 'warning.light', 
+          color: 'warning.contrastText',
+          textAlign: 'center',
+          fontWeight: 'bold'
+        }}>
+          ⚠️ Confirm Organization Name Update
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              This action will affect patient records!
+            </Typography>
+          </Alert>
+          
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <Typography variant="body1" paragraph>
+              Are you sure you want to update the organization name?
+            </Typography>
+            
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              gap: 2,
+              mb: 2,
+              p: 2,
+              bgcolor: 'grey.50',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'grey.300'
+            }}>
+              <Typography variant="h6" color="error">
+                "{confirmationDialog.oldName}"
+              </Typography>
+              <Typography variant="h6" color="text.secondary">
+                →
+              </Typography>
+              <Typography variant="h6" color="success.main">
+                "{confirmationDialog.newName}"
+              </Typography>
+            </Box>
+            
+            <Alert severity="info" sx={{ textAlign: 'left' }}>
+              <Typography variant="body2">
+                <strong>{confirmationDialog.affectedCount}</strong> patient{confirmationDialog.affectedCount !== 1 ? 's' : ''} 
+                {confirmationDialog.affectedCount !== 1 ? ' are' : ' is'} currently associated with this organization and 
+                {confirmationDialog.affectedCount !== 1 ? ' will be' : ' will be'} automatically updated.
+              </Typography>
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={handleCancelUpdate}
+            variant="outlined"
+            color="inherit"
+            sx={{ minWidth: 100 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmUpdate}
+            variant="contained"
+            color="warning"
+            sx={{ minWidth: 100 }}
+          >
+            Update Organization
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

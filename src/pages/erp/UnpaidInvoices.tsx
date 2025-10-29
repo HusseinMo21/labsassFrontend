@@ -46,6 +46,7 @@ import {
   Warning,
   CheckCircle,
   Schedule,
+  Add,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -56,6 +57,9 @@ interface Invoice {
   total_amount: number;
   amount_paid: number;
   remaining_balance: number;
+  patient_name: string;
+  patient_phone: string;
+  created_at: string;
   visit: {
     id: number;
     visit_date: string;
@@ -111,6 +115,10 @@ interface ReceiptData {
     card: number;
     card_method?: string;
   };
+  visit?: {
+    id: number;
+  };
+  visit_id?: number;
 }
 
 const UnpaidInvoices: React.FC = () => {
@@ -152,6 +160,15 @@ const UnpaidInvoices: React.FC = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
+      console.log('Fetching invoices with params:', {
+        query: searchQuery,
+        status: statusFilter,
+        page: currentPage,
+      });
+      
+      // First test if the endpoint is accessible
+      console.log('Testing API endpoint accessibility...');
+      
       const response = await axios.get('/api/unpaid-invoices/search', {
         params: {
           query: searchQuery,
@@ -159,10 +176,21 @@ const UnpaidInvoices: React.FC = () => {
           page: currentPage,
         },
       });
+      
+      console.log('API Response:', response.data);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
       setInvoices(response.data.data || []);
       setTotalPages(response.data.last_page || 1);
-    } catch (error) {
-      toast.error('Failed to fetch invoices');
+    } catch (error: any) {
+      console.error('Error fetching invoices:', error);
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch invoices';
+      toast.error(`Failed to fetch invoices: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -233,485 +261,70 @@ const UnpaidInvoices: React.FC = () => {
 
   const handlePrintOriginalReceipt = async (invoice: Invoice) => {
     try {
-      // Fetch the original receipt data from the visit
-      const response = await axios.get(`/api/check-in/visits/${invoice.visit.id}/receipt`);
-      const receiptData = response.data.receipt_data;
+      // First, test the data endpoint to see what data we're getting
+      console.log('Testing data endpoint for visit:', invoice.visit.id);
+      const dataResponse = await axios.get(`/api/check-in/visits/${invoice.visit.id}/unpaid-invoice-receipt-data`);
+      console.log('Receipt data response:', dataResponse.data);
       
-      // Validate receipt data
-      if (!receiptData) {
-        toast.error('No receipt data found');
-        return;
-      }
+      // Now get the PDF
+      const response = await axios.get(`/api/check-in/visits/${invoice.visit.id}/unpaid-invoice-receipt`, {
+        responseType: 'blob'
+      });
       
-      // Print the original receipt using the same logic as CheckIn component
-      const printWindow = window.open('', '_blank');
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Open PDF in new tab for viewing
+      const printWindow = window.open(url, '_blank');
       if (!printWindow) {
         alert('Popup blocked. Please allow popups for this site.');
         return;
       }
 
-      const receiptHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Receipt - ${receiptData.receipt_number}</title>
-          <style>
-            @page { 
-              size: 80mm 200mm; 
-              margin: 5mm; 
-            }
-            body { 
-              font-family: 'Courier New', monospace; 
-              font-size: 12px; 
-              line-height: 1.2; 
-              margin: 0; 
-              padding: 0; 
-              width: 70mm;
-            }
-            .header { 
-              text-align: center; 
-              border-bottom: 1px solid #000; 
-              padding-bottom: 8px; 
-              margin-bottom: 8px; 
-            }
-            .header h1 { 
-              font-size: 14px; 
-              margin: 0 0 4px 0; 
-              font-weight: bold;
-            }
-            .header p { 
-              margin: 2px 0; 
-              font-size: 10px; 
-            }
-            .section { 
-              margin-bottom: 8px; 
-            }
-            .section h3 { 
-              font-size: 11px; 
-              margin: 0 0 4px 0; 
-              font-weight: bold;
-              border-bottom: 1px dotted #000;
-              padding-bottom: 2px;
-            }
-            .row { 
-              display: flex; 
-              justify-content: space-between; 
-              margin-bottom: 2px; 
-              font-size: 10px;
-            }
-            .row .label { 
-              flex: 1; 
-            }
-            .row .value { 
-              flex: 1; 
-              text-align: right; 
-              font-weight: bold;
-            }
-            .total { 
-              font-weight: bold; 
-              border-top: 1px solid #000; 
-              padding-top: 4px; 
-              margin-top: 4px;
-            }
-            .total .row { 
-              font-size: 11px; 
-            }
-            .barcode { 
-              text-align: center; 
-              font-family: 'Courier New', monospace; 
-              font-size: 8px; 
-              margin: 4px 0; 
-              padding: 2px; 
-              background: #f0f0f0; 
-              border: 1px solid #000;
-            }
-            .footer { 
-              text-align: center; 
-              font-size: 8px; 
-              margin-top: 8px; 
-              border-top: 1px dotted #000; 
-              padding-top: 4px;
-            }
-            .test-item { 
-              margin-bottom: 1px; 
-              font-size: 9px;
-            }
-            .test-name { 
-              display: inline-block; 
-              width: 60%; 
-            }
-            .test-price { 
-              display: inline-block; 
-              width: 35%; 
-              text-align: right; 
-            }
-            @media print { 
-              body { margin: 0; padding: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>PATHOLOGY LAB RECEIPT</h1>
-            <p>Date: ${receiptData.date}</p>
-            <p>Receipt #: ${receiptData.receipt_number}</p>
-            <p>Lab #: ${receiptData.lab_number || 'N/A'}</p>
-          </div>
-          
-          <div class="section">
-            <h3>Patient Information</h3>
-            <div class="row">
-              <span class="label">Name:</span>
-              <span class="value">${receiptData.patient_name}</span>
-            </div>
-            <div class="row">
-              <span class="label">Age:</span>
-              <span class="value">${receiptData.patient_age}</span>
-            </div>
-            <div class="row">
-              <span class="label">Phone:</span>
-              <span class="value">${receiptData.patient_phone}</span>
-            </div>
-          </div>
-          
-          <div class="section">
-            <h3>Tests (${receiptData.tests?.length || 0})</h3>
-            ${(receiptData.tests || []).map((test: any) => `
-                <div class="test-item">
-                  <span class="test-name">${test.name}</span>
-                  <span class="test-price">EGP ${test.price}</span>
-                </div>
-              `).join('')}
-          </div>
-          
-          <div class="section total">
-            <div class="row">
-              <span class="label">Total:</span>
-              <span class="value">EGP ${receiptData.total_amount}</span>
-            </div>
-            <div class="row">
-              <span class="label">Discount:</span>
-              <span class="value">EGP ${receiptData.discount_amount || 0}</span>
-            </div>
-            <div class="row">
-              <span class="label">Final:</span>
-              <span class="value">EGP ${receiptData.final_amount}</span>
-            </div>
-            <div class="row">
-              <span class="label">Paid:</span>
-              <span class="value">EGP ${receiptData.upfront_payment}</span>
-            </div>
-            <div class="row">
-              <span class="label">Remaining:</span>
-              <span class="value">EGP ${receiptData.remaining_balance}</span>
-            </div>
-            <div class="row">
-              <span class="label">Status:</span>
-              <span class="value">${(receiptData.billing_status || 'N/A').toUpperCase()}</span>
-            </div>
-          </div>
-          
-          ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
-          <div class="section">
-            <h3>PAYMENT BREAKDOWN</h3>
-            ${receiptData.payment_breakdown.cash > 0 ? `
-            <div class="row">
-              <span class="label">Paid Cash:</span>
-              <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
-            </div>
-            ` : ''}
-            ${receiptData.payment_breakdown.card > 0 ? `
-            <div class="row">
-              <span class="label">Paid with ${receiptData.payment_breakdown.card_method || 'Card'}:</span>
-              <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
-            </div>
-            ` : ''}
-          </div>
-          ` : ''}
-          
-          ${receiptData.barcode ? `
-          <div class="barcode">
-            ${receiptData.barcode.includes('<svg') ? 
-              receiptData.barcode : 
-              `<img src="data:image/png;base64,${receiptData.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />`
-            }
-            <div style="font-size: 8px; margin-top: 2px;">${receiptData.barcode_text || receiptData.lab_number}</div>
-          </div>
-          ` : ''}
-          
-          <div class="footer">
-            <p>Thank you for choosing our lab!</p>
-            <p>Printed by: ${receiptData.printed_by || 'System'}</p>
-            <p>Printed at: ${receiptData.printed_at || new Date().toLocaleString()}</p>
-            <p>Visit ID: ${receiptData.visit_id || 'N/A'}</p>
-          </div>
-        </body>
-      </html>
-      `;
+      // Clean up the URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 10000);
       
-      printWindow.document.write(receiptHTML);
-      printWindow.document.close();
-      printWindow.print();
-      
-    } catch (error) {
-      console.error('Error printing original receipt:', error);
-      toast.error('Failed to print original receipt');
+      toast.success('Receipt opened in new tab. You can print or download from there.');
+    } catch (error: any) {
+      console.error('Error generating receipt:', error);
+      toast.error('Failed to generate receipt: ' + (error.message || 'Unknown error'));
     }
   };
 
-  const printFinalPaymentReceipt = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site.');
+  const printFinalPaymentReceipt = async () => {
+    if (!receiptData?.visit_id) {
+      toast.error('No visit data available for final payment receipt');
       return;
     }
 
-    const receiptHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Final Payment Receipt - ${receiptData?.receipt_number}</title>
-        <style>
-          @page { 
-            size: 80mm 200mm; 
-            margin: 5mm; 
-          }
-          body { 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 0; 
-            width: 70mm;
-          }
-          .header { 
-            text-align: center; 
-            border-bottom: 1px solid #000; 
-            padding-bottom: 8px; 
-            margin-bottom: 8px; 
-          }
-          .header h1 { 
-            font-size: 14px; 
-            margin: 0 0 4px 0; 
-            font-weight: bold;
-          }
-          .header p { 
-            margin: 2px 0; 
-            font-size: 10px; 
-          }
-          .section { 
-            margin-bottom: 8px; 
-          }
-          .section h3 { 
-            font-size: 11px; 
-            margin: 0 0 4px 0; 
-            font-weight: bold;
-            border-bottom: 1px dotted #000;
-            padding-bottom: 2px;
-          }
-          .row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 2px; 
-            font-size: 10px;
-          }
-          .row .label { 
-            flex: 1; 
-          }
-          .row .value { 
-            flex: 1; 
-            text-align: right; 
-            font-weight: bold;
-          }
-          .total { 
-            font-weight: bold; 
-            border-top: 1px solid #000; 
-            padding-top: 4px; 
-            margin-top: 4px;
-          }
-          .total .row { 
-            font-size: 11px; 
-          }
-          .barcode { 
-            text-align: center; 
-            font-family: 'Courier New', monospace; 
-            font-size: 8px; 
-            margin: 4px 0; 
-            padding: 2px; 
-            background: #f0f0f0; 
-            border: 1px solid #000;
-          }
-          .footer { 
-            text-align: center; 
-            font-size: 8px; 
-            margin-top: 8px; 
-            border-top: 1px dotted #000; 
-            padding-top: 4px;
-          }
-          .test-item { 
-            margin-bottom: 1px; 
-            font-size: 9px;
-          }
-          .test-name { 
-            display: inline-block; 
-            width: 60%; 
-          }
-          .test-price { 
-            display: inline-block; 
-            width: 35%; 
-            text-align: right; 
-          }
-          .payment-breakdown { 
-            background: #f8f9fa; 
-            padding: 4px; 
-            margin: 4px 0; 
-            border: 1px solid #ddd;
-          }
-          .credentials { 
-            background: #f0f0f0; 
-            padding: 4px; 
-            margin: 4px 0; 
-            border: 1px solid #ccc;
-            font-size: 9px;
-          }
-          @media print { 
-            body { margin: 0; padding: 0; }
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>FINAL PAYMENT RECEIPT</h1>
-          <p>Date: ${receiptData?.date}</p>
-          <p>Receipt #: ${receiptData?.receipt_number}</p>
-        </div>
-        
-        <div class="section">
-          <h3>Patient Information</h3>
-          <div class="row">
-            <span class="label">Name:</span>
-            <span class="value">${receiptData?.patient_name}</span>
-          </div>
-          <div class="row">
-            <span class="label">Age:</span>
-            <span class="value">${receiptData?.patient_age}</span>
-          </div>
-          <div class="row">
-            <span class="label">Phone:</span>
-            <span class="value">${receiptData?.patient_phone}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>Tests</h3>
-          ${receiptData?.tests?.map(test => `
-              <div class="test-item">
-                <span class="test-name">${test.name}</span>
-                <span class="test-price">EGP ${test.price}</span>
-              </div>
-            `).join('')}
-        </div>
-        
-        <div class="section total">
-          <div class="row">
-            <span class="label">Total Amount:</span>
-            <span class="value">EGP ${receiptData?.total_amount}</span>
-          </div>
-          <div class="row">
-            <span class="label">Discount:</span>
-            <span class="value">EGP ${receiptData?.discount_amount || 0}</span>
-          </div>
-          <div class="row">
-            <span class="label">Final Amount:</span>
-            <span class="value">EGP ${receiptData?.final_amount}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>Payment Summary</h3>
-          <div class="payment-breakdown">
-            <div class="row">
-              <span class="label">Total Amount:</span>
-              <span class="value">EGP ${receiptData?.total_amount}</span>
-            </div>
-            <div class="row">
-              <span class="label">Total Paid:</span>
-              <span class="value">EGP ${(receiptData?.payment_breakdown?.cash || 0) + (receiptData?.payment_breakdown?.card || 0)}</span>
-            </div>
-            <div class="row">
-              <span class="label">Remaining:</span>
-              <span class="value">EGP ${receiptData?.remaining_balance || 0}</span>
-            </div>
-          </div>
-        </div>
-        
-        ${receiptData?.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
-        <div class="section">
-          <h3>Payment Breakdown</h3>
-          <div class="payment-breakdown">
-            ${receiptData.payment_breakdown.cash > 0 ? `
-            <div class="row">
-              <span class="label">Paid Cash:</span>
-              <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
-            </div>
-            ` : ''}
-            ${receiptData.payment_breakdown.card > 0 ? `
-            <div class="row">
-              <span class="label">Paid with ${receiptData.payment_breakdown.card_method || 'Card'}:</span>
-              <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
-            </div>
-            ` : ''}
-          </div>
-        </div>
-        ` : ''}
-        
-        <div class="section">
-          <div class="row">
-            <span class="label">Expected Delivery:</span>
-            <span class="value">${receiptData?.expected_delivery_date ? new Date(receiptData.expected_delivery_date).toLocaleDateString() : 'N/A'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Lab #:</span>
-            <span class="value">${(receiptData as any)?.lab_number || 'N/A'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Processed by:</span>
-            <span class="value">${(receiptData as any)?.processed_by || 'N/A'}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>Patient Portal Access</h3>
-          <div class="credentials">
-            <div class="row">
-              <span class="label">Username:</span>
-              <span class="value">${receiptData?.patient_credentials?.username}</span>
-            </div>
-            <div class="row">
-              <span class="label">Password:</span>
-              <span class="value">${receiptData?.patient_credentials?.password}</span>
-            </div>
-            <div style="text-align: center; margin-top: 4px; font-size: 8px;">
-              Access your results at: [Patient Portal URL]
-            </div>
-          </div>
-        </div>
-        
-        <div class="footer">
-          <p>Thank you for choosing our lab!</p>
-          <p>Processed by: ${(receiptData as any)?.processed_by || 'System'}</p>
-          <p>Processed at: ${new Date().toLocaleString()}</p>
-          <p>Visit ID: ${(receiptData as any)?.visit_id || 'N/A'}</p>
-        </div>
-      </body>
-    </html>
-    `;
-    
-    printWindow.document.write(receiptHTML);
-    printWindow.document.close();
-    printWindow.print();
+    try {
+      // Generate PDF using the dedicated final payment receipt template
+      const response = await axios.get(`/api/check-in/visits/${receiptData.visit_id}/final-payment-receipt-pdf`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Open PDF in new tab for viewing
+      const printWindow = window.open(url, '_blank');
+      if (!printWindow) {
+        alert('Popup blocked. Please allow popups for this site.');
+        return;
+      }
+      
+      // Clean up the URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 10000);
+      
+      toast.success('Final payment receipt opened in new tab. You can print or download from there.');
+    } catch (error: any) {
+      console.error('Error generating final payment receipt:', error);
+      toast.error('Failed to generate final payment receipt: ' + (error.message || 'Unknown error'));
+    }
   };
 
   return (
@@ -762,215 +375,116 @@ const UnpaidInvoices: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ textAlign: 'center', height: '100%' }}>
-              <CardContent>
-                <Schedule color="warning" sx={{ fontSize: 40, mb: 1 }} />
-                <Typography variant="h4" color="warning.main" sx={{ fontWeight: 600 }}>
-                  {summary.partial_count}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Partial Payments
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
         </Grid>
       )}
 
-      {/* Search and Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Search Patients"
-                placeholder="Search by patient name, phone, email, or lab number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Payment Status</InputLabel>
-                <Select
-                  value={statusFilter}
-                  label="Payment Status"
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Invoices</MenuItem>
-                  <MenuItem value="pending">Pending Payment</MenuItem>
-                  <MenuItem value="partial">Partial Payment</MenuItem>
-                  <MenuItem value="paid">Fully Paid</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={fetchInvoices}
-                startIcon={<Search />}
-              >
-                Search
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
       {/* Invoices Table */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            Invoices
-          </Typography>
-          
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : invoices.length > 0 ? (
-            <>
-              <TableContainer component={Paper} variant="outlined">
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Invoice #</strong></TableCell>
-                      <TableCell><strong>Patient</strong></TableCell>
-                      <TableCell><strong>Lab Number</strong></TableCell>
-                      <TableCell><strong>Visit Date</strong></TableCell>
-                      <TableCell><strong>Total Amount</strong></TableCell>
-                      <TableCell><strong>Paid Amount</strong></TableCell>
-                      <TableCell><strong>Remaining</strong></TableCell>
-                      <TableCell><strong>Status</strong></TableCell>
-                      <TableCell><strong>Actions</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {invoices.map((invoice) => (
-                      <TableRow key={invoice.id} hover>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {invoice.invoice_number}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {invoice.visit?.patient?.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {invoice.visit?.patient?.phone}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ 
-                            fontFamily: 'monospace',
-                            fontWeight: 'bold',
-                            color: 'primary.main'
-                          }}>
-                            {invoice.visit?.patient?.lab || '-'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{formatDate(invoice.visit?.visit_date || '')}</TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {formatCurrency(invoice.total_amount)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="success.main">
-                            {formatCurrency(invoice.amount_paid)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="error.main">
-                            {formatCurrency(invoice.remaining_balance)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{getStatusChip(invoice)}</TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={1}>
-                            {invoice.remaining_balance > 0 && (
-                              <Button
-                                size="small"
-                                variant="contained"
-                                startIcon={<Payment />}
-                                onClick={() => openPaymentModal(invoice)}
-                              >
-                                Add Payment
-                              </Button>
-                            )}
-                            <Tooltip title="Print Original Receipt">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handlePrintOriginalReceipt(invoice)}
-                              >
-                                <Receipt />
-                              </IconButton>
-                            </Tooltip>
-                            {invoice.remaining_balance <= 0 && (
-                              <Tooltip title="Print Final Payment Receipt">
-                                <IconButton
-                                  size="small"
-                                  color="success"
-                                  onClick={() => {
-                                    // Fetch final payment receipt data and print
-                                    axios.get(`/api/invoices/${invoice.id}/final-payment-receipt`)
-                                      .then(response => {
-                                        setReceiptData(response.data);
-                                        setShowReceiptModal(true);
-                                      })
-                                      .catch(error => {
-                                        console.error('Error fetching final payment receipt:', error);
-                                        toast.error('Failed to fetch final payment receipt');
-                                      });
-                                  }}
-                                >
-                                  <Print />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-                  <Pagination
-                    count={totalPages}
-                    page={currentPage}
-                    onChange={(_, page) => setCurrentPage(page)}
-                    color="primary"
-                    showFirstButton
-                    showLastButton
-                  />
-                </Box>
-              )}
-            </>
-          ) : (
-            <Alert severity="info" sx={{ textAlign: 'center' }}>
-              No invoices found
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer sx={{ maxHeight: 600 }}>
+          <Table stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>Invoice #</TableCell>
+                <TableCell>Patient</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Total Amount</TableCell>
+                <TableCell>Paid</TableCell>
+                <TableCell>Remaining</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {invoices.map((invoice) => (
+                <TableRow key={invoice.id} hover>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {invoice.invoice_number}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {invoice.patient_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {invoice.patient_phone}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {new Date(invoice.created_at).toLocaleDateString()}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {formatCurrency(invoice.total_amount)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
+                      {formatCurrency(invoice.amount_paid)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="error.main" sx={{ fontWeight: 500 }}>
+                      {formatCurrency(invoice.remaining_balance)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {getStatusChip(invoice)}
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Tooltip title="Add Payment">
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={() => openPaymentModal(invoice)}
+                          disabled={invoice.remaining_balance <= 0}
+                        >
+                          <Add />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Print Original Receipt">
+                        <IconButton
+                          size="small"
+                          color="secondary"
+                          onClick={() => handlePrintOriginalReceipt(invoice)}
+                        >
+                          <Receipt />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Print Final Payment Receipt">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => {
+                            // Fetch final payment receipt data and print
+                            axios.get(`/api/invoices/${invoice.id}/final-payment-receipt`)
+                              .then(response => {
+                                setReceiptData(response.data);
+                                setShowReceiptModal(true);
+                              })
+                              .catch((error: any) => {
+                                console.error('Error fetching final payment receipt:', error);
+                                toast.error('Failed to fetch final payment receipt');
+                              });
+                          }}
+                          disabled={invoice.remaining_balance > 0}
+                        >
+                          <CheckCircle />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       {/* Payment Modal */}
       <Dialog open={showPaymentModal} onClose={() => setShowPaymentModal(false)} maxWidth="sm" fullWidth>
@@ -984,90 +498,48 @@ const UnpaidInvoices: React.FC = () => {
                     Invoice: {selectedInvoice.invoice_number}
                   </Typography>
                   <Typography variant="body2">
-                    Patient: {selectedInvoice.visit?.patient?.name}
+                    Patient: {selectedInvoice.patient_name}
                   </Typography>
                   <Typography variant="body2">
                     Remaining Balance: {formatCurrency(selectedInvoice.remaining_balance)}
                   </Typography>
                 </Alert>
-
+                
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
                       label="Payment Amount"
                       type="number"
-                      inputProps={{ step: "0.01", min: "0.01", max: selectedInvoice.remaining_balance }}
                       value={paymentForm.amount}
-                      onChange={(e) => setPaymentForm(prev => ({
-                        ...prev,
-                        amount: parseFloat(e.target.value) || 0
-                      }))}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) || 0 })}
+                      inputProps={{ min: 0, max: selectedInvoice.remaining_balance, step: 0.01 }}
                       required
-                      helperText={`Maximum: ${formatCurrency(selectedInvoice.remaining_balance)}`}
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth required>
                       <InputLabel>Payment Method</InputLabel>
                       <Select
                         value={paymentForm.payment_method}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
                         label="Payment Method"
-                        onChange={(e) => setPaymentForm(prev => ({
-                          ...prev,
-                          payment_method: e.target.value
-                        }))}
                       >
-                        <MenuItem value="cash">
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <LocalAtm />
-                            Cash
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="card">
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <CreditCard />
-                            Card
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="Fawry">
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccountBalance />
-                            Fawry
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="InstaPay">
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccountBalance />
-                            InstaPay
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="VodafoneCash">
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccountBalance />
-                            VodafoneCash
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="Other">
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AttachMoney />
-                            Other
-                          </Box>
-                        </MenuItem>
+                        <MenuItem value="cash">Cash</MenuItem>
+                        <MenuItem value="card">Card</MenuItem>
+                        <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+                        <MenuItem value="fawry">Fawry</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="Notes"
+                      label="Notes (Optional)"
                       multiline
-                      rows={2}
+                      rows={3}
                       value={paymentForm.notes}
-                      onChange={(e) => setPaymentForm(prev => ({
-                        ...prev,
-                        notes: e.target.value
-                      }))}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
                     />
                   </Grid>
                 </Grid>
@@ -1075,11 +547,9 @@ const UnpaidInvoices: React.FC = () => {
             )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setShowPaymentModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="contained" startIcon={<Payment />}>
-              Add Payment
+            <Button onClick={() => setShowPaymentModal(false)}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Payment'}
             </Button>
           </DialogActions>
         </form>
@@ -1089,39 +559,30 @@ const UnpaidInvoices: React.FC = () => {
       <Dialog open={showReceiptModal} onClose={() => setShowReceiptModal(false)} maxWidth="md" fullWidth>
         <DialogTitle>Final Payment Receipt Generated</DialogTitle>
         <DialogContent>
-          {receiptData && (
-            <Box>
-              <Alert severity="success" sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Receipt Number: {receiptData.receipt_number}
-                </Typography>
-                <Typography variant="body2">
-                  Patient: {receiptData.patient_name}
-                </Typography>
-                <Typography variant="body2">
-                  Status: Payment Completed
-                </Typography>
-              </Alert>
-              
-              <Box sx={{ textAlign: 'center' }}>
-                <Stack direction="row" spacing={2} justifyContent="center">
-                  <Button
-                    variant="contained"
-                    startIcon={<Print />}
-                    onClick={printFinalPaymentReceipt}
-                  >
-                    Print Final Receipt
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setShowReceiptModal(false)}
-                  >
-                    Close
-                  </Button>
-                </Stack>
-              </Box>
-            </Box>
-          )}
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <CheckCircle color="success" sx={{ fontSize: 64, mb: 2 }} />
+            <Typography variant="h5" sx={{ mb: 2 }}>
+              Payment Completed Successfully!
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3 }}>
+              Final payment receipt has been generated for this invoice.
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Print />}
+              onClick={printFinalPaymentReceipt}
+              sx={{ mr: 2 }}
+            >
+              Print Final Receipt
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setShowReceiptModal(false)}
+            >
+              Close
+            </Button>
+          </Box>
         </DialogContent>
       </Dialog>
     </Box>

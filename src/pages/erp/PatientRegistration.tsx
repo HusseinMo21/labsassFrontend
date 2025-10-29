@@ -87,9 +87,7 @@ const PatientRegistration: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [searching, setSearching] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showSampleModal, setShowSampleModal] = useState(false);
-  const [receiptData, setReceiptData] = useState<any>(null);
   const [sampleData, setSampleData] = useState<any>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   const [loadingSample, setLoadingSample] = useState(false);
@@ -133,19 +131,36 @@ const PatientRegistration: React.FC = () => {
     return gender || 'male';
   };
 
-  // Function to fetch receipt data
+  // Function to fetch receipt data and generate PDF
   const handleReceiptPrint = async () => {
     if (!patientCredentials?.visitId) return;
     
     setLoadingReceipt(true);
     try {
-      const response = await axios.get(`/api/visits/${patientCredentials.visitId}/receipt`);
-      // The API returns data wrapped in 'receipt_data'
-      setReceiptData(response.data.receipt_data || response.data);
-      setShowReceiptModal(true);
+      // Generate PDF using the new receipt template
+      const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Open PDF in new tab for viewing
+      const printWindow = window.open(url, '_blank');
+      if (!printWindow) {
+        alert('Popup blocked. Please allow popups for this site.');
+        return;
+      }
+      
+      // Clean up the URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 10000);
+      
+      toast.success('Receipt opened in new tab. You can print or download from there.');
     } catch (error) {
-      console.error('Failed to fetch receipt:', error);
-      toast.error('فشل في تحميل الإيصال');
+      console.error('Failed to generate receipt:', error);
+      toast.error('Failed to generate receipt: ' + (error.message || 'Unknown error'));
     } finally {
       setLoadingReceipt(false);
     }
@@ -958,359 +973,7 @@ const PatientRegistration: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Receipt Modal - Same as Receipts.tsx */}
-        <Dialog open={showReceiptModal} onClose={() => setShowReceiptModal(false)} maxWidth="md" fullWidth>
-          <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Receipt sx={{ mr: 1, fontSize: 32 }} />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                Visit Receipt
-              </Typography>
-            </Box>
-            {receiptData && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Receipt #{receiptData.receipt_number || 'N/A'} • {receiptData.date || receiptData.visit_date || new Date().toLocaleDateString()}
-              </Typography>
-            )}
-          </DialogTitle>
-          <DialogContent>
-            {receiptData ? (
-              <Box>
-                {/* Patient Info */}
-                <Box sx={{ mb: 4, p: 3, bgcolor: 'primary.50', borderRadius: 3, border: '1px solid', borderColor: 'primary.200' }}>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
-                    <Person sx={{ mr: 1 }} />
-                    Patient Information
-                  </Typography>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>Name:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                        {receiptData.patient_name || receiptData.patient?.name || 'N/A'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>Phone:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                        {receiptData.patient_phone || receiptData.patient?.phone || 'N/A'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Box>
-
-                {/* Tests Ordered */}
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
-                    <Science sx={{ mr: 1 }} />
-                    Tests Ordered ({receiptData.tests?.length || receiptData.visitTests?.length || 0})
-                  </Typography>
-                  {(receiptData.tests && receiptData.tests.length > 0) || (receiptData.visitTests && receiptData.visitTests.length > 0) ? (
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Test Name</TableCell>
-                            <TableCell>Category</TableCell>
-                            <TableCell align="right">Price</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {(receiptData.tests || receiptData.visitTests || []).map((test: any, index: number) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {test.name || test.custom_test_name || (test.labTest?.name) || (test.lab_test?.name) || 'Unknown Test'}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2" color="text.secondary">
-                                  {test.category || test.testCategory?.name || 'Unknown'}
-                                </Typography>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  EGP {test.price || test.final_price || (test.labTest?.price) || (test.lab_test?.price) || 0}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : (
-                    <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        No tests ordered
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Financial Summary */}
-                <Box sx={{ mb: 4, p: 3, bgcolor: 'success.50', borderRadius: 3, border: '1px solid', borderColor: 'success.200' }}>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
-                    <MonetizationOn sx={{ mr: 1 }} />
-                    Financial Summary
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Total Amount:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        EGP {receiptData.total_amount || 0}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Discount:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        EGP {receiptData.discount_amount || 0}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Final Amount:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        EGP {receiptData.final_amount || 0}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Total Paid:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
-                        EGP {receiptData.paid_now || receiptData.upfront_payment || (receiptData.payment_breakdown?.cash || 0) + (receiptData.payment_breakdown?.card || 0) || 0}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Remaining Balance:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: receiptData.remaining_balance > 0 ? 'warning.main' : 'success.main' }}>
-                        EGP {receiptData.remaining_balance || 0}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Payment Method:</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {receiptData.payment_method || 'CASH'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                  
-                  {/* Payment Breakdown */}
-                  {receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) && (
-                    <Box sx={{ mt: 3, p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid', borderColor: 'grey.300' }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                        Payment Breakdown:
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {receiptData.payment_breakdown.cash > 0 && (
-                          <Grid item xs={6}>
-                            <Typography variant="body2" color="text.secondary">Paid Cash:</Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.main' }}>
-                              EGP {receiptData.payment_breakdown.cash}
-                            </Typography>
-                          </Grid>
-                        )}
-                        {receiptData.payment_breakdown.card > 0 && (
-                          <Grid item xs={6}>
-                            <Typography variant="body2" color="text.secondary">
-                              Paid with {receiptData.payment_breakdown.card_method}:
-                            </Typography>
-                            <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                              EGP {receiptData.payment_breakdown.card}
-                            </Typography>
-                          </Grid>
-                        )}
-                      </Grid>
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Status */}
-                <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.50', borderRadius: 2 }}>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Payment Status
-                  </Typography>
-                  <Chip
-                    label={(receiptData.billing_status || receiptData.payment_status || receiptData.status || 'PENDING').toUpperCase()}
-                    color={(receiptData.billing_status || receiptData.payment_status || receiptData.status) === 'paid' ? 'success' : (receiptData.billing_status || receiptData.payment_status || receiptData.status) === 'partial' ? 'warning' : 'default'}
-                    sx={{ fontWeight: 600, mb: 2 }}
-                  />
-                  {receiptData.processed_by && (
-                    <Typography variant="body2" color="text.secondary">
-                      Processed by: {receiptData.processed_by}
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <CircularProgress sx={{ mb: 2 }} />
-                <Typography variant="body1">جاري تحميل بيانات الإيصال...</Typography>
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Print />}
-              onClick={() => {
-                if (receiptData) {
-                  // Use the same print function as Receipts.tsx
-                  const printWindow = window.open('', '_blank');
-                  if (printWindow) {
-                printWindow.document.write(`
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <title>Receipt - ${receiptData.receipt_number}</title>
-                    <style>
-                      @page { size: 80mm 200mm; margin: 5mm; }
-                      body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.2; margin: 0; padding: 0; width: 70mm; }
-                      .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
-                      .header h1 { font-size: 14px; margin: 0 0 4px 0; font-weight: bold; }
-                      .header p { margin: 2px 0; font-size: 10px; }
-                      .section { margin-bottom: 8px; }
-                      .section h3 { font-size: 11px; margin: 0 0 4px 0; font-weight: bold; border-bottom: 1px dotted #000; padding-bottom: 2px; }
-                      .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
-                      .row .label { flex: 1; }
-                      .row .value { flex: 1; text-align: right; font-weight: bold; }
-                      .total { font-weight: bold; border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
-                      .total .row { font-size: 11px; }
-                      .payment-breakdown { margin-top: 4px; padding-top: 4px; border-top: 1px dotted #000; }
-                      .payment-breakdown .row { font-size: 9px; }
-                      .barcode { text-align: center; font-family: 'Courier New', monospace; font-size: 8px; margin: 4px 0; padding: 2px; background: #f0f0f0; border: 1px solid #000; }
-                      .footer { text-align: center; font-size: 8px; margin-top: 8px; border-top: 1px dotted #000; padding-top: 4px; }
-                      .test-item { margin-bottom: 1px; font-size: 9px; }
-                      .test-name { display: inline-block; width: 60%; }
-                      .test-price { display: inline-block; width: 35%; text-align: right; }
-                      @media print { body { margin: 0; padding: 0; } .no-print { display: none; } }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="header">
-                      <h1>${receiptData.billing_status === 'paid' ? 'FINAL PAYMENT RECEIPT' : 'PATHOLOGY LAB RECEIPT'}</h1>
-                      <p>Date: ${receiptData.date ? new Date(receiptData.date).toLocaleDateString() : new Date().toLocaleDateString()}</p>
-                      <p>Receipt #: ${receiptData.receipt_number || 'N/A'}</p>
-                      <p>Lab #: ${receiptData.lab_number || 'N/A'}</p>
-                    </div>
-                    
-                    <div class="section">
-                      <h3>PATIENT INFO</h3>
-                      <div class="row">
-                        <span class="label">Name:</span>
-                        <span class="value" style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${receiptData.patient_name || 'N/A'}</span>
-                      </div>
-                      <div class="row">
-                        <span class="label">Phone:</span>
-                        <span class="value">${receiptData.patient_phone || 'N/A'}</span>
-                      </div>
-                    </div>
-                    
-                    <div class="section">
-                      <h3>TESTS (${receiptData.tests?.length || 0})</h3>
-                      ${(receiptData.tests || []).map((test: any) => `
-                        <div class="test-item">
-                          <span class="test-name">${test.name || 'Unknown Test'}</span>
-                          <span class="test-price">EGP ${test.price || 0}</span>
-                        </div>
-                      `).join('')}
-                    </div>
-                    
-                    <div class="section total">
-                      <div class="row">
-                        <span class="label">Total:</span>
-                        <span class="value">EGP ${receiptData.total_amount || 0}</span>
-                      </div>
-                      <div class="row">
-                        <span class="label">Discount:</span>
-                        <span class="value">EGP ${receiptData.discount_amount || 0}</span>
-                      </div>
-                      <div class="row">
-                        <span class="label">Final:</span>
-                        <span class="value">EGP ${receiptData.final_amount || 0}</span>
-                      </div>
-                      <div class="row">
-                        <span class="label">Total Paid:</span>
-                        <span class="value">EGP ${(receiptData.payment_breakdown?.cash || 0) + (receiptData.payment_breakdown?.card || 0)}</span>
-                      </div>
-                      <div class="row">
-                        <span class="label">Remaining:</span>
-                        <span class="value">EGP ${receiptData.remaining_balance || 0}</span>
-                      </div>
-                    </div>
-                    
-                    ${receiptData.payment_breakdown && (receiptData.payment_breakdown.cash > 0 || receiptData.payment_breakdown.card > 0) ? `
-                      <div class="section payment-breakdown">
-                        <h3>PAYMENT BREAKDOWN</h3>
-                        ${receiptData.payment_breakdown.cash > 0 ? `
-                          <div class="row">
-                            <span class="label">Paid Cash:</span>
-                            <span class="value">EGP ${receiptData.payment_breakdown.cash}</span>
-                          </div>
-                        ` : ''}
-                        ${receiptData.payment_breakdown.card > 0 ? `
-                          <div class="row">
-                            <span class="label">Paid with ${receiptData.payment_breakdown.card_method}:</span>
-                            <span class="value">EGP ${receiptData.payment_breakdown.card}</span>
-                          </div>
-                        ` : ''}
-                      </div>
-                    ` : ''}
-                    
-                    <div class="section">
-                      <div class="row">
-                        <span class="label">Status:</span>
-                        <span class="value">${receiptData.billing_status || 'PENDING'}</span>
-                      </div>
-                    </div>
-                    
-                    ${receiptData.barcode ? `
-                      <div class="barcode">
-                        ${receiptData.barcode}
-                      </div>
-                    ` : ''}
-                    
-                    <div class="footer">
-                      <p>Thank you for choosing our lab!</p>
-                      <p>Processed by: ${receiptData.processed_by || 'System'}</p>
-                      <p>Printed at: ${new Date().toLocaleString()}</p>
-                    </div>
-                  </body>
-                  </html>
-                `);
-                    printWindow.document.close();
-                    printWindow.print();
-                  }
-                }
-              }}
-              sx={{ 
-                backgroundColor: '#1976d2',
-                color: 'white',
-                borderRadius: 1,
-                px: 4,
-                py: 1.5,
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                minWidth: 120,
-              }}
-            >
-              Print Receipt
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => setShowReceiptModal(false)}
-              sx={{ 
-                borderColor: '#d32f2f',
-                color: '#d32f2f',
-                borderRadius: 1,
-                px: 4,
-                py: 1.5,
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                minWidth: 120,
-              }}
-            >
-              إغلاق
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {/* Receipt Modal - Disabled, using PDF instead */}
 
         {/* Sample Label Modal - Same as CheckIn.tsx */}
         <Dialog open={showSampleModal} onClose={() => setShowSampleModal(false)} maxWidth="md" fullWidth>

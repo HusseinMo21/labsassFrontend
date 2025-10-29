@@ -32,6 +32,7 @@ import {
   Visibility,
   Print,
   Refresh,
+  Description,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -511,6 +512,29 @@ const Receipts: React.FC = () => {
     }
   };
 
+  const printA4Receipt = async (receipt: Receipt) => {
+    try {
+      const response = await axios.get(`/api/check-in/visits/${receipt.id}/receipt-a4`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pathology_receipt_${receipt.receipt_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('A4 Receipt downloaded successfully');
+    } catch (error) {
+      console.error('Failed to generate A4 receipt:', error);
+      toast.error('Failed to generate A4 receipt');
+    }
+  };
+
   const getStatusChip = (status: string) => {
     const statusConfig = {
       registered: { color: 'default', label: 'Registered' },
@@ -694,6 +718,14 @@ const Receipts: React.FC = () => {
                       >
                         <Print />
                       </IconButton>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => printA4Receipt(receipt)}
+                        title="Print A4 Receipt"
+                      >
+                        <Description />
+                      </IconButton>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -838,6 +870,16 @@ const Receipts: React.FC = () => {
             }}
           >
             Print Receipt
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Description />}
+            onClick={() => {
+              setDetailsOpen(false);
+              printA4Receipt(selectedReceipt!);
+            }}
+          >
+            Print A4 Receipt
           </Button>
         </DialogActions>
       </Dialog>
