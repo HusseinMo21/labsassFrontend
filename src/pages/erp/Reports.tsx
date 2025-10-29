@@ -30,6 +30,7 @@ import {
   Tabs,
   Tab,
   Pagination,
+  CircularProgress,
 } from '@mui/material';
 import {
   Download,
@@ -155,7 +156,7 @@ const Reports: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
-  const [, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [patientsData, setPatientsData] = useState<PatientsData | null>(null);
   const [testsData, setTestsData] = useState<TestsData | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
@@ -213,9 +214,10 @@ const Reports: React.FC = () => {
 
       // Role-based filtering
       if (user?.role === 'doctor') {
-        // Doctors can see pending and under_review tests, but not completed ones
-        params.test_status = 'pending,under_review';
-        // Don't exclude completed for doctors - they need to see their assigned reports
+        // Doctors can see all visits except completed ones (completed reports go to Enhanced Reports)
+        // They need to see pending, in_progress, and under_review visits
+        params.exclude_completed = 'true';
+        // Doctor user detected, showing non-completed visits
       } else {
         // Both admin and staff can see all visits
         // No role-based filtering
@@ -244,6 +246,10 @@ const Reports: React.FC = () => {
       }
 
       const response = await axios.get('/api/visits', { params });
+      
+      console.log('Fetched visits data:', response.data.data);
+      console.log('Sample visit checked_by_doctors:', response.data.data?.[0]?.checked_by_doctors);
+      
       setVisits(response.data.data || []);
       setTotalPages(response.data.last_page || 1);
     } catch (error) {
@@ -402,6 +408,7 @@ const Reports: React.FC = () => {
   const confirmMarkCompleted = async () => {
     if (!visitToComplete) return;
 
+    setLoading(true);
     try {
       // Mark the visit as completed
       await axios.put(`/api/visits/${visitToComplete.id}/complete`);
@@ -415,6 +422,8 @@ const Reports: React.FC = () => {
     } catch (error) {
       console.error('Failed to mark report as completed:', error);
       toast.error('Failed to mark report as completed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -431,9 +440,17 @@ const Reports: React.FC = () => {
     }
 
     try {
-      await axios.post(`/api/visits/${visitToCheck.id}/mark-checked`, {
+      console.log('Marking visit as checked:', {
+        visitId: visitToCheck.id,
+        doctorName: doctorName.trim(),
+        currentDoctors: visitToCheck.checked_by_doctors
+      });
+
+      const response = await axios.post(`/api/visits/${visitToCheck.id}/mark-checked`, {
         doctor_name: doctorName.trim()
       });
+
+      console.log('Mark as checked response:', response.data);
 
       toast.success('Report marked as checked successfully');
       
@@ -441,9 +458,13 @@ const Reports: React.FC = () => {
       setShowCheckedByModal(false);
       setVisitToCheck(null);
       setDoctorName('');
-      fetchVisits();
+      
+      // Force refresh the visits list
+      console.log('Refreshing visits list after marking as checked');
+      await fetchVisits();
     } catch (error) {
       console.error('Failed to mark report as checked:', error);
+      console.error('Error response:', error.response?.data);
       toast.error('Failed to mark report as checked');
     }
   };
@@ -1209,10 +1230,11 @@ const Reports: React.FC = () => {
           <Button 
             variant="contained" 
             color="success"
-            startIcon={<CheckCircle />}
+            startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
             onClick={confirmMarkCompleted}
+            disabled={loading}
           >
-            Mark as Completed
+            {loading ? 'Marking as Completed...' : 'Mark as Completed'}
           </Button>
         </DialogActions>
       </Dialog>
