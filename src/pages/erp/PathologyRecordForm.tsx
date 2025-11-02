@@ -448,8 +448,9 @@ const PathologyRecordForm: React.FC = () => {
         }
       });
 
-      // Set status to completed when "Record Now" is pressed
-      formDataToSend.set('test_status', 'completed');
+      // Keep the current status when "Record Now" is pressed (don't auto-complete)
+      // Only admin can mark as completed via "Mark as Complete" button
+      formDataToSend.set('test_status', formData.test_status || 'pending');
 
       // Debug: Log the form data being sent
       console.log('Form data being sent:', formData);
@@ -469,8 +470,9 @@ const PathologyRecordForm: React.FC = () => {
         },
       });
 
-      toast.success('Report saved and completed successfully!');
-      navigate('/enhanced-reports');
+      toast.success('Report saved successfully!');
+      // Navigate back to Reports page (not Enhanced Reports, since report is not completed yet)
+      navigate('/reports');
     } catch (error) {
       console.error('Failed to save report:', error);
       toast.error('Failed to save report');
