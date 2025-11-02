@@ -194,6 +194,23 @@ const ShiftManagement: React.FC = () => {
     }
   };
 
+  const handleViewCurrentShiftDetails = async () => {
+    if (!currentShift) return;
+    
+    try {
+      const response = await axios.get(`/api/shifts/${currentShift.id}/report`);
+      if (response.data.success) {
+        const reportData = response.data.data;
+        setShiftReport(reportData);
+        setSelectedShift(currentShift);
+        setReportDialog(true);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch shift details:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch shift details');
+    }
+  };
+
   const handlePrintReport = async (shift: Shift) => {
     try {
       const response = await axios.get(`/api/shifts/${shift.id}/report`);
@@ -203,6 +220,11 @@ const ShiftManagement: React.FC = () => {
         // Create a new window for printing
         const printWindow = window.open('', '_blank');
         if (printWindow) {
+          const openedAt = new Date(reportData.shift_info.opened_at).toLocaleString();
+          const closedAt = reportData.shift_info.closed_at 
+            ? new Date(reportData.shift_info.closed_at).toLocaleString() 
+            : 'Shift Still Open';
+          
           printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -213,73 +235,80 @@ const ShiftManagement: React.FC = () => {
                 .header { text-align: center; margin-bottom: 30px; }
                 .header h1 { color: #333; margin: 0; }
                 .header h2 { color: #666; margin: 5px 0; }
-                .summary { background: #f5f5f5; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-                .summary h3 { margin-top: 0; color: #333; }
-                .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-                .summary-item { background: white; padding: 10px; border-radius: 3px; }
-                .summary-label { font-weight: bold; color: #666; }
-                .summary-value { font-size: 18px; color: #333; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .header p { color: #888; margin: 5px 0; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
                 th { background-color: #f2f2f2; font-weight: bold; }
+                .status-open { color: #4caf50; font-weight: bold; }
+                .status-closed { color: #666; font-weight: bold; }
+                .cash-amount { color: #4caf50; font-weight: bold; }
+                .other-amount { color: #2196f3; font-weight: bold; }
+                .total-amount { color: #1976d2; font-weight: bold; }
+                .payment-methods { margin: 20px 0; }
+                .payment-method { display: inline-block; margin: 5px; padding: 5px 10px; border: 1px solid #ddd; border-radius: 3px; }
                 .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+                @media print {
+                  body { margin: 0; }
+                  .header { page-break-after: avoid; }
+                  table { page-break-inside: auto; }
+                  tr { page-break-inside: avoid; page-break-after: auto; }
+                  thead { display: table-header-group; }
+                  tfoot { display: table-footer-group; }
+                }
               </style>
             </head>
             <body>
               <div class="header">
-                <h1>Shift Close Report</h1>
+                <h1>Shift Report</h1>
                 <h2>${reportData.shift_info.staff_name} - ${reportData.shift_info.shift_type} Shift</h2>
-                <p>Date: ${new Date(reportData.shift_info.opened_at).toLocaleDateString()}</p>
+                <p>${openedAt}${reportData.shift_info.closed_at ? ` - ${closedAt}` : ''}</p>
               </div>
 
-              <div class="summary">
-                <h3>Shift Summary</h3>
-                <div class="summary-grid">
-                  <div class="summary-item">
-                    <div class="summary-label">Shift Duration</div>
-                    <div class="summary-value">${reportData.shift_info.duration}</div>
-                  </div>
-                  <div class="summary-item">
-                    <div class="summary-label">Patients Served</div>
-                    <div class="summary-value">${reportData.shift_info.patients_served}</div>
-                  </div>
-                  <div class="summary-item">
-                    <div class="summary-label">Visits Processed</div>
-                    <div class="summary-value">${reportData.shift_info.visits_processed}</div>
-                  </div>
-                  <div class="summary-item">
-                    <div class="summary-label">Payments Processed</div>
-                    <div class="summary-value">${reportData.shift_info.payments_processed}</div>
-                  </div>
-                  <div class="summary-item">
-                    <div class="summary-label">Cash Collected</div>
-                    <div class="summary-value">EGP ${(parseFloat(reportData.shift_info.cash_collected) || 0).toFixed(2)}</div>
-                  </div>
-                  <div class="summary-item">
-                    <div class="summary-label">Other Payments</div>
-                    <div class="summary-value">EGP ${(parseFloat(reportData.shift_info.other_payments_collected) || 0).toFixed(2)}</div>
-                  </div>
-                  <div class="summary-item">
-                    <div class="summary-label">Total Collected</div>
-                    <div class="summary-value">EGP ${(parseFloat(reportData.shift_info.total_collected) || 0).toFixed(2)}</div>
-                  </div>
-                </div>
-              </div>
+              <!-- Shift Summary Table - Matching History Table Format -->
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Duration</th>
+                    <th>Patients</th>
+                    <th>Visits</th>
+                    <th>Payments</th>
+                    <th>Cash</th>
+                    <th>Other</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>${openedAt}</td>
+                    <td>${reportData.shift_info.shift_type || 'Unknown'}</td>
+                    <td>${reportData.shift_info.duration || 'Unknown'}</td>
+                    <td>${reportData.shift_info.patients_served || 0}</td>
+                    <td>${reportData.shift_info.visits_processed || 0}</td>
+                    <td>${reportData.shift_info.payments_processed || 0}</td>
+                    <td class="cash-amount">EGP ${(parseFloat(reportData.shift_info.cash_collected) || 0).toFixed(2)}</td>
+                    <td class="other-amount">EGP ${(parseFloat(reportData.shift_info.other_payments_collected) || 0).toFixed(2)}</td>
+                    <td class="total-amount">EGP ${(parseFloat(reportData.shift_info.total_collected) || 0).toFixed(2)}</td>
+                    <td class="${reportData.shift_info.closed_at ? 'status-closed' : 'status-open'}">
+                      ${reportData.shift_info.closed_at ? 'CLOSED' : 'OPEN'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
               
               ${reportData.shift_info.payment_breakdown && Object.keys(reportData.shift_info.payment_breakdown).length > 0 ? `
-              <div class="summary">
+              <div class="payment-methods">
                 <h3>Payment Methods Breakdown</h3>
-                <div class="summary-grid">
                   ${Object.entries(reportData.shift_info.payment_breakdown).map(([method, amount]) => `
-                    <div class="summary-item">
-                      <div class="summary-label">${method}</div>
-                      <div class="summary-value">EGP ${(parseFloat(amount as string) || 0).toFixed(2)}</div>
-                    </div>
+                  <span class="payment-method"><strong>${method}:</strong> EGP ${(parseFloat(amount as string) || 0).toFixed(2)}</span>
                   `).join('')}
-                </div>
               </div>
               ` : ''}
 
+              ${reportData.patients && reportData.patients.length > 0 ? `
+              <h3>Patient Details</h3>
               <table>
                 <thead>
                   <tr>
@@ -295,22 +324,21 @@ const ShiftManagement: React.FC = () => {
                 <tbody>
                   ${reportData.patients.map((patient: any) => `
                     <tr>
-                      <td>${patient.patient_name}</td>
-                      <td>${patient.lab_number}</td>
+                      <td>${patient.patient_name || 'Unknown'}</td>
+                      <td>${patient.lab_number || 'N/A'}</td>
                       <td>EGP ${(parseFloat(patient.total_amount) || 0).toFixed(2)}</td>
                       <td>EGP ${(parseFloat(patient.paid_amount) || 0).toFixed(2)}</td>
                       <td>EGP ${(parseFloat(patient.remaining_amount) || 0).toFixed(2)}</td>
-                      <td>${patient.type}</td>
-                      <td>${patient.sender}</td>
+                      <td>${patient.type || 'N/A'}</td>
+                      <td>${patient.sender || 'N/A'}</td>
                     </tr>
                   `).join('')}
                 </tbody>
               </table>
+              ` : '<p style="text-align: center; color: #666; margin-top: 20px;">No patients found for this shift</p>'}
 
               <div class="footer">
                 <p>Report generated on ${new Date().toLocaleString()}</p>
-                <p>Shift opened: ${new Date(reportData.shift_info.opened_at).toLocaleString()}</p>
-                <p>Shift closed: ${new Date(reportData.shift_info.closed_at).toLocaleString()}</p>
               </div>
             </body>
             </html>
@@ -475,6 +503,15 @@ const ShiftManagement: React.FC = () => {
               <Grid item xs={12}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   {(currentShift.status === 'open' || !currentShift.closed_at) && (
+                    <>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        startIcon={<Print />}
+                        onClick={() => handleViewCurrentShiftDetails()}
+                      >
+                        View/Print Shift Details
+                      </Button>
                     <Button
                       variant="contained"
                       color="error"
@@ -483,6 +520,7 @@ const ShiftManagement: React.FC = () => {
                     >
                       End Shift
                     </Button>
+                    </>
                   )}
                 </Box>
               </Grid>
@@ -676,26 +714,92 @@ const ShiftManagement: React.FC = () => {
         <DialogContent>
           {shiftReport && (
             <Box>
-              <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>Shift Summary</Typography>
-                  <Typography variant="body2">Staff: {shiftReport.shift_info.staff_name || 'Unknown'}</Typography>
-                  <Typography variant="body2">Type: {shiftReport.shift_info.shift_type || 'Unknown'}</Typography>
-                  <Typography variant="body2">Duration: {shiftReport.shift_info.duration || 'Unknown'}</Typography>
-                  <Typography variant="body2">Opened: {shiftReport.shift_info.opened_at ? formatTime(shiftReport.shift_info.opened_at) : 'Unknown'}</Typography>
-                  <Typography variant="body2">Closed: {shiftReport.shift_info.closed_at ? formatTime(shiftReport.shift_info.closed_at) : 'Unknown'}</Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>Statistics</Typography>
-                  <Typography variant="body2">Patients Served: {shiftReport.shift_info.patients_served || 0}</Typography>
-                  <Typography variant="body2">Visits Processed: {shiftReport.shift_info.visits_processed || 0}</Typography>
-                  <Typography variant="body2">Payments Processed: {shiftReport.shift_info.payments_processed || 0}</Typography>
-                  <Typography variant="body2">Total Collected: {formatCurrency(shiftReport.shift_info.total_collected || 0)}</Typography>
-                </Grid>
-              </Grid>
+              {/* Header Info */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Staff: {shiftReport.shift_info.staff_name || 'Unknown'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {shiftReport.shift_info.opened_at ? formatTime(shiftReport.shift_info.opened_at) : 'Unknown'}
+                  {shiftReport.shift_info.closed_at && ` - ${formatTime(shiftReport.shift_info.closed_at)}`}
+                </Typography>
+                {!shiftReport.shift_info.closed_at && (
+                  <Chip label="OPEN" color="success" size="small" sx={{ mt: 1 }} />
+                )}
+              </Box>
+
+              {/* Shift Summary Table - Matching History Table Format */}
+              <TableContainer component={Paper} sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Date</strong></TableCell>
+                      <TableCell><strong>Type</strong></TableCell>
+                      <TableCell><strong>Duration</strong></TableCell>
+                      <TableCell><strong>Patients</strong></TableCell>
+                      <TableCell><strong>Visits</strong></TableCell>
+                      <TableCell><strong>Payments</strong></TableCell>
+                      <TableCell><strong>Cash</strong></TableCell>
+                      <TableCell><strong>Other</strong></TableCell>
+                      <TableCell><strong>Total</strong></TableCell>
+                      <TableCell><strong>Status</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>{shiftReport.shift_info.opened_at ? formatTime(shiftReport.shift_info.opened_at) : 'Unknown'}</TableCell>
+                      <TableCell>{shiftReport.shift_info.shift_type || 'Unknown'}</TableCell>
+                      <TableCell>{shiftReport.shift_info.duration || 'Unknown'}</TableCell>
+                      <TableCell>{shiftReport.shift_info.patients_served || 0}</TableCell>
+                      <TableCell>{shiftReport.shift_info.visits_processed || 0}</TableCell>
+                      <TableCell>{shiftReport.shift_info.payments_processed || 0}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="success.main" fontWeight="bold">
+                          {formatCurrency(shiftReport.shift_info.cash_collected || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="info.main" fontWeight="bold">
+                          {formatCurrency(shiftReport.shift_info.other_payments_collected || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="primary.main" fontWeight="bold">
+                          {formatCurrency(shiftReport.shift_info.total_collected || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={shiftReport.shift_info.closed_at ? 'CLOSED' : 'OPEN'} 
+                          color={shiftReport.shift_info.closed_at ? 'default' : 'success'}
+                          size="small"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Payment Methods Breakdown */}
+              {shiftReport.shift_info.payment_breakdown && Object.keys(shiftReport.shift_info.payment_breakdown).length > 0 && (
+                <>
+                  <Typography variant="h6" gutterBottom>Payment Methods Breakdown</Typography>
+                  <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {Object.entries(shiftReport.shift_info.payment_breakdown).map(([method, amount]) => (
+                      <Chip
+                        key={method}
+                        label={`${method}: ${formatCurrency(amount)}`}
+                        variant="outlined"
+                        size="medium"
+                      />
+                    ))}
+                  </Box>
+                </>
+              )}
               
               <Divider sx={{ my: 2 }} />
               
+              {/* Patient Details Table */}
               <Typography variant="h6" gutterBottom>Patient Details</Typography>
               <TableContainer component={Paper}>
                 <Table>
@@ -740,7 +844,10 @@ const ShiftManagement: React.FC = () => {
           <Button onClick={() => setReportDialog(false)}>Close</Button>
           {selectedShift && (
             <Button 
-              onClick={() => handlePrintReport(selectedShift)} 
+              onClick={() => {
+                handlePrintReport(selectedShift);
+                setReportDialog(false);
+              }} 
               variant="contained"
               startIcon={<Print />}
             >

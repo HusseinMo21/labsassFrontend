@@ -14,24 +14,13 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
   CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Save as SaveIcon,
-  Receipt,
-  Person,
-  Science,
-  MonetizationOn,
   Print,
+  Science,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from '../../config/axios';
@@ -160,7 +149,7 @@ const PatientRegistration: React.FC = () => {
       toast.success('Receipt opened in new tab. You can print or download from there.');
     } catch (error) {
       console.error('Failed to generate receipt:', error);
-      toast.error('Failed to generate receipt: ' + (error.message || 'Unknown error'));
+      toast.error('Failed to generate receipt: ' + ((error as any)?.message || 'Unknown error'));
     } finally {
       setLoadingReceipt(false);
     }
@@ -297,8 +286,8 @@ const PatientRegistration: React.FC = () => {
 
     try {
       // Validate required fields
-      if (!formData.name || !formData.phone || !formData.age) {
-        toast.error('Please fill in all required fields (Name, Phone, Age)');
+      if (!formData.name || !formData.age) {
+        toast.error('Please fill in all required fields (Name, Age)');
         return;
       }
 
@@ -507,10 +496,9 @@ const PatientRegistration: React.FC = () => {
                   </Typography>
                   <TextField
                     fullWidth
-                    placeholder="رقم الموبايل"
+                    placeholder="رقم الموبايل (اختياري)"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                required
                 sx={{
                   '& .MuiOutlinedInput-root': {
                         borderRadius: 1,

@@ -14,7 +14,6 @@ import {
   TableRow,
   Paper,
   Button,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -44,7 +43,6 @@ import {
   Folder,
   CheckCircle,
   Person,
-  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -461,7 +459,7 @@ const Reports: React.FC = () => {
       await fetchVisits();
     } catch (error) {
       console.error('Failed to mark report as checked:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('Error response:', (error as any)?.response?.data);
       toast.error('Failed to mark report as checked');
     }
   };

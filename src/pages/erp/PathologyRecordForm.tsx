@@ -127,6 +127,7 @@ const PathologyRecordForm: React.FC = () => {
     type_of_analysis: 'Pathology',
     test_status: 'pending',
     image: null as File | null,
+    image_placement: 'end_of_report', // 'clinical_data', 'nature_of_specimen', 'gross_pathology', 'microscopic_examination', 'conclusion', 'end_of_report'
   });
 
   useEffect(() => {
@@ -182,16 +183,16 @@ const PathologyRecordForm: React.FC = () => {
       
       console.log('Found reports:', reports);
       
-      if (reports.length > 0) {
-        // Get the latest completed report, or fall back to the latest report
-        let report = reports
-          .filter(r => r.status === 'completed')
-          .sort((a, b) => b.id - a.id)[0];
-        
-        if (!report) {
-          // Fall back to the latest report if no completed report found
-          report = reports.sort((a, b) => b.id - a.id)[0];
-        }
+        if (reports.length > 0) {
+          // Get the latest completed report, or fall back to the latest report
+          let report = reports
+            .filter((r: any) => r.status === 'completed')
+            .sort((a: any, b: any) => b.id - a.id)[0];
+
+          if (!report) {
+            // Fall back to the latest report if no completed report found
+            report = reports.sort((a: any, b: any) => b.id - a.id)[0];
+          }
         
         console.log('Selected report:', report);
         console.log('Report status:', report.status);
@@ -235,12 +236,12 @@ const PathologyRecordForm: React.FC = () => {
               if (reportsResponse.data && reportsResponse.data.length > 0) {
                 // Get the latest completed report, or fall back to the latest report
                 let report = reportsResponse.data
-                  .filter(r => r.status === 'completed')
-                  .sort((a, b) => b.id - a.id)[0];
+                  .filter((r: any) => r.status === 'completed')
+                  .sort((a: any, b: any) => b.id - a.id)[0];
                 
                 if (!report) {
                   // Fall back to the latest report if no completed report found
-                  report = reportsResponse.data.sort((a, b) => b.id - a.id)[0];
+                  report = reportsResponse.data.sort((a: any, b: any) => b.id - a.id)[0];
                 }
                 
                 console.log('Selected report from direct API call:', report);
@@ -263,11 +264,53 @@ const PathologyRecordForm: React.FC = () => {
       const today = new Date().toISOString().split('T')[0];
       
       console.log('Setting form data with reportData:', reportData);
+      console.log('Visit data for referred_by:', {
+        reportData_referred_by: (reportData as any).referred_by,
+        patient_doctor_id: visitData.patient?.doctor_id,
+        patient_doctor: visitData.patient?.doctor,
+        patient_sender: visitData.patient?.sender,
+        visit_referred_doctor: visitData.referred_doctor,
+        labRequest_referred_doctor: visitData.labRequest?.referred_doctor,
+        metadata: visitData.metadata,
+        patient_object: visitData.patient,
+      });
+      
+      // Try to get referred_by from multiple sources
+      let referredBy = '';
+      if ((reportData as any).referred_by) {
+        referredBy = (reportData as any).referred_by;
+      } else if (visitData.referred_doctor) {
+        referredBy = visitData.referred_doctor;
+      } else if (visitData.patient?.doctor_id) {
+        referredBy = visitData.patient.doctor_id;
+      } else if (visitData.patient?.doctor) {
+        referredBy = visitData.patient.doctor;
+      } else if (visitData.patient?.sender) {
+        referredBy = visitData.patient.sender;
+      } else if (visitData.labRequest?.referred_doctor) {
+        referredBy = visitData.labRequest.referred_doctor;
+      } else if (visitData.metadata) {
+        // Try to get from metadata
+        try {
+          const metadata = typeof visitData.metadata === 'string' ? JSON.parse(visitData.metadata) : visitData.metadata;
+          if (metadata?.patient_data?.doctor) {
+            referredBy = metadata.patient_data.doctor;
+          } else if (metadata?.referred_doctor) {
+            referredBy = metadata.referred_doctor;
+          } else if (metadata?.doctor) {
+            referredBy = metadata.doctor;
+          }
+        } catch (e) {
+          console.warn('Failed to parse metadata:', e);
+        }
+      }
+      
+      console.log('Final referred_by value:', referredBy);
       
       setFormData({
         // Patient Information
         patient_name: visitData.patient?.name || '',
-        referred_by: (reportData as any).referred_by || visitData.patient?.doctor_id || visitData.patient?.sender || visitData.referred_doctor || '',
+        referred_by: referredBy,
         lab_no: visitData.lab_number || visitData.labRequest?.full_lab_no || visitData.labRequest?.lab_no || visitData.patient?.lab || visitData.visit_number || '',
         date: visitData.visit_date ? visitData.visit_date.split('T')[0] : today,
         age: visitData.patient?.age || '',
@@ -286,6 +329,7 @@ const PathologyRecordForm: React.FC = () => {
         type_of_analysis: (reportData as any).type_of_analysis || 'Pathology',
         test_status: visitData.test_status || 'pending',
         image: null,
+        image_placement: (reportData as any).image_placement || 'end_of_report',
       });
       
       console.log('Final form data set:', {
@@ -330,13 +374,17 @@ const PathologyRecordForm: React.FC = () => {
       if (template) {
         setFormData(prev => ({
           ...prev,
+          // Pathology Details - All fields
           clinical_data: template.clinical_data || prev.clinical_data,
           nature_of_specimen: template.specimen_information || prev.nature_of_specimen,
           gross_pathology: template.gross_examination || prev.gross_pathology,
-          microscopic_examination: template.microscopic_description || prev.microscopic_examination,
+          microscopic_examination: template.microscopic_description || template.microscopic || prev.microscopic_examination,
           conclusion: template.diagnosis || prev.conclusion,
           recommendations: template.recommendations || prev.recommendations,
+          // Patient Information
           referred_by: template.referred_doctor || prev.referred_by,
+          // Document Type
+          type_of_analysis: template.type_of_analysis || prev.type_of_analysis,
         }));
       }
     }
@@ -802,97 +850,236 @@ const PathologyRecordForm: React.FC = () => {
             </Box>
           </Box>
           
-          
-          
           <Box sx={{ mb: 4 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
+            {/* Clinical data */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Clinical data
+              </Typography>
+              {formData.image_placement === 'clinical_data' && formData.image ? (
+                <Box sx={{ 
+                  border: '2px solid', 
+                  borderColor: 'primary.main', 
+                  borderRadius: 2, 
+                  p: 2, 
+                  textAlign: 'center',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                    Image will replace this field
+                  </Typography>
+                  <img 
+                    src={URL.createObjectURL(formData.image)} 
+                    alt="Preview" 
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }} 
+                  />
+                </Box>
+              ) : (
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
-                  label="Clinical data *"
                   name="clinical_data"
                   value={formData.clinical_data}
                   onChange={(e) => handleInputChange('clinical_data', e.target.value)}
-                  required
+                  required={formData.image_placement !== 'clinical_data'}
                   placeholder="Clinical data: *"
+                  disabled={formData.image_placement === 'clinical_data'}
                 />
-              </Grid>
-              <Grid item xs={12} md={6}>
+              )}
+            </Box>
+
+            {/* Nature of specimen */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Nature of specimen
+              </Typography>
+              {formData.image_placement === 'nature_of_specimen' && formData.image ? (
+                <Box sx={{ 
+                  border: '2px solid', 
+                  borderColor: 'primary.main', 
+                  borderRadius: 2, 
+                  p: 2, 
+                  textAlign: 'center',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                    Image will replace this field
+                  </Typography>
+                  <img 
+                    src={URL.createObjectURL(formData.image)} 
+                    alt="Preview" 
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }} 
+                  />
+                </Box>
+              ) : (
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
-                  label="Nature of specimen *"
                   name="nature_of_specimen"
                   value={formData.nature_of_specimen}
                   onChange={(e) => handleInputChange('nature_of_specimen', e.target.value)}
-                  required
+                  required={formData.image_placement !== 'nature_of_specimen'}
                   placeholder="Nature of specimen: *"
+                  disabled={formData.image_placement === 'nature_of_specimen'}
                 />
-              </Grid>
-            </Grid>
-            
-            <Grid container spacing={2} sx={{ mt: 2 }}>
-              <Grid item xs={12} md={6}>
+              )}
+            </Box>
+
+            {/* Gross Pathology */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Gross Pathology
+              </Typography>
+              {formData.image_placement === 'gross_pathology' && formData.image ? (
+                <Box sx={{ 
+                  border: '2px solid', 
+                  borderColor: 'primary.main', 
+                  borderRadius: 2, 
+                  p: 2, 
+                  textAlign: 'center',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                    Image will replace this field
+                  </Typography>
+                  <img 
+                    src={URL.createObjectURL(formData.image)} 
+                    alt="Preview" 
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }} 
+                  />
+                </Box>
+              ) : (
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
-                  label="Gross Pathology"
                   name="gross_pathology"
                   value={formData.gross_pathology}
                   onChange={(e) => handleInputChange('gross_pathology', e.target.value)}
                   placeholder="Gross Pathology"
+                  disabled={formData.image_placement === 'gross_pathology'}
                 />
-              </Grid>
-              <Grid item xs={12} md={6}>
+              )}
+            </Box>
+
+            {/* Microscopic examination */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Microscopic examination
+              </Typography>
+              {formData.image_placement === 'microscopic_examination' && formData.image ? (
+                <Box sx={{ 
+                  border: '2px solid', 
+                  borderColor: 'primary.main', 
+                  borderRadius: 2, 
+                  p: 2, 
+                  textAlign: 'center',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                    Image will replace this field
+                  </Typography>
+                  <img 
+                    src={URL.createObjectURL(formData.image)} 
+                    alt="Preview" 
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }} 
+                  />
+                </Box>
+              ) : (
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
-                  label="Microscopic examination"
                   name="microscopic_examination"
                   value={formData.microscopic_examination}
                   onChange={(e) => handleInputChange('microscopic_examination', e.target.value)}
                   placeholder="Microscopic examination"
+                  disabled={formData.image_placement === 'microscopic_examination'}
                 />
-              </Grid>
-            </Grid>
-            
-            <Grid container spacing={2} sx={{ mt: 2 }}>
-              <Grid item xs={12} md={6}>
+              )}
+            </Box>
+
+            {/* Conclusion */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Conclusion
+              </Typography>
+              {formData.image_placement === 'conclusion' && formData.image ? (
+                <Box sx={{ 
+                  border: '2px solid', 
+                  borderColor: 'primary.main', 
+                  borderRadius: 2, 
+                  p: 2, 
+                  textAlign: 'center',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                    Image will replace this field
+                  </Typography>
+                  <img 
+                    src={URL.createObjectURL(formData.image)} 
+                    alt="Preview" 
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }} 
+                  />
+                </Box>
+              ) : (
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
-                  label="Conclusion"
                   name="conclusion"
                   value={formData.conclusion}
                   onChange={(e) => handleInputChange('conclusion', e.target.value)}
                   placeholder="Conclusion"
+                  disabled={formData.image_placement === 'conclusion'}
                 />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label="Recommendations"
-                  name="recommendations"
-                  value={formData.recommendations}
-                  onChange={(e) => handleInputChange('recommendations', e.target.value)}
-                  placeholder="Recommendations"
-                />
-              </Grid>
-            </Grid>
+              )}
+            </Box>
+
+            {/* Recommendations */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                Recommendations
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                name="recommendations"
+                value={formData.recommendations}
+                onChange={(e) => handleInputChange('recommendations', e.target.value)}
+                placeholder="Recommendations"
+              />
+            </Box>
           </Box>
 
           {/* Image Upload Section */}
           <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
             Image Upload
           </Typography>
+          
+          <Box sx={{ mb: 3 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Image Placement</InputLabel>
+              <Select
+                value={formData.image_placement}
+                onChange={(e) => handleInputChange('image_placement', e.target.value)}
+                label="Image Placement"
+              >
+                <MenuItem value="end_of_report">End of Report (Standalone)</MenuItem>
+                <MenuItem value="clinical_data">Replace Clinical data</MenuItem>
+                <MenuItem value="nature_of_specimen">Replace Nature of specimen</MenuItem>
+                <MenuItem value="gross_pathology">Replace Gross Pathology</MenuItem>
+                <MenuItem value="microscopic_examination">Replace Microscopic examination</MenuItem>
+                <MenuItem value="conclusion">Replace Conclusion</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Choose where to place the image. It can replace one of the pathology detail fields or appear at the end of the report.
+            </Typography>
+          </Box>
           
           <Box sx={{ mb: 4 }}>
             <Box sx={{ 

@@ -28,7 +28,6 @@ import {
   Inventory,
   Assessment,
   BarChart,
-  Search,
   Notifications,
   PersonAdd,
   CreditCard,
@@ -98,7 +97,6 @@ const navigationItems: NavigationItem[] = [
   // Doctor - Can view and approve reports
   { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },
   { path: '/doctor/reports', label: 'Reports', icon: <Assessment />, roles: ['doctor'] },
-  { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['doctor'] },
   { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['doctor'] },
 
   // Patient - Can view their own reports after payment

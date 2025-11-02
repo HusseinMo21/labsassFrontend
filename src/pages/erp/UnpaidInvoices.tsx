@@ -16,7 +16,6 @@ import {
   Paper,
   Chip,
   Alert,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -25,21 +24,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  InputAdornment,
-  Pagination,
-  Stack,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import {
-  Search,
-  Payment,
   Receipt,
   Print,
-  AttachMoney,
-  AccountBalance,
-  CreditCard,
-  LocalAtm,
   Assessment,
   TrendingUp,
   TrendingDown,
@@ -124,12 +114,12 @@ interface ReceiptData {
 
 const UnpaidInvoices: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery] = useState('');
+  const [statusFilter] = useState('all');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage] = useState(1);
+  const [, setTotalPages] = useState(1);
   
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -256,9 +246,6 @@ const UnpaidInvoices: React.FC = () => {
     return `EGP ${parseFloat(amount.toString()).toFixed(2)}`;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
 
   const handlePrintOriginalReceipt = async (invoice: Invoice) => {
     try {
