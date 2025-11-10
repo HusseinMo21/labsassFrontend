@@ -87,6 +87,24 @@ interface Visit {
   }>;
 }
 
+interface ReportData {
+  clinical_data?: string;
+  nature_of_specimen?: string;
+  gross_pathology?: string;
+  microscopic_examination?: string;
+  conclusion?: string;
+  recommendations?: string;
+  referred_by?: string;
+  type_of_analysis?: string;
+  image_placement?: string;
+  // Legacy field names for backward compatibility
+  gross_examination?: string;
+  microscopic_description?: string;
+  specimen_information?: string;
+  diagnosis?: string;
+  [key: string]: any; // Allow additional properties
+}
+
 const PathologyRecordForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
@@ -147,7 +165,7 @@ const PathologyRecordForm: React.FC = () => {
       console.log('Lab request reports:', visitData.labRequest?.reports);
       
       // Load report data if available
-      let reportData = {};
+      let reportData: ReportData = {};
       
       // Try multiple ways to find reports
       let reports = [];
@@ -204,7 +222,7 @@ const PathologyRecordForm: React.FC = () => {
         console.log('Report content:', report.content);
         
         try {
-          reportData = JSON.parse(report.content || '{}');
+          reportData = JSON.parse(report.content || '{}') as ReportData;
           console.log('Parsed report data:', reportData);
           
           // Normalize key names - handle different variations
@@ -244,7 +262,7 @@ const PathologyRecordForm: React.FC = () => {
         if (reports.length > 0) {
           const report = reports[0];
           try {
-            reportData = JSON.parse(report.content || '{}');
+            reportData = JSON.parse(report.content || '{}') as ReportData;
             
             // Normalize key names - handle different variations
             if (reportData && typeof reportData === 'object') {
@@ -285,7 +303,7 @@ const PathologyRecordForm: React.FC = () => {
                 console.log('Selected report from direct API call:', report);
                 
                 try {
-                  reportData = JSON.parse(report.content || '{}');
+                  reportData = JSON.parse(report.content || '{}') as ReportData;
                   console.log('Loaded report data from direct API call:', reportData);
                   
                   // Normalize key names - handle different variations
@@ -319,7 +337,7 @@ const PathologyRecordForm: React.FC = () => {
       
       console.log('Setting form data with reportData:', reportData);
       console.log('Visit data for referred_by:', {
-        reportData_referred_by: (reportData as any).referred_by,
+        reportData_referred_by: reportData.referred_by,
         patient_doctor_id: visitData.patient?.doctor_id,
         patient_doctor: visitData.patient?.doctor,
         patient_sender: visitData.patient?.sender,
@@ -331,8 +349,8 @@ const PathologyRecordForm: React.FC = () => {
       
       // Try to get referred_by from multiple sources
       let referredBy = '';
-      if ((reportData as any).referred_by) {
-        referredBy = (reportData as any).referred_by;
+      if (reportData.referred_by) {
+        referredBy = reportData.referred_by;
       } else if (visitData.referred_doctor) {
         referredBy = visitData.referred_doctor;
       } else if (visitData.patient?.doctor_id) {
@@ -373,55 +391,55 @@ const PathologyRecordForm: React.FC = () => {
         receiving_date: visitData.visit_date ? visitData.visit_date.split('T')[0] : today,
         
         // Pathology Details - prioritize reportData, but handle empty strings, nulls, and single dots
-        clinical_data: ((reportData as any)?.clinical_data && 
-          (reportData as any).clinical_data !== null && 
-          (reportData as any).clinical_data !== '.' && 
-          String((reportData as any).clinical_data).trim() !== '') 
-          ? String((reportData as any).clinical_data) 
+        clinical_data: (reportData?.clinical_data && 
+          reportData.clinical_data !== null && 
+          reportData.clinical_data !== '.' && 
+          String(reportData.clinical_data).trim() !== '') 
+          ? String(reportData.clinical_data) 
           : (visitData.clinical_data || ''),
-        nature_of_specimen: ((reportData as any)?.nature_of_specimen && 
-          (reportData as any).nature_of_specimen !== null && 
-          String((reportData as any).nature_of_specimen).trim() !== '') 
-          ? String((reportData as any).nature_of_specimen) 
+        nature_of_specimen: (reportData?.nature_of_specimen && 
+          reportData.nature_of_specimen !== null && 
+          String(reportData.nature_of_specimen).trim() !== '') 
+          ? String(reportData.nature_of_specimen) 
           : (visitData.specimen_information || ''),
-        gross_pathology: ((reportData as any)?.gross_pathology && 
-          (reportData as any).gross_pathology !== null && 
-          String((reportData as any).gross_pathology).trim() !== '') 
-          ? String((reportData as any).gross_pathology) 
-          : ((reportData as any)?.gross_examination && 
-            (reportData as any).gross_examination !== null && 
-            String((reportData as any).gross_examination).trim() !== '')
-            ? String((reportData as any).gross_examination)
+        gross_pathology: (reportData?.gross_pathology && 
+          reportData.gross_pathology !== null && 
+          String(reportData.gross_pathology).trim() !== '') 
+          ? String(reportData.gross_pathology) 
+          : (reportData?.gross_examination && 
+            reportData.gross_examination !== null && 
+            String(reportData.gross_examination).trim() !== '')
+            ? String(reportData.gross_examination)
             : (visitData.gross_examination || ''),
-        microscopic_examination: ((reportData as any)?.microscopic_examination && 
-          (reportData as any).microscopic_examination !== null && 
-          String((reportData as any).microscopic_examination).trim() !== '') 
-          ? String((reportData as any).microscopic_examination) 
-          : ((reportData as any)?.microscopic_description && 
-            (reportData as any).microscopic_description !== null && 
-            String((reportData as any).microscopic_description).trim() !== '')
-            ? String((reportData as any).microscopic_description)
+        microscopic_examination: (reportData?.microscopic_examination && 
+          reportData.microscopic_examination !== null && 
+          String(reportData.microscopic_examination).trim() !== '') 
+          ? String(reportData.microscopic_examination) 
+          : (reportData?.microscopic_description && 
+            reportData.microscopic_description !== null && 
+            String(reportData.microscopic_description).trim() !== '')
+            ? String(reportData.microscopic_description)
             : (visitData.microscopic_description || ''),
-        conclusion: ((reportData as any)?.conclusion && 
-          (reportData as any).conclusion !== null && 
-          String((reportData as any).conclusion).trim() !== '') 
-          ? String((reportData as any).conclusion) 
-          : ((reportData as any)?.diagnosis && 
-            (reportData as any).diagnosis !== null && 
-            String((reportData as any).diagnosis).trim() !== '')
-            ? String((reportData as any).diagnosis)
+        conclusion: (reportData?.conclusion && 
+          reportData.conclusion !== null && 
+          String(reportData.conclusion).trim() !== '') 
+          ? String(reportData.conclusion) 
+          : (reportData?.diagnosis && 
+            reportData.diagnosis !== null && 
+            String(reportData.diagnosis).trim() !== '')
+            ? String(reportData.diagnosis)
             : (visitData.diagnosis || ''),
-        recommendations: ((reportData as any)?.recommendations && 
-          (reportData as any).recommendations !== null && 
-          String((reportData as any).recommendations).trim() !== '') 
-          ? String((reportData as any).recommendations) 
+        recommendations: (reportData?.recommendations && 
+          reportData.recommendations !== null && 
+          String(reportData.recommendations).trim() !== '') 
+          ? String(reportData.recommendations) 
           : (visitData.recommendations || ''),
         
         // Document Type
-        type_of_analysis: (reportData as any).type_of_analysis || 'Pathology',
+        type_of_analysis: reportData.type_of_analysis || 'Pathology',
         test_status: visitData.test_status || 'pending',
         image: null,
-        image_placement: (reportData as any).image_placement || 'end_of_report',
+        image_placement: reportData.image_placement || 'end_of_report',
       };
       
       console.log('Final form data being set:', {
@@ -433,8 +451,8 @@ const PathologyRecordForm: React.FC = () => {
         recommendations_length: newFormData.recommendations.length,
         reportData_keys: reportData ? Object.keys(reportData) : 'no reportData',
         reportData_sample: reportData ? {
-          clinical_data_preview: (reportData as any).clinical_data ? String((reportData as any).clinical_data).substring(0, 50) : 'EMPTY',
-          gross_pathology_preview: (reportData as any).gross_pathology ? String((reportData as any).gross_pathology).substring(0, 50) : 'EMPTY',
+          clinical_data_preview: reportData.clinical_data ? String(reportData.clinical_data).substring(0, 50) : 'EMPTY',
+          gross_pathology_preview: reportData.gross_pathology ? String(reportData.gross_pathology).substring(0, 50) : 'EMPTY',
         } : 'no reportData',
       });
       

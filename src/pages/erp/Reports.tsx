@@ -716,7 +716,7 @@ const Reports: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                      <TableCell>Visit #</TableCell>
+                      <TableCell>Lab No</TableCell>
                       <TableCell>Patient</TableCell>
                       <TableCell>Date</TableCell>
                       <TableCell>Tests</TableCell>
@@ -729,7 +729,7 @@ const Reports: React.FC = () => {
                       <TableRow key={visit.id}>
                       <TableCell>
                           <Typography variant="body2" fontWeight="bold">
-                          {visit.visit_number}
+                          {visit.lab_number || visit.labRequest?.full_lab_no || 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>

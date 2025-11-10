@@ -466,15 +466,15 @@ const Patients: React.FC = () => {
                   ...(deliveryType === 'report' 
                     ? {
                         report_delivered: deliveryFormData.delivered,
-                        report_delivery_date: deliveryFormData.delivery_date || null,
-                        report_delivery_notes: deliveryFormData.notes || null,
-                        report_delivered_by: deliveryFormData.delivered_by || null,
+                        report_delivery_date: deliveryFormData.delivery_date || undefined,
+                        report_delivery_notes: deliveryFormData.notes || undefined,
+                        report_delivered_by: deliveryFormData.delivered_by || undefined,
                       }
                     : {
                         wax_blocks_delivered: deliveryFormData.delivered,
-                        wax_blocks_delivery_date: deliveryFormData.delivery_date || null,
-                        wax_blocks_delivery_notes: deliveryFormData.notes || null,
-                        wax_blocks_delivered_by: deliveryFormData.delivered_by || null,
+                        wax_blocks_delivery_date: deliveryFormData.delivery_date || undefined,
+                        wax_blocks_delivery_notes: deliveryFormData.notes || undefined,
+                        wax_blocks_delivered_by: deliveryFormData.delivered_by || undefined,
                       })
                 }
               : patient
