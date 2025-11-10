@@ -184,7 +184,7 @@ const PathologyRecordForm: React.FC = () => {
       console.log('Found reports:', reports);
       
         if (reports.length > 0) {
-          // Get the latest completed report, or fall back to the latest report
+          // Get the latest report (prioritize completed, but use any if available)
           let report = reports
             .filter((r: any) => r.status === 'completed')
             .sort((a: any, b: any) => b.id - a.id)[0];
@@ -192,6 +192,11 @@ const PathologyRecordForm: React.FC = () => {
           if (!report) {
             // Fall back to the latest report if no completed report found
             report = reports.sort((a: any, b: any) => b.id - a.id)[0];
+          }
+          
+          // If still no report, use the first one
+          if (!report && reports.length > 0) {
+            report = reports[0];
           }
         
         console.log('Selected report:', report);
@@ -201,6 +206,23 @@ const PathologyRecordForm: React.FC = () => {
         try {
           reportData = JSON.parse(report.content || '{}');
           console.log('Parsed report data:', reportData);
+          
+          // Normalize key names - handle different variations
+          if (reportData && typeof reportData === 'object') {
+            // Map old key names to new ones
+            if (reportData.gross_examination && !reportData.gross_pathology) {
+              reportData.gross_pathology = reportData.gross_examination;
+            }
+            if (reportData.microscopic_description && !reportData.microscopic_examination) {
+              reportData.microscopic_examination = reportData.microscopic_description;
+            }
+            if (reportData.specimen_information && !reportData.nature_of_specimen) {
+              reportData.nature_of_specimen = reportData.specimen_information;
+            }
+            if (reportData.diagnosis && !reportData.conclusion) {
+              reportData.conclusion = reportData.diagnosis;
+            }
+          }
         } catch (e) {
           console.warn('Failed to parse report content:', e);
         }
@@ -223,6 +245,22 @@ const PathologyRecordForm: React.FC = () => {
           const report = reports[0];
           try {
             reportData = JSON.parse(report.content || '{}');
+            
+            // Normalize key names - handle different variations
+            if (reportData && typeof reportData === 'object') {
+              if (reportData.gross_examination && !reportData.gross_pathology) {
+                reportData.gross_pathology = reportData.gross_examination;
+              }
+              if (reportData.microscopic_description && !reportData.microscopic_examination) {
+                reportData.microscopic_examination = reportData.microscopic_description;
+              }
+              if (reportData.specimen_information && !reportData.nature_of_specimen) {
+                reportData.nature_of_specimen = reportData.specimen_information;
+              }
+              if (reportData.diagnosis && !reportData.conclusion) {
+                reportData.conclusion = reportData.diagnosis;
+              }
+            }
           } catch (e) {
             console.warn('Failed to parse fallback report content:', e);
           }
@@ -249,6 +287,22 @@ const PathologyRecordForm: React.FC = () => {
                 try {
                   reportData = JSON.parse(report.content || '{}');
                   console.log('Loaded report data from direct API call:', reportData);
+                  
+                  // Normalize key names - handle different variations
+                  if (reportData && typeof reportData === 'object') {
+                    if (reportData.gross_examination && !reportData.gross_pathology) {
+                      reportData.gross_pathology = reportData.gross_examination;
+                    }
+                    if (reportData.microscopic_description && !reportData.microscopic_examination) {
+                      reportData.microscopic_examination = reportData.microscopic_description;
+                    }
+                    if (reportData.specimen_information && !reportData.nature_of_specimen) {
+                      reportData.nature_of_specimen = reportData.specimen_information;
+                    }
+                    if (reportData.diagnosis && !reportData.conclusion) {
+                      reportData.conclusion = reportData.diagnosis;
+                    }
+                  }
                 } catch (e) {
                   console.warn('Failed to parse direct report content:', e);
                 }
@@ -307,7 +361,8 @@ const PathologyRecordForm: React.FC = () => {
       
       console.log('Final referred_by value:', referredBy);
       
-      setFormData({
+      // Build form data object
+      const newFormData = {
         // Patient Information
         patient_name: visitData.patient?.name || '',
         referred_by: referredBy,
@@ -317,29 +372,73 @@ const PathologyRecordForm: React.FC = () => {
         sex: visitData.patient?.gender ? visitData.patient.gender.charAt(0).toUpperCase() + visitData.patient.gender.slice(1).toLowerCase() : 'Male',
         receiving_date: visitData.visit_date ? visitData.visit_date.split('T')[0] : today,
         
-        // Pathology Details
-        clinical_data: (reportData as any).clinical_data || visitData.clinical_data || '',
-        nature_of_specimen: (reportData as any).nature_of_specimen || visitData.specimen_information || '',
-        gross_pathology: (reportData as any).gross_pathology || visitData.gross_examination || '',
-        microscopic_examination: (reportData as any).microscopic_examination || visitData.microscopic_description || '',
-        conclusion: (reportData as any).conclusion || visitData.diagnosis || '',
-        recommendations: (reportData as any).recommendations || visitData.recommendations || '',
+        // Pathology Details - prioritize reportData, but handle empty strings, nulls, and single dots
+        clinical_data: ((reportData as any)?.clinical_data && 
+          (reportData as any).clinical_data !== null && 
+          (reportData as any).clinical_data !== '.' && 
+          String((reportData as any).clinical_data).trim() !== '') 
+          ? String((reportData as any).clinical_data) 
+          : (visitData.clinical_data || ''),
+        nature_of_specimen: ((reportData as any)?.nature_of_specimen && 
+          (reportData as any).nature_of_specimen !== null && 
+          String((reportData as any).nature_of_specimen).trim() !== '') 
+          ? String((reportData as any).nature_of_specimen) 
+          : (visitData.specimen_information || ''),
+        gross_pathology: ((reportData as any)?.gross_pathology && 
+          (reportData as any).gross_pathology !== null && 
+          String((reportData as any).gross_pathology).trim() !== '') 
+          ? String((reportData as any).gross_pathology) 
+          : ((reportData as any)?.gross_examination && 
+            (reportData as any).gross_examination !== null && 
+            String((reportData as any).gross_examination).trim() !== '')
+            ? String((reportData as any).gross_examination)
+            : (visitData.gross_examination || ''),
+        microscopic_examination: ((reportData as any)?.microscopic_examination && 
+          (reportData as any).microscopic_examination !== null && 
+          String((reportData as any).microscopic_examination).trim() !== '') 
+          ? String((reportData as any).microscopic_examination) 
+          : ((reportData as any)?.microscopic_description && 
+            (reportData as any).microscopic_description !== null && 
+            String((reportData as any).microscopic_description).trim() !== '')
+            ? String((reportData as any).microscopic_description)
+            : (visitData.microscopic_description || ''),
+        conclusion: ((reportData as any)?.conclusion && 
+          (reportData as any).conclusion !== null && 
+          String((reportData as any).conclusion).trim() !== '') 
+          ? String((reportData as any).conclusion) 
+          : ((reportData as any)?.diagnosis && 
+            (reportData as any).diagnosis !== null && 
+            String((reportData as any).diagnosis).trim() !== '')
+            ? String((reportData as any).diagnosis)
+            : (visitData.diagnosis || ''),
+        recommendations: ((reportData as any)?.recommendations && 
+          (reportData as any).recommendations !== null && 
+          String((reportData as any).recommendations).trim() !== '') 
+          ? String((reportData as any).recommendations) 
+          : (visitData.recommendations || ''),
         
         // Document Type
         type_of_analysis: (reportData as any).type_of_analysis || 'Pathology',
         test_status: visitData.test_status || 'pending',
         image: null,
         image_placement: (reportData as any).image_placement || 'end_of_report',
+      };
+      
+      console.log('Final form data being set:', {
+        clinical_data_length: newFormData.clinical_data.length,
+        nature_of_specimen_length: newFormData.nature_of_specimen.length,
+        gross_pathology_length: newFormData.gross_pathology.length,
+        microscopic_examination_length: newFormData.microscopic_examination.length,
+        conclusion_length: newFormData.conclusion.length,
+        recommendations_length: newFormData.recommendations.length,
+        reportData_keys: reportData ? Object.keys(reportData) : 'no reportData',
+        reportData_sample: reportData ? {
+          clinical_data_preview: (reportData as any).clinical_data ? String((reportData as any).clinical_data).substring(0, 50) : 'EMPTY',
+          gross_pathology_preview: (reportData as any).gross_pathology ? String((reportData as any).gross_pathology).substring(0, 50) : 'EMPTY',
+        } : 'no reportData',
       });
       
-      console.log('Final form data set:', {
-        clinical_data: (reportData as any).clinical_data || visitData.clinical_data || '',
-        nature_of_specimen: (reportData as any).nature_of_specimen || visitData.specimen_information || '',
-        gross_pathology: (reportData as any).gross_pathology || visitData.gross_examination || '',
-        microscopic_examination: (reportData as any).microscopic_examination || visitData.microscopic_description || '',
-        conclusion: (reportData as any).conclusion || visitData.diagnosis || '',
-        recommendations: (reportData as any).recommendations || visitData.recommendations || '',
-      });
+      setFormData(newFormData);
       
     } catch (error) {
       console.error('Failed to fetch visit data:', error);

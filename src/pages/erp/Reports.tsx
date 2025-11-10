@@ -181,8 +181,8 @@ const Reports: React.FC = () => {
 
   const [resultsData, setResultsData] = useState<{ [key: number]: { result_value: string; result_status: string; result_notes: string } }>({});
   const [dateRange, setDateRange] = useState({
-    start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0], // End of current month to include all visits in the month
+    start_date: '', // Empty by default to show all visits
+    end_date: '', // Empty by default to show all visits
   });
 
   // Separate effects for better performance
@@ -234,7 +234,7 @@ const Reports: React.FC = () => {
         params.test_status = statusFilter;
       }
 
-      // Add date range
+      // Add date range (only if both dates are provided)
       if (dateRange.start_date && dateRange.end_date) {
         params.start_date = dateRange.start_date;
         params.end_date = dateRange.end_date;

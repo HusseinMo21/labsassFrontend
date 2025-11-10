@@ -189,7 +189,8 @@ const Patients: React.FC = () => {
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/patients?page=${currentPage}&search=${search}`);
+      // Add cache-busting parameter to ensure fresh data
+      const response = await axios.get(`/api/patients?page=${currentPage}&search=${search}&_t=${Date.now()}`);
       console.log('Fetched patients data:', response.data.data);
       setPatients(response.data.data);
       setTotalPages(response.data.last_page);
@@ -440,16 +441,54 @@ const Patients: React.FC = () => {
         updateData.wax_blocks_delivered_by = deliveryFormData.delivered_by || null;
       }
 
-      await axios.put(`/api/patients/${selectedPatientForDelivery.id}`, updateData);
+      const response = await axios.put(`/api/patients/${selectedPatientForDelivery.id}`, updateData);
       
       const itemName = deliveryType === 'report' ? 'Report' : 'Wax Blocks (بلوكات الشمع)';
       toast.success(`${itemName} delivery status updated successfully`);
       
-      // Close modal and refresh data
+      // Update local state immediately with the updated patient data
+      const updatedPatient = response.data?.patient || response.data?.data;
+      if (updatedPatient) {
+        setPatients(prevPatients => 
+          prevPatients.map(patient => 
+            patient.id === selectedPatientForDelivery.id 
+              ? { ...patient, ...updatedPatient }
+              : patient
+          )
+        );
+      } else {
+        // Fallback: update with the form data we just sent
+        setPatients(prevPatients => 
+          prevPatients.map(patient => 
+            patient.id === selectedPatientForDelivery.id 
+              ? {
+                  ...patient,
+                  ...(deliveryType === 'report' 
+                    ? {
+                        report_delivered: deliveryFormData.delivered,
+                        report_delivery_date: deliveryFormData.delivery_date || null,
+                        report_delivery_notes: deliveryFormData.notes || null,
+                        report_delivered_by: deliveryFormData.delivered_by || null,
+                      }
+                    : {
+                        wax_blocks_delivered: deliveryFormData.delivered,
+                        wax_blocks_delivery_date: deliveryFormData.delivery_date || null,
+                        wax_blocks_delivery_notes: deliveryFormData.notes || null,
+                        wax_blocks_delivered_by: deliveryFormData.delivered_by || null,
+                      })
+                }
+              : patient
+          )
+        );
+      }
+      
+      // Close modal and refresh data to ensure consistency
       setReportDeliveryModalOpen(false);
       setWaxBlocksModalOpen(false);
       setSelectedPatientForDelivery(null);
       resetDeliveryForm();
+      
+      // Refresh data from server to ensure we have the latest
       fetchPatients();
     } catch (error: any) {
       console.error('Delivery update error:', error);
