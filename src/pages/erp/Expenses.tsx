@@ -77,11 +77,7 @@ const Expenses: React.FC = () => {
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    category: '',
-    expense_date: new Date().toISOString().split('T')[0],
     payment_method: '',
-    reference_number: '',
-    notes: '',
   });
 
   useEffect(() => {
@@ -156,11 +152,7 @@ const Expenses: React.FC = () => {
     setFormData({
       description: '',
       amount: '',
-      category: '',
-      expense_date: new Date().toISOString().split('T')[0],
       payment_method: '',
-      reference_number: '',
-      notes: '',
     });
     setShowModal(true);
   };
@@ -171,11 +163,7 @@ const Expenses: React.FC = () => {
     setFormData({
       description: expense.description,
       amount: expense.amount.toString(),
-      category: expense.category,
-      expense_date: expense.expense_date,
       payment_method: expense.payment_method || '',
-      reference_number: expense.reference_number || '',
-      notes: expense.notes || '',
     });
     setShowModal(true);
   };
@@ -197,7 +185,7 @@ const Expenses: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.description.trim() || !formData.amount || !formData.category.trim() || !formData.expense_date) {
+    if (!formData.description.trim() || !formData.amount) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -206,11 +194,7 @@ const Expenses: React.FC = () => {
       const expenseData = {
         description: formData.description.trim(),
         amount: parseFloat(formData.amount),
-        category: formData.category.trim(),
-        expense_date: formData.expense_date,
         payment_method: formData.payment_method.trim() || null,
-        reference_number: formData.reference_number.trim() || null,
-        notes: formData.notes.trim() || null,
       };
 
       if (isEditing && selectedExpense) {
@@ -535,14 +519,6 @@ const Expenses: React.FC = () => {
             />
             <TextField
               fullWidth
-              label="Category"
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              margin="normal"
-              required
-            />
-            <TextField
-              fullWidth
               label="Amount (EGP)"
               type="number"
               value={formData.amount}
@@ -553,35 +529,9 @@ const Expenses: React.FC = () => {
             />
             <TextField
               fullWidth
-              label="Expense Date"
-              type="date"
-              value={formData.expense_date}
-              onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-              margin="normal"
-              required
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              fullWidth
               label="Payment Method"
               value={formData.payment_method}
               onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              label="Reference Number"
-              value={formData.reference_number}
-              onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              label="Notes"
-              multiline
-              rows={3}
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               margin="normal"
             />
           </Box>
