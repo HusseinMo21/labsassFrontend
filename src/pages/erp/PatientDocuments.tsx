@@ -121,8 +121,14 @@ const PatientDocuments: React.FC = () => {
       const response = await axios.get(endpoint);
       const documentData = response.data;
       
-      const content = atob(documentData.content);
-      const blob = new Blob([content], { type: 'application/pdf' });
+      // Convert base64 to binary
+      const binaryString = atob(documentData.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([bytes], { type: 'application/pdf' });
       const blobUrl = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
@@ -148,22 +154,49 @@ const PatientDocuments: React.FC = () => {
       const response = await axios.get(endpoint);
       const documentData = response.data;
       
-      const content = atob(documentData.content);
-      const blob = new Blob([content], { type: 'application/pdf' });
-      const blobUrl = URL.createObjectURL(blob);
-      
-      const printWindow = window.open(blobUrl, '_blank');
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-        toast.success('PDF opened in a new tab. Please use the browser\'s print function.');
-      } else {
-        toast.error('Popup blocked. Please allow popups for this site to print the document.');
+      // Convert base64 to binary
+      const binaryString = atob(documentData.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
       
-      // Clean up blob URL after a delay
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create an iframe to load the PDF and then print it
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      
+      iframe.onload = () => {
+        try {
+          // Wait a bit for the PDF to fully load
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+            // Clean up after printing
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+              URL.revokeObjectURL(blobUrl);
+            }, 1000);
+          }, 500);
+        } catch (error) {
+          console.error('Error printing:', error);
+          // Fallback: open in new window
+          window.open(blobUrl, '_blank');
+          document.body.removeChild(iframe);
+          toast.info('PDF opened in a new tab. Please use the browser\'s print function.');
+        }
+      };
+      
+      iframe.onerror = () => {
+        // Fallback: open in new window if iframe fails
+        window.open(blobUrl, '_blank');
+        document.body.removeChild(iframe);
+        toast.info('PDF opened in a new tab. Please use the browser\'s print function.');
+      };
+      
     } catch (error) {
       console.error('Error printing document:', error);
       toast.error('Failed to print document');
@@ -415,8 +448,14 @@ const PatientDocuments: React.FC = () => {
               <Button
                 startIcon={<Download />}
                 onClick={() => {
-                  const content = atob(selectedDocument.content);
-                  const blob = new Blob([content], { type: 'application/pdf' });
+                  // Convert base64 to binary
+                  const binaryString = atob(selectedDocument.content);
+                  const bytes = new Uint8Array(binaryString.length);
+                  for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                  }
+                  
+                  const blob = new Blob([bytes], { type: 'application/pdf' });
                   const blobUrl = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = blobUrl;
@@ -425,6 +464,7 @@ const PatientDocuments: React.FC = () => {
                   link.click();
                   document.body.removeChild(link);
                   URL.revokeObjectURL(blobUrl);
+                  toast.success('Document downloaded successfully');
                 }}
                 variant="outlined"
                 color="primary"
@@ -434,16 +474,48 @@ const PatientDocuments: React.FC = () => {
               <Button
                 startIcon={<Print />}
                 onClick={() => {
-                  const content = atob(selectedDocument.content);
-                  const blob = new Blob([content], { type: 'application/pdf' });
-                  const blobUrl = URL.createObjectURL(blob);
-                  const printWindow = window.open(blobUrl, '_blank');
-                  if (printWindow) {
-                    printWindow.onload = () => {
-                      printWindow.print();
-                    };
+                  // Convert base64 to binary
+                  const binaryString = atob(selectedDocument.content);
+                  const bytes = new Uint8Array(binaryString.length);
+                  for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
                   }
-                  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                  
+                  const blob = new Blob([bytes], { type: 'application/pdf' });
+                  const blobUrl = URL.createObjectURL(blob);
+                  
+                  // Create an iframe to load the PDF and then print it
+                  const iframe = document.createElement('iframe');
+                  iframe.style.display = 'none';
+                  iframe.src = blobUrl;
+                  document.body.appendChild(iframe);
+                  
+                  iframe.onload = () => {
+                    try {
+                      // Wait a bit for the PDF to fully load
+                      setTimeout(() => {
+                        iframe.contentWindow?.print();
+                        // Clean up after printing
+                        setTimeout(() => {
+                          document.body.removeChild(iframe);
+                          URL.revokeObjectURL(blobUrl);
+                        }, 1000);
+                      }, 500);
+                    } catch (error) {
+                      console.error('Error printing:', error);
+                      // Fallback: open in new window
+                      window.open(blobUrl, '_blank');
+                      document.body.removeChild(iframe);
+                      toast.info('PDF opened in a new tab. Please use the browser\'s print function.');
+                    }
+                  };
+                  
+                  iframe.onerror = () => {
+                    // Fallback: open in new window if iframe fails
+                    window.open(blobUrl, '_blank');
+                    document.body.removeChild(iframe);
+                    toast.info('PDF opened in a new tab. Please use the browser\'s print function.');
+                  };
                 }}
                 variant="outlined"
                 color="primary"

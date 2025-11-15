@@ -33,7 +33,7 @@ import {
   Visibility,
   Print,
   Refresh,
-  Description,
+  Edit,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -103,6 +103,9 @@ const Receipts: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
@@ -225,6 +228,8 @@ const Receipts: React.FC = () => {
       };
       
       setSelectedReceipt(updatedReceipt);
+      setEditingReceipt({ ...updatedReceipt });
+      setIsEditing(false);
       setDetailsOpen(true);
     } catch (error) {
       console.error('Failed to fetch receipt details:', error);
@@ -241,53 +246,181 @@ const Receipts: React.FC = () => {
         };
         
         setSelectedReceipt(updatedReceipt);
+        setEditingReceipt({ ...updatedReceipt });
+        setIsEditing(false);
         setDetailsOpen(true);
       } catch (fallbackError) {
         console.error('Failed to fetch receipt from fallback endpoint:', fallbackError);
         // Use original receipt data as last resort
         setSelectedReceipt(receipt);
+        setEditingReceipt({ ...receipt });
+        setIsEditing(false);
         setDetailsOpen(true);
       }
     }
   };
 
+  const handleSaveReceipt = async () => {
+    if (!editingReceipt || !selectedReceipt) return;
+    
+    setSaving(true);
+    try {
+      // Update the visit with edited data
+      const updateData: any = {
+        total_amount: editingReceipt.total_amount,
+        final_amount: editingReceipt.final_amount,
+        upfront_payment: editingReceipt.upfront_payment,
+        remaining_balance: editingReceipt.remaining_balance,
+        payment_method: editingReceipt.payment_method,
+      };
+
+      // Update visit metadata to include financial data
+      const visitResponse = await axios.get(`/api/visits/${selectedReceipt.id}`);
+      const visit = visitResponse.data;
+      
+      // Parse metadata if it's a string, otherwise use as is
+      let metadata: any = {};
+      if (visit.metadata) {
+        if (typeof visit.metadata === 'string') {
+          try {
+            metadata = JSON.parse(visit.metadata);
+          } catch (e) {
+            console.error('Failed to parse metadata:', e);
+            metadata = {};
+          }
+        } else {
+          metadata = { ...visit.metadata };
+        }
+      }
+      
+      const financialData = metadata.financial_data || {};
+      const paymentDetails = metadata.payment_details || {};
+      
+      financialData.total_amount = editingReceipt.total_amount;
+      financialData.final_amount = editingReceipt.final_amount;
+      financialData.amount_paid = editingReceipt.upfront_payment;
+      financialData.remaining_balance = editingReceipt.remaining_balance;
+      
+      // Update payment breakdown based on payment method
+      const paymentMethod = editingReceipt.payment_method?.toLowerCase() || 'cash';
+      if (paymentMethod === 'cash') {
+        paymentDetails.amount_paid_cash = editingReceipt.upfront_payment;
+        paymentDetails.amount_paid_card = 0;
+      } else {
+        paymentDetails.amount_paid_cash = 0;
+        paymentDetails.amount_paid_card = editingReceipt.upfront_payment;
+        paymentDetails.additional_payment_method = editingReceipt.payment_method;
+      }
+      paymentDetails.total_paid = editingReceipt.upfront_payment;
+      
+      metadata.financial_data = financialData;
+      metadata.payment_details = paymentDetails;
+      updateData.metadata = metadata;
+
+      // Update the visit
+      await axios.put(`/api/visits/${selectedReceipt.id}`, updateData);
+
+      // Update all visits for the same patient
+      if (selectedReceipt.patient?.id) {
+        const patientVisitsResponse = await axios.get('/api/visits', {
+          params: { patient_id: selectedReceipt.patient.id }
+        });
+        
+        const patientVisits = patientVisitsResponse.data.data || [];
+        const updatePromises = patientVisits.map((v: any) => {
+          if (v.id === selectedReceipt.id) return Promise.resolve();
+          
+          // Parse metadata if it's a string
+          let vMetadata: any = {};
+          if (v.metadata) {
+            if (typeof v.metadata === 'string') {
+              try {
+                vMetadata = JSON.parse(v.metadata);
+              } catch (e) {
+                console.error('Failed to parse metadata for visit:', v.id, e);
+                vMetadata = {};
+              }
+            } else {
+              vMetadata = { ...v.metadata };
+            }
+          }
+          
+          const vFinancialData = vMetadata.financial_data || {};
+          const vPaymentDetails = vMetadata.payment_details || {};
+          
+          vFinancialData.total_amount = editingReceipt.total_amount;
+          vFinancialData.final_amount = editingReceipt.final_amount;
+          vFinancialData.amount_paid = editingReceipt.upfront_payment;
+          vFinancialData.remaining_balance = editingReceipt.remaining_balance;
+          
+          // Update payment breakdown based on payment method
+          const paymentMethod = editingReceipt.payment_method?.toLowerCase() || 'cash';
+          if (paymentMethod === 'cash') {
+            vPaymentDetails.amount_paid_cash = editingReceipt.upfront_payment;
+            vPaymentDetails.amount_paid_card = 0;
+          } else {
+            vPaymentDetails.amount_paid_cash = 0;
+            vPaymentDetails.amount_paid_card = editingReceipt.upfront_payment;
+            vPaymentDetails.additional_payment_method = editingReceipt.payment_method;
+          }
+          vPaymentDetails.total_paid = editingReceipt.upfront_payment;
+          
+          vMetadata.financial_data = vFinancialData;
+          vMetadata.payment_details = vPaymentDetails;
+          
+          return axios.put(`/api/visits/${v.id}`, {
+            total_amount: editingReceipt.total_amount,
+            final_amount: editingReceipt.final_amount,
+            upfront_payment: editingReceipt.upfront_payment,
+            remaining_balance: editingReceipt.remaining_balance,
+            payment_method: editingReceipt.payment_method,
+            metadata: vMetadata
+          });
+        });
+        
+        await Promise.all(updatePromises);
+      }
+
+      setSelectedReceipt(editingReceipt);
+      setIsEditing(false);
+      toast.success('Receipt updated successfully for all related visits');
+      fetchReceipts();
+    } catch (error: any) {
+      console.error('Failed to save receipt:', error);
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Unknown error';
+      toast.error('Failed to save receipt: ' + errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handlePrint = async (receipt: Receipt) => {
     try {
-      // Try the new universal receipt endpoint first
-      const response = await axios.get(`/api/visits/${receipt.id}/receipt`);
-      const receiptData = response.data.receipt_data;
+      // Use the same PDF endpoint as unpaid invoices
+      const response = await axios.get(`/api/check-in/visits/${receipt.id}/unpaid-invoice-receipt`, {
+        responseType: 'blob'
+      });
       
-      // Update the receipt with the proper receipt data
-      const updatedReceipt = {
-        ...receipt,
-        ...receiptData,
-        barcode: receiptData.barcode
-      };
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       
-      setSelectedReceipt(updatedReceipt);
-      setPrintOpen(true);
-    } catch (error) {
-      console.error('Failed to fetch receipt data for printing:', error);
-      
-      // Try the check-in receipt endpoint as fallback
-      try {
-        const fallbackResponse = await axios.get(`/api/check-in/visits/${receipt.id}/receipt`);
-        const fallbackData = fallbackResponse.data.receipt_data;
-        
-        const updatedReceipt = {
-          ...receipt,
-          ...fallbackData,
-          barcode: fallbackData.barcode
-        };
-        
-        setSelectedReceipt(updatedReceipt);
-        setPrintOpen(true);
-      } catch (fallbackError) {
-        console.error('Failed to fetch receipt from fallback endpoint:', fallbackError);
-        // Use original receipt data as last resort
-        setSelectedReceipt(receipt);
-        setPrintOpen(true);
+      // Open PDF in new tab for viewing
+      const printWindow = window.open(url, '_blank');
+      if (!printWindow) {
+        alert('Popup blocked. Please allow popups for this site.');
+        return;
       }
+
+      // Clean up the URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 10000);
+      
+      toast.success('Receipt opened in new tab. You can print or download from there.');
+    } catch (error: any) {
+      console.error('Error generating receipt:', error);
+      toast.error('Failed to generate receipt: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -513,28 +646,6 @@ const Receipts: React.FC = () => {
     }
   };
 
-  const printA4Receipt = async (receipt: Receipt) => {
-    try {
-      const response = await axios.get(`/api/check-in/visits/${receipt.id}/receipt-a4`, {
-        responseType: 'blob'
-      });
-      
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `pathology_receipt_${receipt.receipt_number}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('A4 Receipt downloaded successfully');
-    } catch (error) {
-      console.error('Failed to generate A4 receipt:', error);
-      toast.error('Failed to generate A4 receipt');
-    }
-  };
 
   const getStatusChip = (status: string) => {
     const statusConfig = {
@@ -719,14 +830,6 @@ const Receipts: React.FC = () => {
                       >
                         <Print />
                       </IconButton>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => printA4Receipt(receipt)}
-                        title="Print A4 Receipt"
-                      >
-                        <Description />
-                      </IconButton>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -752,31 +855,34 @@ const Receipts: React.FC = () => {
       )}
 
       {/* Receipt Details Dialog */}
-      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={detailsOpen} onClose={() => {
+        setIsEditing(false);
+        setDetailsOpen(false);
+      }} maxWidth="md" fullWidth>
         <DialogTitle>
           Receipt Details - {selectedReceipt?.receipt_number}
         </DialogTitle>
         <DialogContent>
-          {selectedReceipt && (
-            <Grid container spacing={3}>
+          {editingReceipt && (
+            <Grid container spacing={3} sx={{ mt: 1 }}>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Patient Information</Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2"><strong>Name:</strong> {selectedReceipt.patient.name}</Typography>
-                  <Typography variant="body2"><strong>Phone:</strong> {selectedReceipt.patient.phone}</Typography>
-                  {selectedReceipt.patient.email && (
-                    <Typography variant="body2"><strong>Email:</strong> {selectedReceipt.patient.email}</Typography>
+                  <Typography variant="body2"><strong>Name:</strong> {editingReceipt.patient.name}</Typography>
+                  <Typography variant="body2"><strong>Phone:</strong> {editingReceipt.patient.phone}</Typography>
+                  {editingReceipt.patient.email && (
+                    <Typography variant="body2"><strong>Email:</strong> {editingReceipt.patient.email}</Typography>
                   )}
                 </Box>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Receipt Information</Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2"><strong>Receipt #:</strong> {selectedReceipt.receipt_number}</Typography>
-                  <Typography variant="body2"><strong>Lab #:</strong> {selectedReceipt.lab_number || 'N/A'}</Typography>
-                  <Typography variant="body2"><strong>Visit #:</strong> {selectedReceipt.visit_number}</Typography>
-                  <Typography variant="body2"><strong>Date:</strong> {new Date(selectedReceipt.visit_date).toLocaleDateString()}</Typography>
-                  <Typography variant="body2"><strong>Time:</strong> {selectedReceipt.visit_time}</Typography>
+                  <Typography variant="body2"><strong>Receipt #:</strong> {editingReceipt.receipt_number}</Typography>
+                  <Typography variant="body2"><strong>Lab #:</strong> {editingReceipt.lab_number || 'N/A'}</Typography>
+                  <Typography variant="body2"><strong>Visit #:</strong> {editingReceipt.visit_number}</Typography>
+                  <Typography variant="body2"><strong>Date:</strong> {new Date(editingReceipt.visit_date).toLocaleDateString()}</Typography>
+                  <Typography variant="body2"><strong>Time:</strong> {editingReceipt.visit_time}</Typography>
                 </Box>
               </Grid>
               <Grid item xs={12}>
@@ -791,7 +897,7 @@ const Receipts: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {(selectedReceipt.visitTests || []).map((test) => (
+                      {(editingReceipt.visitTests || []).map((test) => (
                         <TableRow key={test.id}>
                           <TableCell>{(test as any).custom_test_name || (test.labTest || test.lab_test)?.name || 'Unknown Test'}</TableCell>
                           <TableCell>{formatCurrency((test as any).final_price || (test.labTest || test.lab_test)?.price || 0)}</TableCell>
@@ -804,56 +910,120 @@ const Receipts: React.FC = () => {
               </Grid>
               <Grid item xs={12}>
                 <Typography variant="h6" gutterBottom>Payment Summary</Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                   <Typography variant="body2">Total Amount:</Typography>
-                  <Typography variant="body2">{formatCurrency(selectedReceipt.total_amount)}</Typography>
+                  {isEditing ? (
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={editingReceipt.total_amount}
+                      onChange={(e) => {
+                        const newTotal = parseFloat(e.target.value) || 0;
+                        setEditingReceipt({
+                          ...editingReceipt,
+                          total_amount: newTotal,
+                          final_amount: newTotal - (editingReceipt.discount_amount || 0),
+                          remaining_balance: (newTotal - (editingReceipt.discount_amount || 0)) - editingReceipt.upfront_payment
+                        });
+                      }}
+                      sx={{ width: 150 }}
+                      inputProps={{ min: 0, step: 0.01 }}
+                    />
+                  ) : (
+                    <Typography variant="body2">{formatCurrency(editingReceipt.total_amount)}</Typography>
+                  )}
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                   <Typography variant="body2">Final Amount:</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatCurrency(selectedReceipt.final_amount)}</Typography>
+                  {isEditing ? (
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={editingReceipt.final_amount}
+                      onChange={(e) => {
+                        const newFinal = parseFloat(e.target.value) || 0;
+                        setEditingReceipt({
+                          ...editingReceipt,
+                          final_amount: newFinal,
+                          remaining_balance: newFinal - editingReceipt.upfront_payment
+                        });
+                      }}
+                      sx={{ width: 150 }}
+                      inputProps={{ min: 0, step: 0.01 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{formatCurrency(editingReceipt.final_amount)}</Typography>
+                  )}
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                   <Typography variant="body2">Amount Paid:</Typography>
-                  <Typography variant="body2" color="success.main">{formatCurrency(selectedReceipt.upfront_payment)}</Typography>
+                  {isEditing ? (
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={editingReceipt.upfront_payment}
+                      onChange={(e) => {
+                        const newPaid = parseFloat(e.target.value) || 0;
+                        setEditingReceipt({
+                          ...editingReceipt,
+                          upfront_payment: newPaid,
+                          remaining_balance: editingReceipt.final_amount - newPaid
+                        });
+                      }}
+                      sx={{ width: 150 }}
+                      inputProps={{ min: 0, step: 0.01 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" color="success.main">{formatCurrency(editingReceipt.upfront_payment)}</Typography>
+                  )}
                 </Box>
                 
                 {/* Payment Breakdown */}
-                {selectedReceipt.payment_breakdown && (selectedReceipt.payment_breakdown.cash > 0 || selectedReceipt.payment_breakdown.card > 0) && (
+                {editingReceipt.payment_breakdown && (editingReceipt.payment_breakdown.cash > 0 || editingReceipt.payment_breakdown.card > 0) && (
                   <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                     <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
                       Payment Breakdown:
                     </Typography>
-                    {selectedReceipt.payment_breakdown.cash > 0 && (
+                    {editingReceipt.payment_breakdown.cash > 0 && (
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="body2">Paid Cash:</Typography>
-                        <Typography variant="body2" color="success.main">{formatCurrency(selectedReceipt.payment_breakdown.cash)}</Typography>
+                        <Typography variant="body2" color="success.main">{formatCurrency(editingReceipt.payment_breakdown.cash)}</Typography>
                       </Box>
                     )}
-                    {selectedReceipt.payment_breakdown.card > 0 && (
+                    {editingReceipt.payment_breakdown.card > 0 && (
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Paid with {selectedReceipt.payment_breakdown.card_method}:</Typography>
-                        <Typography variant="body2" color="success.main">{formatCurrency(selectedReceipt.payment_breakdown.card)}</Typography>
+                        <Typography variant="body2">Paid with {editingReceipt.payment_breakdown.card_method}:</Typography>
+                        <Typography variant="body2" color="success.main">{formatCurrency(editingReceipt.payment_breakdown.card)}</Typography>
                       </Box>
                     )}
                   </Box>
                 )}
                 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                   <Typography variant="body2">Remaining Balance:</Typography>
-                  <Typography variant="body2" color="error.main">{formatCurrency(selectedReceipt.remaining_balance)}</Typography>
+                  <Typography variant="body2" color="error.main">{formatCurrency(editingReceipt.remaining_balance)}</Typography>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                   <Typography variant="body2">Payment Method:</Typography>
-                  <Typography variant="body2">{selectedReceipt.payment_method}</Typography>
+                  {isEditing ? (
+                    <TextField
+                      size="small"
+                      value={editingReceipt.payment_method}
+                      onChange={(e) => setEditingReceipt({ ...editingReceipt, payment_method: e.target.value })}
+                      sx={{ width: 150 }}
+                    />
+                  ) : (
+                    <Typography variant="body2">{editingReceipt.payment_method}</Typography>
+                  )}
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2">Billing Status:</Typography>
-                  {getBillingStatusChip(selectedReceipt.billing_status)}
+                  {getBillingStatusChip(editingReceipt.billing_status)}
                 </Box>
-                {selectedReceipt.processed_by && (
+                {editingReceipt.processed_by && (
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2">Processed by:</Typography>
-                    <Typography variant="body2">{selectedReceipt.processed_by}</Typography>
+                    <Typography variant="body2">{editingReceipt.processed_by}</Typography>
                   </Box>
                 )}
               </Grid>
@@ -861,27 +1031,65 @@ const Receipts: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDetailsOpen(false)}>Close</Button>
-          <Button
-            variant="contained"
-            startIcon={<Print />}
-            onClick={() => {
-              setDetailsOpen(false);
-              printReceipt(selectedReceipt!);
-            }}
-          >
-            Print Receipt
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Description />}
-            onClick={() => {
-              setDetailsOpen(false);
-              printA4Receipt(selectedReceipt!);
-            }}
-          >
-            Print A4 Receipt
-          </Button>
+          <Button onClick={() => {
+            setIsEditing(false);
+            setDetailsOpen(false);
+          }}>Close</Button>
+          {!isEditing ? (
+            <>
+              <Button
+                variant="contained"
+                startIcon={<Print />}
+                onClick={async () => {
+                  if (selectedReceipt) {
+                    await handlePrint(selectedReceipt);
+                  }
+                }}
+              >
+                Print Receipt
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Edit />}
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setEditingReceipt(selectedReceipt ? { ...selectedReceipt } : null);
+                  setIsEditing(false);
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<Print />}
+                onClick={async () => {
+                  if (selectedReceipt) {
+                    await handlePrint(selectedReceipt);
+                  }
+                }}
+                disabled={saving}
+              >
+                Print Receipt
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleSaveReceipt}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 

@@ -33,11 +33,10 @@ import {
   Business,
   Visibility,
   Delete,
-  WhatsApp,
-  Phone,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
+import OrganizationPatientsView from '../../components/OrganizationPatientsView';
 
 interface Organization {
   id: number;
@@ -106,10 +105,8 @@ const Organizations: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
   });
-  const [patientsOpen, setPatientsOpen] = useState(false);
+  const [viewingPatients, setViewingPatients] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [patientsLoading, setPatientsLoading] = useState(false);
   const [confirmationDialog, setConfirmationDialog] = useState({
     open: false,
     oldName: '',
@@ -170,53 +167,6 @@ const Organizations: React.FC = () => {
     setSearchTimeout(timeout);
   };
 
-  const fetchOrganizationPatients = async (organizationId: number) => {
-    try {
-      setPatientsLoading(true);
-      const response = await axios.get(`/api/organizations/${organizationId}/patients`);
-      const patientsData = response.data.patients;
-      
-      // Fetch detailed information for each patient
-      const patientsWithDetails = await Promise.all(
-        patientsData.map(async (patient: Patient) => {
-          try {
-            const detailResponse = await axios.get(`/api/patients/${patient.id}`);
-            const detailedPatient = detailResponse.data;
-            
-            // Calculate financial summary
-            const totalPaid = detailedPatient.visits?.reduce((sum: number, visit: Visit) => {
-              return sum + (Number(visit.invoice?.amount_paid) || 0);
-            }, 0) || 0;
-            
-            const totalTests = detailedPatient.visits?.reduce((sum: number, visit: any) => {
-              return sum + (visit.visit_tests?.length || 0);
-            }, 0) || 0;
-            
-            const labNumbers = detailedPatient.visits?.map((visit: any) => {
-              return visit.lab_request?.lab_no;
-            }).filter(Boolean) || [];
-            
-            return {
-              ...patient,
-              visits: detailedPatient.visits,
-              total_paid: totalPaid,
-              total_tests: totalTests,
-              lab_numbers: labNumbers
-            };
-          } catch (error) {
-            console.error(`Failed to fetch details for patient ${patient.id}:`, error);
-            return patient;
-          }
-        })
-      );
-      
-      setPatients(patientsWithDetails);
-    } catch (error) {
-      toast.error('Failed to fetch organization patients');
-    } finally {
-      setPatientsLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,8 +281,12 @@ const Organizations: React.FC = () => {
 
   const handleViewPatients = (organization: Organization) => {
     setSelectedOrganization(organization);
-    setPatientsOpen(true);
-    fetchOrganizationPatients(organization.id);
+    setViewingPatients(true);
+  };
+
+  const handleClosePatientsView = () => {
+    setViewingPatients(false);
+    setSelectedOrganization(null);
   };
 
   const resetForm = () => {
@@ -353,29 +307,16 @@ const Organizations: React.FC = () => {
     resetForm();
   };
 
-  const formatPhoneNumber = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (!cleaned.startsWith('20') && cleaned.length === 10) {
-      return `20${cleaned}`;
-    }
-    return cleaned;
-  };
 
-  const handleWhatsAppContact = (patient: Patient) => {
-    const contactNumber = patient.whatsapp_number || patient.phone;
-    
-    if (!contactNumber) {
-      toast.error('No phone number available for this patient');
-      return;
-    }
-
-    const phoneNumber = formatPhoneNumber(contactNumber);
-    const patientName = patient.name || 'Patient';
-    const defaultMessage = `Hello ${patientName}, this is the lab team regarding your test request.`;
-    const encodedMessage = encodeURIComponent(defaultMessage);
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
-  };
+  // If viewing patients, show the patients view component
+  if (viewingPatients && selectedOrganization) {
+    return (
+      <OrganizationPatientsView 
+        organization={selectedOrganization} 
+        onClose={handleClosePatientsView}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -540,226 +481,6 @@ const Organizations: React.FC = () => {
             </Button>
           </DialogActions>
         </form>
-      </Dialog>
-
-      {/* Organization Patients Dialog */}
-      <Dialog open={patientsOpen} onClose={() => setPatientsOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>
-          {selectedOrganization?.name} - All Patients ({patients.length})
-        </DialogTitle>
-        <DialogContent>
-          {patientsLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress />
-            </Box>
-          ) : patients.length === 0 ? (
-            <Alert severity="info">No patients found for this organization</Alert>
-          ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Patient Name</TableCell>
-                    <TableCell>Phone</TableCell>
-                    <TableCell>WhatsApp</TableCell>
-                    <TableCell>Gender</TableCell>
-                    <TableCell>Visits</TableCell>
-                    <TableCell>Total Amount</TableCell>
-                    <TableCell>Total Paid</TableCell>
-                    <TableCell>Remaining</TableCell>
-                    <TableCell>Tests</TableCell>
-                    <TableCell>Lab Numbers</TableCell>
-                    <TableCell>تاريخ الحضور</TableCell>
-                    <TableCell>تاريخ الاستلام</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {patients.map((patient) => (
-                    <TableRow key={patient.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Business color="primary" />
-                          {patient.name}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Phone fontSize="small" color="action" />
-                          {patient.phone}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {patient.whatsapp_number ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <WhatsApp fontSize="small" color="success" />
-                            {patient.whatsapp_number}
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No WhatsApp
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={patient.gender === 'male' ? 'Male' : 'Female'}
-                          color={patient.gender === 'male' ? 'primary' : 'secondary'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge badgeContent={patient.visits_count} color="primary">
-                          <Typography variant="body2">
-                            {patient.visits_count} visits
-                          </Typography>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          EGP {(Number(patient.total_amount) || 0).toFixed(2)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`EGP ${(Number(patient.total_paid) || 0).toFixed(2)}`}
-                          color="success"
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`EGP ${(Number(patient.remaining_balance) || 0).toFixed(2)}`}
-                          color={Number(patient.remaining_balance) > 0 ? "error" : "success"}
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`${patient.total_tests || 0} tests`}
-                          color="info"
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {patient.lab_numbers && patient.lab_numbers.length > 0 ? (
-                            patient.lab_numbers.slice(0, 2).map((labNo, index) => (
-                              <Chip 
-                                key={index}
-                                label={labNo}
-                                color="secondary"
-                                variant="outlined"
-                                size="small"
-                              />
-                            ))
-                          ) : (
-                            <Chip 
-                              label="No labs"
-                              color="default"
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                          {patient.lab_numbers && patient.lab_numbers.length > 2 && (
-                            <Chip 
-                              label={`+${patient.lab_numbers.length - 2}`}
-                              color="default"
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {patient.attendance_dates && patient.attendance_dates.length > 0 ? (
-                            patient.attendance_dates.slice(0, 2).map((date, index) => (
-                              <Chip 
-                                key={index}
-                                label={new Date(date).toLocaleDateString('ar-EG')}
-                                color="info"
-                                variant="outlined"
-                                size="small"
-                              />
-                            ))
-                          ) : (
-                            <Chip 
-                              label="No dates"
-                              color="default"
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                          {patient.attendance_dates && patient.attendance_dates.length > 2 && (
-                            <Chip 
-                              label={`+${patient.attendance_dates.length - 2}`}
-                              color="default"
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {patient.delivery_dates && patient.delivery_dates.length > 0 ? (
-                            patient.delivery_dates.slice(0, 2).map((date, index) => (
-                              <Chip 
-                                key={index}
-                                label={new Date(date).toLocaleDateString('ar-EG')}
-                                color="warning"
-                                variant="outlined"
-                                size="small"
-                              />
-                            ))
-                          ) : (
-                            <Chip 
-                              label="No dates"
-                              color="default"
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                          {patient.delivery_dates && patient.delivery_dates.length > 2 && (
-                            <Chip 
-                              label={`+${patient.delivery_dates.length - 2}`}
-                              color="default"
-                              variant="outlined"
-                              size="small"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell align="center">
-                        {(patient.whatsapp_number || patient.phone) && (
-                          <Tooltip title="Contact via WhatsApp">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleWhatsAppContact(patient)}
-                              sx={{ 
-                                color: '#25D366',
-                                '&:hover': { bgcolor: 'rgba(37, 211, 102, 0.1)' }
-                              }}
-                            >
-                              <WhatsApp />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPatientsOpen(false)}>Close</Button>
-        </DialogActions>
       </Dialog>
 
       {/* Confirmation Dialog for Organization Name Update */}
