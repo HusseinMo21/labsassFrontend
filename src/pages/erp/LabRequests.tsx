@@ -278,9 +278,15 @@ const LabRequests: React.FC = () => {
         setCurrentPage(1);
         console.log(`Loaded ${response.data.length} lab requests (non-paginated)`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching lab requests:', error);
-      toast.error('Failed to fetch lab requests');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to fetch lab requests';
+      console.error('Error details:', {
+        message: errorMessage,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -106,12 +106,16 @@ const DoctorPatientsView: React.FC<DoctorPatientsViewProps> = ({ doctor, onClose
         },
       });
       
+      console.log('Doctor patients API response:', response.data);
+      
       setPatients(response.data.patients || []);
       setTotalPages(response.data.last_page || 1);
-      setTotalPatients(response.data.total || 0);
-    } catch (error) {
+      // Use total from pagination response, or fallback to patients_count from doctor object
+      setTotalPatients(response.data.total ?? response.data.doctor?.patients_count ?? 0);
+    } catch (error: any) {
       console.error('Failed to fetch doctor patients:', error);
-      toast.error('Failed to fetch doctor patients');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch doctor patients';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
