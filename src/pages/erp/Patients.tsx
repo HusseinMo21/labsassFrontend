@@ -594,13 +594,12 @@ const Patients: React.FC = () => {
                   <TableCell>Doctor</TableCell>
                   <TableCell align="center">Report Status</TableCell>
                   <TableCell align="center">Wax Blocks Status</TableCell>
-                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center">
+                    <TableCell colSpan={8} align="center">
                       <Alert severity="info">No patients found</Alert>
                     </TableCell>
                   </TableRow>
@@ -697,22 +696,6 @@ const Patients: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                          <IconButton
-                            color="primary"
-                            onClick={() => handleEdit(patient)}
-                            title="Edit Patient"
-                          >
-                            <Edit />
-                          </IconButton>
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDeleteClick(patient)}
-                            title="Delete Patient"
-                          >
-                            <Delete />
-                          </IconButton>
-                        </Box>
                       </TableCell>
                     </TableRow>
                   ))

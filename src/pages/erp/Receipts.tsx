@@ -731,7 +731,7 @@ const Receipts: React.FC = () => {
                 <TableRow key={receipt.id} hover>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
-                      {receipt.lab_number || receipt.patient?.lab || 'N/A'}
+                      {receipt.lab_number || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>

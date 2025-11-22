@@ -27,7 +27,6 @@ import {
   IconButton,
   Tooltip,
   Pagination,
-  Stack,
 } from '@mui/material';
 import {
   Receipt,
@@ -553,7 +552,7 @@ const UnpaidInvoices: React.FC = () => {
             <Pagination
               count={totalPages}
               page={currentPage}
-              onChange={(event, value) => {
+              onChange={(_event, value) => {
                 setCurrentPage(value);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}

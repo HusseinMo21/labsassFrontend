@@ -137,6 +137,11 @@ interface PatientDetails {
     balance: number;
     status: string;
     payment_method: string;
+    payment_breakdown?: {
+      cash?: number;
+      card?: number;
+      card_method?: string;
+    };
     created_at: string;
   }>;
   reports: Array<{
@@ -975,32 +980,77 @@ const LabRequests: React.FC = () => {
                   <Typography variant="h6" gutterBottom>Payment History & Financial Status</Typography>
                   
                   {/* Financial Summary */}
-                  <Box sx={{ mb: 3, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={3}>
-                        <Typography variant="body2" color="text.secondary">Total Amount</Typography>
-                        <Typography variant="h6" color="primary">${patientDetails.visits_summary.total_amount}</Typography>
-                      </Grid>
-                      <Grid item xs={3}>
-                        <Typography variant="body2" color="text.secondary">Total Paid</Typography>
-                        <Typography variant="h6" color="success.main">${patientDetails.visits_summary.total_paid}</Typography>
-                      </Grid>
-                      <Grid item xs={3}>
-                        <Typography variant="body2" color="text.secondary">Pending Balance</Typography>
-                        <Typography variant="h6" color={patientDetails.visits_summary.total_balance > 0 ? 'error.main' : 'success.main'}>
-                          ${patientDetails.visits_summary.total_balance}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={3}>
-                        <Typography variant="body2" color="text.secondary">Payment Status</Typography>
-                        <Chip 
-                          label={patientDetails.visits_summary.total_balance > 0 ? 'Pending Payment' : 'Fully Paid'} 
-                          color={patientDetails.visits_summary.total_balance > 0 ? 'warning' : 'success'}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Box>
+                  {(() => {
+                    // Calculate total paid in cash and other payment methods
+                    // Use payment_breakdown if available, which contains the actual split
+                    const totalPaidCash = patientDetails.payment_history.reduce((sum, p) => {
+                      // First priority: use payment_breakdown.cash if available
+                      if (p.payment_breakdown && typeof p.payment_breakdown.cash === 'number') {
+                        return sum + p.payment_breakdown.cash;
+                      }
+                      // Fallback: if no breakdown, check payment_method
+                      if (p.payment_method?.toLowerCase() === 'cash') {
+                        return sum + (Number(p.amount_paid) || 0);
+                      }
+                      return sum;
+                    }, 0);
+                    
+                    const totalPaidOther = patientDetails.payment_history.reduce((sum, p) => {
+                      // First priority: use payment_breakdown.card if available
+                      if (p.payment_breakdown && typeof p.payment_breakdown.card === 'number') {
+                        return sum + p.payment_breakdown.card;
+                      }
+                      // Fallback: if no breakdown, check payment_method
+                      if (p.payment_method?.toLowerCase() !== 'cash' && p.payment_method) {
+                        return sum + (Number(p.amount_paid) || 0);
+                      }
+                      return sum;
+                    }, 0);
+                    
+                    // Calculate total paid from all payments (should be cash + other)
+                    const calculatedTotalPaid = totalPaidCash + totalPaidOther;
+
+                    return (
+                      <Box sx={{ mb: 3, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={2.4}>
+                            <Typography variant="body2" color="text.secondary">Total Amount</Typography>
+                            <Typography variant="h6" color="primary">${patientDetails.visits_summary.total_amount}</Typography>
+                          </Grid>
+                          <Grid item xs={2.4}>
+                            <Typography variant="body2" color="text.secondary">Paid in Cash</Typography>
+                            <Typography variant="h6" color="info.main">${totalPaidCash.toFixed(2)}</Typography>
+                          </Grid>
+                          <Grid item xs={2.4}>
+                            <Typography variant="body2" color="text.secondary">Paid in Other Methods</Typography>
+                            <Typography variant="h6" color="secondary.main">${totalPaidOther.toFixed(2)}</Typography>
+                          </Grid>
+                          <Grid item xs={2.4}>
+                            <Typography variant="body2" color="text.secondary">Total Paid</Typography>
+                            <Typography variant="h6" color="success.main">${calculatedTotalPaid.toFixed(2)}</Typography>
+                          </Grid>
+                          <Grid item xs={2.4}>
+                            <Typography variant="body2" color="text.secondary">Pending Balance</Typography>
+                            <Typography variant="h6" color={patientDetails.visits_summary.total_balance > 0 ? 'error.main' : 'success.main'}>
+                              ${patientDetails.visits_summary.total_balance}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                              <Typography variant="body2" color="text.secondary">Payment Status</Typography>
+                              <Chip 
+                                label={patientDetails.visits_summary.total_balance > 0 ? 'Pending Payment' : 'Fully Paid'} 
+                                color={patientDetails.visits_summary.total_balance > 0 ? 'warning' : 'success'}
+                                size="small"
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      </Box>
+                    );
+                  })()}
 
                   {/* Payment History Table */}
                   <Table size="small">
@@ -1009,42 +1059,65 @@ const LabRequests: React.FC = () => {
                         <TableCell>Visit Date</TableCell>
                         <TableCell>Invoice Number</TableCell>
                         <TableCell>Total Amount</TableCell>
-                        <TableCell>Amount Paid</TableCell>
+                        <TableCell>Paid in Cash</TableCell>
+                        <TableCell>Paid in Other Methods</TableCell>
+                        <TableCell>Total Paid</TableCell>
                         <TableCell>Balance</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Payment Method</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {patientDetails.payment_history.map((payment, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{new Date(payment.visit_date).toLocaleDateString()}</TableCell>
-                          <TableCell>{payment.invoice_number}</TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="bold">
-                              ${payment.total_amount}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" color="success.main">
-                              ${payment.amount_paid}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" color={payment.balance > 0 ? 'error.main' : 'success.main'}>
-                              ${payment.balance}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={payment.status} 
-                              size="small" 
-                              color={payment.status === 'paid' ? 'success' : payment.status === 'partial' ? 'warning' : 'error'}
-                            />
-                          </TableCell>
-                          <TableCell>{payment.payment_method || 'N/A'}</TableCell>
-                        </TableRow>
-                      ))}
+                      {patientDetails.payment_history.map((payment, index) => {
+                        // Use payment_breakdown if available, otherwise fallback to payment_method
+                        const paidCash = payment.payment_breakdown?.cash 
+                          ? Number(payment.payment_breakdown.cash) || 0
+                          : (payment.payment_method?.toLowerCase() === 'cash' ? Number(payment.amount_paid) || 0 : 0);
+                        
+                        const paidOther = payment.payment_breakdown?.card 
+                          ? Number(payment.payment_breakdown.card) || 0
+                          : (payment.payment_method?.toLowerCase() !== 'cash' && payment.payment_method ? Number(payment.amount_paid) || 0 : 0);
+                        
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>{new Date(payment.visit_date).toLocaleDateString()}</TableCell>
+                            <TableCell>{payment.invoice_number}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight="bold">
+                                ${payment.total_amount}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color={paidCash > 0 ? "info.main" : "text.secondary"}>
+                                ${paidCash.toFixed(2)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color={paidOther > 0 ? "secondary.main" : "text.secondary"}>
+                                ${paidOther.toFixed(2)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color="success.main" fontWeight="medium">
+                                ${payment.amount_paid}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" color={payment.balance > 0 ? 'error.main' : 'success.main'}>
+                                ${payment.balance}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={payment.status} 
+                                size="small" 
+                                color={payment.status === 'paid' ? 'success' : payment.status === 'partial' ? 'warning' : 'error'}
+                              />
+                            </TableCell>
+                            <TableCell>{payment.payment_method || 'N/A'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>

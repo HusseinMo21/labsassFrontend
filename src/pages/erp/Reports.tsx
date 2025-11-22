@@ -430,19 +430,7 @@ const Reports: React.FC = () => {
     }
   };
 
-  const handleTestResults = (visit: Visit) => {
-    setSelectedVisit(visit);
-    const initialResults: { [key: number]: { result_value: string; result_status: string; result_notes: string } } = {};
-    visit.visit_tests.forEach((vt) => {
-      initialResults[vt.id] = {
-        result_value: vt.result_value || '',
-        result_status: vt.result_status || 'normal',
-        result_notes: vt.result_notes || '',
-      };
-    });
-    setResultsData(initialResults);
-    setShowResultsModal(true);
-  };
+  // Removed handleTestResults - no longer used after removing Results button
 
   const handleResultsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
