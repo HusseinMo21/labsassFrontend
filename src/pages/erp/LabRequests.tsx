@@ -41,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Sample {
   id?: number;
@@ -166,6 +167,7 @@ interface Patient {
 }
 
 const LabRequests: React.FC = () => {
+  const { user } = useAuth();
   const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -602,30 +604,34 @@ const LabRequests: React.FC = () => {
                       >
                         View Details
                       </Button>
-                      <Tooltip title="Update Suffix">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openSuffixDialog(labRequest);
-                          }}
-                          color="secondary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteLabRequest(labRequest.id);
-                          }}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {user?.role === 'admin' && (
+                        <>
+                          <Tooltip title="Update Suffix">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openSuffixDialog(labRequest);
+                              }}
+                              color="secondary"
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteLabRequest(labRequest.id);
+                              }}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>

@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../contexts/AuthContext';
 import DoctorPatientsView from '../../components/DoctorPatientsView';
 
 interface Doctor {
@@ -47,6 +48,7 @@ interface Doctor {
 }
 
 const Doctors: React.FC = () => {
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -366,22 +368,26 @@ const Doctors: React.FC = () => {
                               <Visibility />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit Doctor">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleEdit(doctor)}
-                            >
-                              <Edit />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete Doctor">
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(doctor)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
+                          {user?.role === 'admin' && (
+                            <>
+                              <Tooltip title="Edit Doctor">
+                                <IconButton
+                                  color="primary"
+                                  onClick={() => handleEdit(doctor)}
+                                >
+                                  <Edit />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete Doctor">
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleDelete(doctor)}
+                                >
+                                  <Delete />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>

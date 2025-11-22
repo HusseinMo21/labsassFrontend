@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../contexts/AuthContext';
 import OrganizationPatientsView from '../../components/OrganizationPatientsView';
 
 interface Organization {
@@ -47,6 +48,7 @@ interface Organization {
 }
 
 const Organizations: React.FC = () => {
+  const { user } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -366,22 +368,26 @@ const Organizations: React.FC = () => {
                               <Visibility />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit Organization">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleEdit(organization)}
-                            >
-                              <Edit />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete Organization">
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(organization)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
+                          {user?.role === 'admin' && (
+                            <>
+                              <Tooltip title="Edit Organization">
+                                <IconButton
+                                  color="primary"
+                                  onClick={() => handleEdit(organization)}
+                                >
+                                  <Edit />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete Organization">
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleDelete(organization)}
+                                >
+                                  <Delete />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>

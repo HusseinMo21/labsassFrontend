@@ -309,6 +309,64 @@ const Users: React.FC = () => {
     );
   });
 
+  // Group users by role (normalize role to lowercase to handle any case differences)
+  const usersByRole = filteredUsers.reduce((acc, user) => {
+    // Get the original role value
+    const originalRole = user.role || '';
+    
+    // Normalize role: convert to string, lowercase, trim, and remove extra spaces
+    const roleValue = String(originalRole).toLowerCase().trim().replace(/\s+/g, ' ');
+    
+    // Map ALL variations to standard role names
+    let normalizedRole = roleValue;
+    
+    // Staff variations - check if it contains "staff" anywhere (case insensitive)
+    if (roleValue === 'staff' || roleValue === 'staff user' || roleValue.includes('staff')) {
+      normalizedRole = 'staff';
+    }
+    // Lab technician variations
+    else if (roleValue.includes('lab') || roleValue.includes('technician') || roleValue.includes('tech')) {
+      normalizedRole = 'lab_technician';
+    }
+    // Accountant variations
+    else if (roleValue.includes('account')) {
+      normalizedRole = 'accountant';
+    }
+    // Admin variations
+    else if (roleValue.includes('admin')) {
+      normalizedRole = 'admin';
+    }
+    // Doctor variations
+    else if (roleValue.includes('doctor') || roleValue.includes('dr')) {
+      normalizedRole = 'doctor';
+    }
+    // Patient variations
+    else if (roleValue.includes('patient')) {
+      normalizedRole = 'patient';
+    }
+    // If no match, use the normalized value as-is
+    else {
+      normalizedRole = roleValue || 'unknown';
+    }
+    
+    if (!acc[normalizedRole]) {
+      acc[normalizedRole] = [];
+    }
+    acc[normalizedRole].push(user);
+    return acc;
+  }, {} as Record<string, User[]>);
+
+  // Define role order and labels
+  const roleOrder = ['admin', 'doctor', 'lab_technician', 'staff', 'accountant', 'patient'];
+  const roleLabels: { [key: string]: string } = {
+    admin: 'Administrators',
+    doctor: 'Doctors',
+    lab_technician: 'Lab Technicians',
+    staff: 'Staff',
+    accountant: 'Accountants',
+    patient: 'Patients',
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -322,17 +380,6 @@ const Users: React.FC = () => {
           sx={{ borderRadius: 2 }}
         >
           Add User
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => setDeleteErrorDialog({
-            open: true,
-            title: 'Test Dialog',
-            message: 'This is a test message',
-            relatedData: ['Test item 1', 'Test item 2']
-          })}
-        >
-          Test Dialog
         </Button>
       </Box>
 
@@ -362,104 +409,167 @@ const Users: React.FC = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>User</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Created</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            <Person />
-                          </Avatar>
-                          <Box>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              {user.display_name || user.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              ID: {user.id}
-                              {user.role === 'patient' && user.patient_id && (
-                                <span> • Patient ID: {user.patient_id}</span>
-                              )}
-                              {user.role === 'patient' && user.real_name && (
-                                <span> • Real Name: {user.real_name}</span>
-                              )}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Email sx={{ fontSize: 16, color: 'text.secondary' }} />
-                          {user.email}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getRoleLabel(user.role)}
-                          color={getRoleColor(user.role) as any}
-                          size="small"
-                          icon={user.role === 'admin' ? <AdminPanelSettings /> : <Person />}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={user.is_active ? 'Active' : 'Inactive'}
-                          color={user.is_active ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                          <Tooltip title="Edit User">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleOpenDialog(user)}
-                              color="primary"
-                            >
-                              <Edit />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title={user.is_active ? 'Deactivate' : 'Activate'}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleToggleStatus(user.id, user.is_active)}
-                              color={user.is_active ? 'warning' : 'success'}
-                            >
-                              {user.is_active ? <VisibilityOff /> : <Visibility />}
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete User">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDelete(user.id)}
-                              color="error"
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <Box>
+              {/* Get all unique normalized roles from usersByRole, sorted by roleOrder */}
+              {(() => {
+                // Get all roles that exist in usersByRole
+                const existingRoles = Object.keys(usersByRole).filter(role => usersByRole[role] && usersByRole[role].length > 0);
+                
+                // Sort them according to roleOrder
+                const sortedRoles = existingRoles.sort((a, b) => {
+                  const aIndex = roleOrder.findIndex(r => {
+                    const normalized = r.toLowerCase().trim();
+                    if (normalized.includes('staff') && a === 'staff') return true;
+                    if (normalized.includes('lab') && a === 'lab_technician') return true;
+                    if (normalized.includes('account') && a === 'accountant') return true;
+                    if (normalized.includes('admin') && a === 'admin') return true;
+                    if (normalized.includes('doctor') && a === 'doctor') return true;
+                    if (normalized.includes('patient') && a === 'patient') return true;
+                    return normalized === a;
+                  });
+                  const bIndex = roleOrder.findIndex(r => {
+                    const normalized = r.toLowerCase().trim();
+                    if (normalized.includes('staff') && b === 'staff') return true;
+                    if (normalized.includes('lab') && b === 'lab_technician') return true;
+                    if (normalized.includes('account') && b === 'accountant') return true;
+                    if (normalized.includes('admin') && b === 'admin') return true;
+                    if (normalized.includes('doctor') && b === 'doctor') return true;
+                    if (normalized.includes('patient') && b === 'patient') return true;
+                    return normalized === b;
+                  });
+                  return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+                });
+                
+                return sortedRoles.map((normalizedRole) => {
+                  const roleUsers = usersByRole[normalizedRole] || [];
+                  // Find the original role label from roleOrder
+                  const originalRole = roleOrder.find(r => {
+                    const rKey = r.toLowerCase().trim();
+                    if (rKey.includes('staff') && normalizedRole === 'staff') return true;
+                    if ((rKey.includes('lab') || rKey.includes('technician') || rKey.includes('tech')) && normalizedRole === 'lab_technician') return true;
+                    if (rKey.includes('account') && normalizedRole === 'accountant') return true;
+                    if (rKey.includes('admin') && normalizedRole === 'admin') return true;
+                    if ((rKey.includes('doctor') || rKey.includes('dr')) && normalizedRole === 'doctor') return true;
+                    if (rKey.includes('patient') && normalizedRole === 'patient') return true;
+                    return rKey === normalizedRole;
+                  }) || normalizedRole;
+
+                return (
+                  <Box key={normalizedRole} sx={{ mb: 4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Chip
+                        label={roleLabels[originalRole] || originalRole.charAt(0).toUpperCase() + originalRole.slice(1)}
+                        color={getRoleColor(normalizedRole) as any}
+                        size="medium"
+                        sx={{ fontWeight: 'bold', fontSize: '1rem', py: 2.5 }}
+                        icon={normalizedRole === 'admin' ? <AdminPanelSettings /> : <Person />}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        ({roleUsers.length} {roleUsers.length === 1 ? 'user' : 'users'})
+                      </Typography>
+                    </Box>
+                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                      <Table>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: 'grey.50' }}>
+                            <TableCell>User</TableCell>
+                            <TableCell>Email</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Created</TableCell>
+                            <TableCell align="center">Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {roleUsers.map((user) => (
+                            <TableRow key={user.id} hover>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                  <Avatar sx={{ bgcolor: `${getRoleColor(user.role)}.main` }}>
+                                    <Person />
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                      {user.display_name || user.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ID: {user.id}
+                                      {user.role === 'patient' && user.patient_id && (
+                                        <span> • Patient ID: {user.patient_id}</span>
+                                      )}
+                                      {user.role === 'patient' && user.real_name && (
+                                        <span> • Real Name: {user.real_name}</span>
+                                      )}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Email sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                  {user.email}
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={user.is_active ? 'Active' : 'Inactive'}
+                                  color={user.is_active ? 'success' : 'default'}
+                                  size="small"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(user.created_at).toLocaleDateString()}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                  <Tooltip title="Edit User">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleOpenDialog(user)}
+                                      color="primary"
+                                    >
+                                      <Edit />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title={user.is_active ? 'Deactivate' : 'Activate'}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleToggleStatus(user.id, user.is_active)}
+                                      color={user.is_active ? 'warning' : 'success'}
+                                    >
+                                      {user.is_active ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete User">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleDelete(user.id)}
+                                      color="error"
+                                    >
+                                      <Delete />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                );
+                });
+              })()}
+              
+              {Object.keys(usersByRole).length === 0 && !loading && (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No users found
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           )}
 
           {totalPages > 1 && (
