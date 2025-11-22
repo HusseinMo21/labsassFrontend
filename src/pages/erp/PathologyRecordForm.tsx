@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import TemplateSaveModal from '../../components/TemplateSaveModal';
 import {
@@ -108,7 +108,11 @@ interface ReportData {
 const PathologyRecordForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { } = useAuth();
+  
+  // Get return URL from navigation state, default to /reports
+  const returnUrl = (location.state as { returnUrl?: string })?.returnUrl || '/reports';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [visit, setVisit] = useState<Visit | null>(null);
@@ -588,8 +592,8 @@ const PathologyRecordForm: React.FC = () => {
       });
 
       toast.success('Report saved successfully!');
-      // Navigate back to Reports page (not Enhanced Reports, since report is not completed yet)
-      navigate('/reports');
+      // Navigate back to Reports page with saved state
+      navigate(returnUrl);
     } catch (error) {
       console.error('Failed to save report:', error);
       toast.error('Failed to save report');
@@ -808,7 +812,7 @@ const PathologyRecordForm: React.FC = () => {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">Visit not found</Alert>
-        <Button onClick={() => navigate('/reports')} sx={{ mt: 2 }}>
+        <Button onClick={() => navigate(returnUrl)} sx={{ mt: 2 }}>
           Back to Reports
         </Button>
       </Box>
@@ -820,7 +824,7 @@ const PathologyRecordForm: React.FC = () => {
     <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <IconButton onClick={() => navigate('/reports')}>
+        <IconButton onClick={() => navigate(returnUrl)}>
           <ArrowBack />
         </IconButton>
         <Box>

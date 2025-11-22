@@ -102,7 +102,6 @@ const Receipts: React.FC = () => {
   const [printOpen, setPrintOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTimeout, setSearchTimeout] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null);
   const [saving, setSaving] = useState(false);
@@ -123,19 +122,10 @@ const Receipts: React.FC = () => {
     const patientId = searchParams.get('patient');
     if (patientId) {
       setSearchTerm(patientId);
-      // You could also filter the receipts by patient ID here
-      // For now, we'll just set the search term
+      // Auto search if patient ID is provided in URL
+      fetchReceipts();
     }
   }, [searchParams]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
-  }, [searchTimeout]);
 
   const fetchReceipts = async () => {
     setLoading(true);
@@ -199,19 +189,7 @@ const Receipts: React.FC = () => {
 
   const handleSearchInputChange = (value: string) => {
     setSearchTerm(value);
-    
-    // Clear existing timeout
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-    
-    // Set new timeout for debounced search
-    const timeout = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page when searching
-      fetchReceipts();
-    }, 500); // Wait 500ms after user stops typing
-    
-    setSearchTimeout(timeout);
+    // No auto search - only update the search term
   };
 
   const handleViewDetails = async (receipt: Receipt) => {
@@ -695,7 +673,7 @@ const Receipts: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               fullWidth
-              placeholder="Search by receipt number, visit number, patient name, phone, or patient ID"
+              placeholder="Search by Lab Number, Patient Name, or Phone Number"
               value={searchTerm}
               onChange={(e) => handleSearchInputChange(e.target.value)}
               InputProps={{
@@ -707,10 +685,6 @@ const Receipts: React.FC = () => {
               }}
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
-                  // Clear timeout and search immediately on Enter
-                  if (searchTimeout) {
-                    clearTimeout(searchTimeout);
-                  }
                   handleSearch();
                 }
               }}
@@ -741,9 +715,7 @@ const Receipts: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Receipt #</TableCell>
-                  <TableCell>Lab #</TableCell>
-                  <TableCell>Visit #</TableCell>
+                  <TableCell>Lab No</TableCell>
                   <TableCell>Patient</TableCell>
                   <TableCell>Date & Time</TableCell>
                   <TableCell>Total Amount</TableCell>
@@ -758,18 +730,8 @@ const Receipts: React.FC = () => {
                 {receipts.map((receipt) => (
                 <TableRow key={receipt.id} hover>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
-                      {receipt.receipt_number}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'primary.main' }}>
-                      {receipt.lab_number || 'N/A'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                      {receipt.visit_number}
+                      {receipt.lab_number || receipt.patient?.lab || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Box,
@@ -151,6 +151,7 @@ interface FinancialData {
 const Reports: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [patientsData, setPatientsData] = useState<PatientsData | null>(null);
   const [testsData, setTestsData] = useState<TestsData | null>(null);
@@ -162,7 +163,12 @@ const Reports: React.FC = () => {
   const [selectedImageVisit, setSelectedImageVisit] = useState<Visit | null>(null);
   const [showReplaceImageModal, setShowReplaceImageModal] = useState(false);
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Initialize state from URL parameters
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = searchParams.get('page');
+    return page ? parseInt(page, 10) : 1;
+  });
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [visitToComplete, setVisitToComplete] = useState<Visit | null>(null);
   const [showCheckedByModal, setShowCheckedByModal] = useState(false);
@@ -171,12 +177,85 @@ const Reports: React.FC = () => {
   const [showReportedByModal, setShowReportedByModal] = useState(false);
   const [visitToShowReportedBy, setVisitToShowReportedBy] = useState<Visit | null>(null);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return searchParams.get('search') || '';
+  });
+  const [statusFilter, setStatusFilter] = useState(() => {
+    return searchParams.get('status') || 'all';
+  });
 
-  // Reset pagination when search or filter changes
+  // Track if we're updating URL from state (to avoid loops)
+  const isUpdatingUrl = useRef(false);
+  const isInitialLoad = useRef(true);
+  const prevSearchTerm = useRef(searchTerm);
+  const prevStatusFilter = useRef(statusFilter);
+
+  // Sync state from URL when URL changes (e.g., browser back/forward, navigation)
   useEffect(() => {
-    setCurrentPage(1);
+    // Skip on initial load - state is already initialized from URL
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    
+    // Skip if we're the ones updating the URL
+    if (isUpdatingUrl.current) {
+      return;
+    }
+    
+    const pageFromUrl = searchParams.get('page');
+    const searchFromUrl = searchParams.get('search') || '';
+    const statusFromUrl = searchParams.get('status') || 'all';
+    
+    const newPage = pageFromUrl ? parseInt(pageFromUrl, 10) : 1;
+    const newSearch = searchFromUrl;
+    const newStatus = statusFromUrl;
+    
+    // Update state from URL
+    if (newPage !== currentPage) {
+      setCurrentPage(newPage);
+    }
+    if (newSearch !== searchTerm) {
+      setSearchTerm(newSearch);
+    }
+    if (newStatus !== statusFilter) {
+      setStatusFilter(newStatus);
+    }
+  }, [searchParams]);
+
+  // Update URL parameters when state changes (user actions)
+  useEffect(() => {
+    isUpdatingUrl.current = true;
+    
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set('page', currentPage.toString());
+    }
+    if (searchTerm) {
+      params.set('search', searchTerm);
+    }
+    if (statusFilter !== 'all') {
+      params.set('status', statusFilter);
+    }
+    setSearchParams(params, { replace: true });
+    
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isUpdatingUrl.current = false;
+    }, 0);
+  }, [currentPage, searchTerm, statusFilter, setSearchParams]);
+
+  // Reset pagination when search or filter changes (user action only)
+  useEffect(() => {
+    // Only reset if user actually changed search or filter
+    if (prevSearchTerm.current !== searchTerm || prevStatusFilter.current !== statusFilter) {
+      prevSearchTerm.current = searchTerm;
+      prevStatusFilter.current = statusFilter;
+      // Only reset if not initial load
+      if (!isInitialLoad.current) {
+        setCurrentPage(1);
+      }
+    }
   }, [searchTerm, statusFilter]);
 
   const [resultsData, setResultsData] = useState<{ [key: number]: { result_value: string; result_status: string; result_notes: string } }>({});
@@ -275,8 +354,20 @@ const Reports: React.FC = () => {
   };
 
   const handleTestReport = (visit: Visit) => {
-    // Navigate to the new ReportForm component
-    navigate(`/reports/${visit.id}`);
+    // Navigate to the new ReportForm component with return URL
+    // Build return URL with current state
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set('page', currentPage.toString());
+    }
+    if (searchTerm) {
+      params.set('search', searchTerm);
+    }
+    if (statusFilter !== 'all') {
+      params.set('status', statusFilter);
+    }
+    const returnUrl = `/reports${params.toString() ? `?${params.toString()}` : ''}`;
+    navigate(`/reports/${visit.id}`, { state: { returnUrl } });
   };
 
   const handleViewDocuments = (visit: Visit) => {

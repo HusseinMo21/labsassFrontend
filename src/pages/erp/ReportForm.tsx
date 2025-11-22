@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Box,
@@ -77,7 +77,11 @@ interface Visit {
 const ReportForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { } = useAuth();
+  
+  // Get return URL from navigation state, default to /reports
+  const returnUrl = (location.state as { returnUrl?: string })?.returnUrl || '/reports';
   const [visit, setVisit] = useState<Visit | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -230,7 +234,7 @@ const ReportForm: React.FC = () => {
       await axios.put(`/api/visits/${visit.id}`, formData, { headers });
       
       toast.success('Test report updated successfully' + (testFormData.image ? ' with image' : ''));
-      navigate('/erp/reports'); // Navigate back to reports page
+      navigate(returnUrl); // Navigate back to reports page with saved state
     } catch (error) {
       console.error('Test report update error:', error);
       toast.error('Failed to update test report');
@@ -251,7 +255,7 @@ const ReportForm: React.FC = () => {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">Visit not found</Alert>
-        <Button onClick={() => navigate('/erp/reports')} startIcon={<ArrowBack />}>
+        <Button onClick={() => navigate(returnUrl)} startIcon={<ArrowBack />}>
           Back to Reports
         </Button>
       </Box>
@@ -262,7 +266,7 @@ const ReportForm: React.FC = () => {
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <IconButton onClick={() => navigate('/erp/reports')}>
+        <IconButton onClick={() => navigate(returnUrl)}>
           <ArrowBack />
         </IconButton>
         <Box>
@@ -502,7 +506,7 @@ const ReportForm: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                   <Button
                     variant="outlined"
-                    onClick={() => navigate('/erp/reports')}
+                    onClick={() => navigate(returnUrl)}
                     disabled={saving}
                   >
                     Cancel
