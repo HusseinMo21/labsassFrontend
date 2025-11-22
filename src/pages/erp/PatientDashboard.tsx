@@ -9,11 +9,15 @@ import {
   Button,
   Alert,
   CircularProgress,
+  Divider,
+  Chip,
 } from '@mui/material';
 import {
   Assessment,
-  CalendarToday,
-  Receipt,
+  Person,
+  Phone,
+  Email,
+  Description,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,12 +28,32 @@ const PatientDashboard: React.FC = () => {
   const { user } = useAuth();
   const [patientData, setPatientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalReports: 0,
+    completedReports: 0,
+    pendingReports: 0,
+  });
 
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
         const response = await axios.get('/api/patient/me');
         setPatientData(response.data);
+        
+        // Fetch reports statistics
+        try {
+          const reportsResponse = await axios.get('/api/patient/reports');
+          const reports = reportsResponse.data?.data || reportsResponse.data || [];
+          const completed = reports.filter((r: any) => r.test_status === 'completed').length;
+          const pending = reports.filter((r: any) => r.test_status !== 'completed').length;
+          setStats({
+            totalReports: reports.length,
+            completedReports: completed,
+            pendingReports: pending,
+          });
+        } catch (error) {
+          console.error('Error fetching reports stats:', error);
+        }
       } catch (error) {
         console.error('Error fetching patient data:', error);
       } finally {
@@ -45,24 +69,10 @@ const PatientDashboard: React.FC = () => {
   const quickActions = [
     {
       title: 'My Reports',
-      description: 'View your test reports (after payment)',
+      description: 'View your test reports and results',
       icon: <Assessment />,
       color: '#1976d2',
       path: '/patient/reports',
-    },
-    {
-      title: 'My Visits',
-      description: 'View your visit history',
-      icon: <CalendarToday />,
-      color: '#388e3c',
-      path: '/patient/visits',
-    },
-    {
-      title: 'My Invoices',
-      description: 'View and pay your invoices',
-      icon: <Receipt />,
-      color: '#f57c00',
-      path: '/patient/invoices',
     },
   ];
 
@@ -75,25 +85,75 @@ const PatientDashboard: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        My Dashboard
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>
-        {patientData ? (
-          <>مرحباً {patientData.name}، مرحباً بك في بوابة المريض. يمكنك الوصول إلى معلوماتك الطبية أدناه.</>
-        ) : (
-          'Welcome to your patient portal. Access your medical information below.'
-        )}
-      </Typography>
-
-      <Alert severity="info" sx={{ mb: 4 }}>
-        <Typography variant="body2">
-          <strong>Important:</strong> You can only view your test reports after you have paid the full amount and the admin has marked the report as completed.
+    <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
+      {/* Header Section */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+          My Dashboard
         </Typography>
-      </Alert>
+        <Typography variant="subtitle1" color="text.secondary">
+          {patientData ? (
+            <>مرحباً <strong>{patientData.name}</strong>، مرحباً بك في بوابة المريض</>
+          ) : (
+            'Welcome to your patient portal'
+          )}
+        </Typography>
+      </Box>
 
-      <Grid container spacing={3}>
+      {/* Statistics Cards */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={4}>
+          <Card sx={{ bgcolor: 'primary.main', color: 'white', p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                  {stats.totalReports}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Total Reports
+                </Typography>
+              </Box>
+              <Assessment sx={{ fontSize: 48, opacity: 0.3 }} />
+            </Box>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Card sx={{ bgcolor: 'success.main', color: 'white', p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                  {stats.completedReports}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Completed Reports
+                </Typography>
+              </Box>
+              <Description sx={{ fontSize: 48, opacity: 0.3 }} />
+            </Box>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Card sx={{ bgcolor: 'warning.main', color: 'white', p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                  {stats.pendingReports}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Pending Reports
+                </Typography>
+              </Box>
+              <Assessment sx={{ fontSize: 48, opacity: 0.3 }} />
+            </Box>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Quick Actions */}
+      <Typography variant="h6" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+        Quick Access
+      </Typography>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
         {quickActions.map((action, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>
             <Card
@@ -101,14 +161,17 @@ const PatientDashboard: React.FC = () => {
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                transition: 'transform 0.2s',
+                transition: 'all 0.3s ease',
+                border: '1px solid',
+                borderColor: 'divider',
                 '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 4,
+                  transform: 'translateY(-8px)',
+                  boxShadow: 6,
+                  borderColor: action.color,
                 },
               }}
             >
-              <CardContent sx={{ flexGrow: 1 }}>
+              <CardContent sx={{ flexGrow: 1, p: 3 }}>
                 <Box
                   sx={{
                     display: 'flex',
@@ -118,31 +181,37 @@ const PatientDashboard: React.FC = () => {
                 >
                   <Box
                     sx={{
-                      p: 1,
-                      borderRadius: 1,
-                      bgcolor: action.color,
-                      color: 'white',
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: `${action.color}15`,
+                      color: action.color,
                       mr: 2,
                     }}
                   >
                     {action.icon}
                   </Box>
-                  <Typography variant="h6" component="h2">
+                  <Typography variant="h6" component="h2" sx={{ fontWeight: 'bold' }}>
                     {action.title}
                   </Typography>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {action.description}
                 </Typography>
               </CardContent>
-              <CardActions>
+              <CardActions sx={{ p: 2, pt: 0 }}>
                 <Button
-                  size="small"
+                  fullWidth
                   variant="contained"
                   onClick={() => navigate(action.path)}
-                  sx={{ bgcolor: action.color }}
+                  sx={{
+                    bgcolor: action.color,
+                    '&:hover': {
+                      bgcolor: action.color,
+                      opacity: 0.9,
+                    },
+                  }}
                 >
-                  Access
+                  View Reports
                 </Button>
               </CardActions>
             </Card>
@@ -150,23 +219,76 @@ const PatientDashboard: React.FC = () => {
         ))}
       </Grid>
 
-      <Box sx={{ mt: 4, p: 3, bgcolor: 'success.light', borderRadius: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Patient Information
-        </Typography>
-        <Typography variant="body2" paragraph>
-          • View your test results and reports
-        </Typography>
-        <Typography variant="body2" paragraph>
-          • Track your visit history and appointments
-        </Typography>
-        <Typography variant="body2" paragraph>
-          • Manage your invoices and payments
-        </Typography>
+      {/* Patient Information Card */}
+      {patientData && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+              Patient Information
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Name
+                  </Typography>
+                </Box>
+                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                  {patientData.name || 'N/A'}
+                </Typography>
+              </Grid>
+              {patientData.phone && (
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Phone sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Phone
+                    </Typography>
+                  </Box>
+                  <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                    {patientData.phone}
+                  </Typography>
+                </Grid>
+              )}
+              {patientData.email && (
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Email sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Email
+                    </Typography>
+                  </Box>
+                  <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                    {patientData.email}
+                  </Typography>
+                </Grid>
+              )}
+              {patientData.age && (
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Age
+                    </Typography>
+                  </Box>
+                  <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                    {patientData.age} years
+                  </Typography>
+                </Grid>
+              )}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Information Alert */}
+      <Alert severity="info" sx={{ borderRadius: 2 }}>
         <Typography variant="body2">
-          • Download your reports as PDF files
+          <strong>Note:</strong> You can view your test reports after payment is completed and the report is marked as completed by the administrator.
         </Typography>
-      </Box>
+      </Alert>
     </Box>
   );
 };

@@ -26,6 +26,8 @@ import {
   ArrowBack,
   CloudUpload,
   ContentCopy,
+  Fullscreen,
+  FullscreenExit,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -126,6 +128,10 @@ const PathologyRecordForm: React.FC = () => {
   const [copyingData, setCopyingData] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [sourcePatientData, setSourcePatientData] = useState<any>(null);
+
+  // Expandable field dialog state
+  const [expandedField, setExpandedField] = useState<string | null>(null);
+  const [expandedValue, setExpandedValue] = useState('');
 
   const [formData, setFormData] = useState({
     // Patient Information
@@ -486,6 +492,19 @@ const PathologyRecordForm: React.FC = () => {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleExpandField = (field: string) => {
+    setExpandedField(field);
+    setExpandedValue(formData[field as keyof typeof formData] as string || '');
+  };
+
+  const handleCloseExpandedField = () => {
+    if (expandedField) {
+      handleInputChange(expandedField, expandedValue);
+    }
+    setExpandedField(null);
+    setExpandedValue('');
   };
 
   const handleTemplateChange = (templateId: string) => {
@@ -1029,17 +1048,36 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  name="clinical_data"
-                  value={formData.clinical_data}
-                  onChange={(e) => handleInputChange('clinical_data', e.target.value)}
-                  required={formData.image_placement !== 'clinical_data'}
-                  placeholder="Clinical data: *"
-                  disabled={formData.image_placement === 'clinical_data'}
-                />
+                <Box sx={{ position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    name="clinical_data"
+                    value={formData.clinical_data}
+                    onChange={(e) => handleInputChange('clinical_data', e.target.value)}
+                    required={formData.image_placement !== 'clinical_data'}
+                    placeholder="Clinical data: *"
+                    disabled={formData.image_placement === 'clinical_data'}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('clinical_data')}
+                    sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      right: 8,
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                      },
+                    }}
+                  >
+                    <Fullscreen fontSize="small" />
+                  </IconButton>
+                </Box>
               )}
             </Box>
 
@@ -1067,17 +1105,36 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  name="nature_of_specimen"
-                  value={formData.nature_of_specimen}
-                  onChange={(e) => handleInputChange('nature_of_specimen', e.target.value)}
-                  required={formData.image_placement !== 'nature_of_specimen'}
-                  placeholder="Nature of specimen: *"
-                  disabled={formData.image_placement === 'nature_of_specimen'}
-                />
+                <Box sx={{ position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    name="nature_of_specimen"
+                    value={formData.nature_of_specimen}
+                    onChange={(e) => handleInputChange('nature_of_specimen', e.target.value)}
+                    required={formData.image_placement !== 'nature_of_specimen'}
+                    placeholder="Nature of specimen: *"
+                    disabled={formData.image_placement === 'nature_of_specimen'}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('nature_of_specimen')}
+                    sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      right: 8,
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                      },
+                    }}
+                  >
+                    <Fullscreen fontSize="small" />
+                  </IconButton>
+                </Box>
               )}
             </Box>
 
@@ -1105,16 +1162,35 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  name="gross_pathology"
-                  value={formData.gross_pathology}
-                  onChange={(e) => handleInputChange('gross_pathology', e.target.value)}
-                  placeholder="Gross Pathology"
-                  disabled={formData.image_placement === 'gross_pathology'}
-                />
+                <Box sx={{ position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    name="gross_pathology"
+                    value={formData.gross_pathology}
+                    onChange={(e) => handleInputChange('gross_pathology', e.target.value)}
+                    placeholder="Gross Pathology"
+                    disabled={formData.image_placement === 'gross_pathology'}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('gross_pathology')}
+                    sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      right: 8,
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                      },
+                    }}
+                  >
+                    <Fullscreen fontSize="small" />
+                  </IconButton>
+                </Box>
               )}
             </Box>
 
@@ -1142,16 +1218,35 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  name="microscopic_examination"
-                  value={formData.microscopic_examination}
-                  onChange={(e) => handleInputChange('microscopic_examination', e.target.value)}
-                  placeholder="Microscopic examination"
-                  disabled={formData.image_placement === 'microscopic_examination'}
-                />
+                <Box sx={{ position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    name="microscopic_examination"
+                    value={formData.microscopic_examination}
+                    onChange={(e) => handleInputChange('microscopic_examination', e.target.value)}
+                    placeholder="Microscopic examination"
+                    disabled={formData.image_placement === 'microscopic_examination'}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('microscopic_examination')}
+                    sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      right: 8,
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                      },
+                    }}
+                  >
+                    <Fullscreen fontSize="small" />
+                  </IconButton>
+                </Box>
               )}
             </Box>
 
@@ -1179,16 +1274,35 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  name="conclusion"
-                  value={formData.conclusion}
-                  onChange={(e) => handleInputChange('conclusion', e.target.value)}
-                  placeholder="Conclusion"
-                  disabled={formData.image_placement === 'conclusion'}
-                />
+                <Box sx={{ position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    name="conclusion"
+                    value={formData.conclusion}
+                    onChange={(e) => handleInputChange('conclusion', e.target.value)}
+                    placeholder="Conclusion"
+                    disabled={formData.image_placement === 'conclusion'}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('conclusion')}
+                    sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      right: 8,
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                      },
+                    }}
+                  >
+                    <Fullscreen fontSize="small" />
+                  </IconButton>
+                </Box>
               )}
             </Box>
 
@@ -1197,15 +1311,34 @@ const PathologyRecordForm: React.FC = () => {
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                 Recommendations
               </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                name="recommendations"
-                value={formData.recommendations}
-                onChange={(e) => handleInputChange('recommendations', e.target.value)}
-                placeholder="Recommendations"
-              />
+              <Box sx={{ position: 'relative' }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  name="recommendations"
+                  value={formData.recommendations}
+                  onChange={(e) => handleInputChange('recommendations', e.target.value)}
+                  placeholder="Recommendations"
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => handleExpandField('recommendations')}
+                  sx={{
+                    position: 'absolute',
+                    bottom: 8,
+                    right: 8,
+                    bgcolor: 'background.paper',
+                    boxShadow: 1,
+                    '&:hover': {
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                    },
+                  }}
+                >
+                  <Fullscreen fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
 
@@ -1463,6 +1596,61 @@ const PathologyRecordForm: React.FC = () => {
           <Button onClick={() => setCopyModalOpen(false)}>Cancel</Button>
           <Button onClick={copyPathologyData} variant="contained" color="primary">
             Copy Details
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Expanded Field Dialog */}
+      <Dialog
+        open={expandedField !== null}
+        onClose={handleCloseExpandedField}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            maxHeight: '70vh',
+          }
+        }}
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              {expandedField === 'clinical_data' && 'Clinical data'}
+              {expandedField === 'nature_of_specimen' && 'Nature of specimen'}
+              {expandedField === 'gross_pathology' && 'Gross Pathology'}
+              {expandedField === 'microscopic_examination' && 'Microscopic examination'}
+              {expandedField === 'conclusion' && 'Conclusion'}
+              {expandedField === 'recommendations' && 'Recommendations'}
+            </Typography>
+            <IconButton onClick={handleCloseExpandedField} size="small">
+              <FullscreenExit />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            multiline
+            rows={12}
+            value={expandedValue}
+            onChange={(e) => setExpandedValue(e.target.value)}
+            placeholder={
+              expandedField === 'clinical_data' ? 'Clinical data: *' :
+              expandedField === 'nature_of_specimen' ? 'Nature of specimen: *' :
+              expandedField === 'gross_pathology' ? 'Gross Pathology' :
+              expandedField === 'microscopic_examination' ? 'Microscopic examination' :
+              expandedField === 'conclusion' ? 'Conclusion' :
+              'Recommendations'
+            }
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseExpandedField} variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleCloseExpandedField} variant="contained" color="primary">
+            Save
           </Button>
         </DialogActions>
       </Dialog>

@@ -102,8 +102,6 @@ const navigationItems: NavigationItem[] = [
   // Patient - Can view their own reports after payment
   { path: '/patient/dashboard', label: 'My Dashboard', icon: <Dashboard />, roles: ['patient'] },
   { path: '/patient/reports', label: 'My Reports', icon: <Assessment />, roles: ['patient'] },
-  { path: '/patient/visits', label: 'My Visits', icon: <CalendarToday />, roles: ['patient'] },
-  { path: '/patient/invoices', label: 'My Invoices', icon: <Receipt />, roles: ['patient'] },
 ];
 
 const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

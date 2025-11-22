@@ -899,15 +899,6 @@ const Reports: React.FC = () => {
                                 <Button
                                   size="small"
                                   variant="outlined"
-                                  color="info"
-                                  startIcon={<Assessment />}
-                                  onClick={() => handleTestResults(visit)}
-                                >
-                                  Results
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
                                   color="primary"
                                   startIcon={<Person />}
                                   onClick={() => handleCheckedBy(visit)}
@@ -915,17 +906,7 @@ const Reports: React.FC = () => {
                                   Checked By
                                 </Button>
                               </>
-                            ) : (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="info"
-                                startIcon={<Assessment />}
-                                onClick={() => handleTestResults(visit)}
-                              >
-                                Results
-                              </Button>
-                            )}
+                            ) : null}
                             <Button
                               size="small"
                               variant="outlined"
