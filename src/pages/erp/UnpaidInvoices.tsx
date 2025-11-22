@@ -26,6 +26,8 @@ import {
   MenuItem,
   IconButton,
   Tooltip,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
   Receipt,
@@ -37,6 +39,7 @@ import {
   CheckCircle,
   Schedule,
   Add,
+  Search,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -114,12 +117,13 @@ interface ReceiptData {
 
 const UnpaidInvoices: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [searchQuery] = useState('');
-  const [statusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [currentPage] = useState(1);
-  const [, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -136,7 +140,19 @@ const UnpaidInvoices: React.FC = () => {
 
   useEffect(() => {
     fetchSummary();
-    fetchInvoices();
+  }, []);
+
+  useEffect(() => {
+    // Reset to page 1 when search or filter changes
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchInvoices();
+    }, searchQuery ? 500 : 0); // Debounce search by 500ms only if there's a search query
+
+    return () => clearTimeout(timeoutId);
   }, [searchQuery, statusFilter, currentPage]);
 
   const fetchSummary = async () => {
@@ -174,6 +190,7 @@ const UnpaidInvoices: React.FC = () => {
       
       setInvoices(response.data.data || []);
       setTotalPages(response.data.last_page || 1);
+      setTotalItems(response.data.total || 0);
     } catch (error: any) {
       console.error('Error fetching invoices:', error);
       console.error('Error response:', error.response);
@@ -321,6 +338,62 @@ const UnpaidInvoices: React.FC = () => {
         Unpaid Invoices & Patient Remaining
       </Typography>
 
+      {/* Search and Filter Section */}
+      <Card sx={{ mb: 3, p: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              placeholder="Search by Lab Number, Patient Name, or Phone Number"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Status Filter</InputLabel>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                label="Status Filter"
+                sx={{
+                  borderRadius: 2,
+                }}
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="partial">Partial</MenuItem>
+                <MenuItem value="paid">Paid</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+              }}
+              sx={{
+                borderRadius: 2,
+                py: 1.5,
+              }}
+            >
+              Clear Filters
+            </Button>
+          </Grid>
+        </Grid>
+      </Card>
+
       {/* Summary Cards */}
       {summary && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -372,7 +445,7 @@ const UnpaidInvoices: React.FC = () => {
           <Table stickyHeader>
                   <TableHead>
                     <TableRow>
-                <TableCell>Invoice #</TableCell>
+                <TableCell>Lab Number</TableCell>
                 <TableCell>Patient</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Total Amount</TableCell>
@@ -387,7 +460,7 @@ const UnpaidInvoices: React.FC = () => {
                       <TableRow key={invoice.id} hover>
                         <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {invoice.invoice_number}
+                            {invoice.visit?.patient?.lab || invoice.invoice_number || 'N/A'}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -472,6 +545,25 @@ const UnpaidInvoices: React.FC = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+        {totalPages > 1 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 3, gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing {((currentPage - 1) * 15) + 1} to {Math.min(currentPage * 15, totalItems)} of {totalItems} invoices
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(event, value) => {
+                setCurrentPage(value);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              color="primary"
+              size="large"
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        )}
       </Paper>
 
       {/* Payment Modal */}

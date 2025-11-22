@@ -21,6 +21,8 @@ import {
   Save as SaveIcon,
   Print,
   Science,
+  Preview,
+  Edit,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from '../../config/axios';
@@ -77,14 +79,19 @@ const PatientRegistration: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [showSampleModal, setShowSampleModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [sampleData, setSampleData] = useState<any>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   const [loadingSample, setLoadingSample] = useState(false);
+  const [updatingPatient, setUpdatingPatient] = useState(false);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
   const [patientCredentials, setPatientCredentials] = useState<{
     username: string;
     password: string;
     visitId?: number;
     labNumber?: string;
+    patientId?: number;
   } | null>(null);
 
   const handleInputChange = (field: keyof PatientFormData, value: string) => {
@@ -152,6 +159,246 @@ const PatientRegistration: React.FC = () => {
       toast.error('Failed to generate receipt: ' + ((error as any)?.message || 'Unknown error'));
     } finally {
       setLoadingReceipt(false);
+    }
+  };
+
+  // Function to preview receipt
+  const handlePreviewReceipt = async () => {
+    if (!patientCredentials?.visitId) return;
+    
+    setLoadingReceipt(true);
+    try {
+      // Fetch PDF as blob
+      const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      setReceiptPreviewUrl(url);
+      setShowPreviewModal(true);
+    } catch (error) {
+      console.error('Failed to load receipt for preview:', error);
+      toast.error('Failed to load receipt: ' + ((error as any)?.message || 'Unknown error'));
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
+
+  // Function to load patient data for editing
+  const handleLoadPatientForEdit = async () => {
+    if (!patientCredentials?.patientId || !patientCredentials?.visitId) {
+      toast.error('Patient ID or Visit ID not found');
+      return;
+    }
+
+    try {
+      // Fetch both patient and visit data
+      const [patientResponse, visitResponse] = await Promise.all([
+        axios.get(`/api/patients/${patientCredentials.patientId}`),
+        axios.get(`/api/visits/${patientCredentials.visitId}`)
+      ]);
+
+      const patient = patientResponse.data;
+      const visit = visitResponse.data;
+
+      // Parse visit metadata to get payment details
+      let metadata: any = {};
+      let paymentDetails: any = {};
+      try {
+        metadata = visit.metadata ? (typeof visit.metadata === 'string' ? JSON.parse(visit.metadata) : visit.metadata) : {};
+        paymentDetails = metadata.payment_details || {};
+      } catch (e) {
+        console.error('Failed to parse visit metadata:', e);
+      }
+
+      // Helper function to format date for input field
+      const formatDateForInput = (dateString: string) => {
+        if (!dateString) return '';
+        try {
+          const date = new Date(dateString);
+          return date.toISOString().split('T')[0];
+        } catch {
+          return '';
+        }
+      };
+
+      // Helper function to map gender values
+      const mapGender = (gender: string) => {
+        if (gender === 'male') return 'ذكر';
+        if (gender === 'female') return 'أنثى';
+        return gender || 'ذكر';
+      };
+
+      // Get payment amounts from visit metadata or patient record
+      const totalAmount = visit.total_amount || patient.total_amount || 0;
+      const amountPaidCash = paymentDetails.amount_paid_cash || patient.amount_paid_cash || 0;
+      const amountPaidCard = paymentDetails.amount_paid_card || patient.amount_paid_card || 0;
+      const additionalPaymentMethod = paymentDetails.additional_payment_method || patient.additional_payment_method || 'Fawry';
+
+      // Get patient data from visit metadata if available
+      const patientDataFromMetadata = metadata.patient_data || {};
+
+      // Fill the form with patient data (prioritize visit metadata, then patient record)
+      setFormData({
+        name: patient.name || patientDataFromMetadata.name || '',
+        age: patient.age?.toString() || patientDataFromMetadata.age?.toString() || '',
+        phone: patient.phone || patientDataFromMetadata.phone || '',
+        lab_number: patient.lab || patient.lab_number || patientDataFromMetadata.lab_number || '',
+        gender: mapGender(patient.gender || patientDataFromMetadata.gender),
+        organization: patient.organization || patientDataFromMetadata.organization || 
+                     (typeof patient.organization_id === 'string' ? patient.organization_id : '') || '',
+        attendance_day: patient.day_of_week || patientDataFromMetadata.attendance_day || 
+                       (visit.visit_date ? getDayNameFromDate(visit.visit_date) : 'السبت'),
+        delivery_day: patient.day_of_week || patientDataFromMetadata.delivery_day || 
+                     (visit.expected_delivery_date ? getDayNameFromDate(visit.expected_delivery_date) : 'السبت'),
+        delivery_date: formatDateForInput(visit.expected_delivery_date || patient.delivery_date || patientDataFromMetadata.delivery_date),
+        referring_doctor: patient.doctor || patientDataFromMetadata.doctor || patientDataFromMetadata.referring_doctor || '',
+        sample_size: patient.sample_size || patientDataFromMetadata.sample_size || 'صغيرة جدا',
+        number_of_samples: patient.number_of_samples?.toString() || patientDataFromMetadata.number_of_samples?.toString() || '',
+        attendance_date: formatDateForInput(visit.visit_date || patient.attendance_date || patientDataFromMetadata.attendance_date),
+        previous_tests: patient.previous_tests || patientDataFromMetadata.previous_tests || 'نعم',
+        sample_type: patient.sample_type || patientDataFromMetadata.sample_type || 'Pathology',
+        medical_history: patient.medical_history || patientDataFromMetadata.medical_history || '',
+        total_amount: totalAmount.toString(),
+        amount_paid_cash: amountPaidCash.toString(),
+        amount_paid_card: amountPaidCard.toString(),
+        additional_payment_method: additionalPaymentMethod,
+      });
+
+      setIsEditing(true);
+    } catch (error: any) {
+      console.error('Failed to load patient data:', error);
+      toast.error('Failed to load patient data for editing: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  // Function to handle patient update
+  const handleUpdatePatient = async () => {
+    if (!patientCredentials?.patientId) {
+      toast.error('Patient ID not found');
+      return;
+    }
+
+    setUpdatingPatient(true);
+    try {
+      // Validate required fields
+      if (!formData.name || !formData.age) {
+        toast.error('Please fill in all required fields (Name, Age)');
+        return;
+      }
+
+      // Validate payment amounts
+      const paymentError = validatePaymentAmounts();
+      if (paymentError) {
+        toast.error(paymentError);
+        return;
+      }
+
+      // Prepare data for update
+      const patientData: any = {
+        name: formData.name,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        gender: mapGenderForBackend(formData.gender),
+        organization: formData.organization,
+        doctor: formData.referring_doctor,
+        sample_type: formData.sample_type,
+        sample_size: formData.sample_size,
+        number_of_samples: parseInt(formData.number_of_samples) || 1,
+        day_of_week: formData.attendance_day,
+        medical_history: formData.medical_history,
+        previous_tests: formData.previous_tests,
+        attendance_date: formData.attendance_date,
+        delivery_date: formData.delivery_date,
+        total_amount: parseFloat(formData.total_amount) || 0,
+        amount_paid_cash: parseFloat(formData.amount_paid_cash) || 0,
+        amount_paid: getTotalPaidAmount(),
+        lab_number: formData.lab_number,
+      };
+
+      // Only include additional payment method and amount if they have values
+      const additionalPaymentAmount = parseFloat(formData.amount_paid_card) || 0;
+      if (additionalPaymentAmount > 0 && formData.additional_payment_method) {
+        patientData.amount_paid_card = additionalPaymentAmount;
+        patientData.additional_payment_method = formData.additional_payment_method;
+      }
+
+      // Update patient
+      await axios.put(`/api/patients/${patientCredentials.patientId}`, patientData);
+      
+      // Also update visit if payment information changed and visitId exists
+      if (patientCredentials.visitId) {
+        const totalAmount = parseFloat(formData.total_amount) || 0;
+        const totalPaid = getTotalPaidAmount();
+        const remainingBalance = Math.max(0, totalAmount - totalPaid);
+        
+        // Determine payment status
+        let billingStatus = 'unpaid';
+        if (remainingBalance <= 0 && totalAmount > 0) {
+          billingStatus = 'paid';
+        } else if (totalPaid > 0) {
+          billingStatus = 'partial';
+        }
+
+        // Get existing visit metadata
+        try {
+          const visitResponse = await axios.get(`/api/visits/${patientCredentials.visitId}`);
+          const visit = visitResponse.data;
+          const metadata = visit.metadata ? JSON.parse(visit.metadata) : {};
+          
+          // Update payment details in metadata
+          const paymentDetails = metadata.payment_details || {};
+          paymentDetails.amount_paid_cash = parseFloat(formData.amount_paid_cash) || 0;
+          paymentDetails.amount_paid_card = additionalPaymentAmount;
+          paymentDetails.additional_payment_method = formData.additional_payment_method;
+          paymentDetails.total_paid = totalPaid;
+          
+          metadata.payment_details = paymentDetails;
+          
+          // Update visit
+          await axios.put(`/api/visits/${patientCredentials.visitId}`, {
+            total_amount: totalAmount,
+            upfront_payment: totalPaid,
+            billing_status: billingStatus,
+            metadata: JSON.stringify(metadata),
+          });
+        } catch (visitError) {
+          console.error('Failed to update visit:', visitError);
+          // Don't fail the whole operation if visit update fails
+        }
+      }
+      
+      toast.success('Patient updated successfully!');
+      setIsEditing(false);
+      
+      // Refresh the receipt preview by fetching new PDF
+      if (patientCredentials.visitId) {
+        try {
+          // Clean up old blob URL
+          if (receiptPreviewUrl) {
+            window.URL.revokeObjectURL(receiptPreviewUrl);
+          }
+          
+          // Fetch updated PDF
+          const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt`, {
+            responseType: 'blob'
+          });
+          
+          const blob = new Blob([response.data], { type: 'application/pdf' });
+          const url = window.URL.createObjectURL(blob);
+          setReceiptPreviewUrl(url);
+        } catch (error) {
+          console.error('Failed to refresh receipt preview:', error);
+          toast.error('Failed to refresh receipt preview');
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to update patient:', error);
+      const message = error.response?.data?.message || 'Failed to update patient';
+      toast.error(message);
+    } finally {
+      setUpdatingPatient(false);
     }
   };
 
@@ -341,8 +588,9 @@ const PatientRegistration: React.FC = () => {
           username: response.data.user_credentials.username,
           password: response.data.user_credentials.password,
           visitId: response.data.visit_id,
-            labNumber: response.data.lab_number,
-          });
+          labNumber: response.data.lab_number,
+          patientId: response.data.patient_id,
+        });
         setShowCredentialsModal(true);
         }
         
@@ -909,6 +1157,28 @@ const PatientRegistration: React.FC = () => {
             <Button
               variant="contained"
               color="primary"
+              startIcon={<Preview />}
+              onClick={handlePreviewReceipt}
+              sx={{ 
+                backgroundColor: '#4caf50',
+                color: 'white',
+                borderRadius: 1,
+                px: 4,
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                minWidth: 140,
+                '&:hover': {
+                  backgroundColor: '#45a049',
+                }
+              }}
+            >
+              معاينة الإيصال
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Print />}
               onClick={handleReceiptPrint}
               disabled={loadingReceipt}
               sx={{ 
@@ -927,6 +1197,7 @@ const PatientRegistration: React.FC = () => {
             <Button
               variant="contained"
               color="secondary"
+              startIcon={<Science />}
               onClick={handleSamplePrint}
               disabled={loadingSample}
               sx={{ 
@@ -961,7 +1232,304 @@ const PatientRegistration: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Receipt Modal - Disabled, using PDF instead */}
+        {/* Receipt Preview Modal */}
+        <Dialog 
+          open={showPreviewModal} 
+          onClose={() => {
+            setShowPreviewModal(false);
+            setIsEditing(false);
+            // Clean up blob URL when closing
+            if (receiptPreviewUrl) {
+              window.URL.revokeObjectURL(receiptPreviewUrl);
+              setReceiptPreviewUrl(null);
+            }
+          }} 
+          maxWidth="lg" 
+          fullWidth
+          PaperProps={{
+            sx: {
+              height: '90vh',
+              maxHeight: '90vh',
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            textAlign: 'center', 
+            fontSize: '1.5rem', 
+            fontWeight: 'bold', 
+            color: '#1976d2',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            pb: 1
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Preview sx={{ fontSize: 28 }} />
+              <Typography variant="h6">معاينة الإيصال</Typography>
+            </Box>
+            {!isEditing && (
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<Edit />}
+                onClick={handleLoadPatientForEdit}
+                disabled={loadingReceipt}
+                sx={{ 
+                  borderRadius: 1,
+                  px: 3,
+                  py: 1,
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                تعديل
+              </Button>
+            )}
+          </DialogTitle>
+          <DialogContent sx={{ p: 0, position: 'relative' }}>
+            {isEditing ? (
+              <Box sx={{ p: 3, maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
+                <Typography variant="h6" sx={{ mb: 3, color: '#d32f2f', textAlign: 'center' }}>
+                  تعديل بيانات المريض
+                </Typography>
+                <Grid container spacing={2}>
+                  {/* Name */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      الاسم *
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      required
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Age */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      السن *
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.age}
+                      onChange={(e) => handleInputChange('age', e.target.value)}
+                      required
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Phone */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      رقم الموبايل
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Organization */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      الجهة
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.organization}
+                      onChange={(e) => handleInputChange('organization', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Gender */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      النوع
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.gender}
+                        onChange={(e) => handleInputChange('gender', e.target.value)}
+                      >
+                        <MenuItem value="ذكر">ذكر</MenuItem>
+                        <MenuItem value="أنثى">أنثى</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  {/* Referring Doctor */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      الدكتور المرسل
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.referring_doctor}
+                      onChange={(e) => handleInputChange('referring_doctor', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Total Amount */}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      إجمالي المبلغ
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      value={formData.total_amount}
+                      onChange={(e) => handleInputChange('total_amount', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Amount Paid Cash */}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      المبلغ المدفوع نقداً
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      value={formData.amount_paid_cash}
+                      onChange={(e) => handleInputChange('amount_paid_cash', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Amount Paid Card */}
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      المبلغ المدفوع ب {formData.additional_payment_method}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      value={formData.amount_paid_card}
+                      onChange={(e) => handleInputChange('amount_paid_card', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  {/* Medical History */}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                      التاريخ المرضي
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      value={formData.medical_history}
+                      onChange={(e) => handleInputChange('medical_history', e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            ) : (
+              <Box sx={{ height: 'calc(90vh - 120px)', width: '100%' }}>
+                {receiptPreviewUrl ? (
+                  <iframe
+                    id="receipt-preview-iframe"
+                    src={receiptPreviewUrl}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                    }}
+                    title="Receipt Preview"
+                  />
+                ) : (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                    <CircularProgress />
+                  </Box>
+                )}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
+            {isEditing ? (
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={() => setIsEditing(false)}
+                  disabled={updatingPatient}
+                  sx={{ 
+                    borderColor: '#666',
+                    color: '#666',
+                    borderRadius: 1,
+                    px: 4,
+                    py: 1.5,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    minWidth: 120,
+                  }}
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleUpdatePatient}
+                  disabled={updatingPatient}
+                  startIcon={updatingPatient ? <CircularProgress size={20} /> : <SaveIcon />}
+                  sx={{ 
+                    backgroundColor: '#1976d2',
+                    color: 'white',
+                    borderRadius: 1,
+                    px: 4,
+                    py: 1.5,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    minWidth: 120,
+                  }}
+                >
+                  {updatingPatient ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Print />}
+                  onClick={handleReceiptPrint}
+                  disabled={loadingReceipt}
+                  sx={{ 
+                    backgroundColor: '#1976d2',
+                    color: 'white',
+                    borderRadius: 1,
+                    px: 4,
+                    py: 1.5,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    minWidth: 120,
+                  }}
+                >
+                  {loadingReceipt ? 'جاري التحميل...' : 'طباعة الإيصال'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setShowPreviewModal(false);
+                    setIsEditing(false);
+                  }}
+                  sx={{ 
+                    borderColor: '#d32f2f',
+                    color: '#d32f2f',
+                    borderRadius: 1,
+                    px: 4,
+                    py: 1.5,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    minWidth: 120,
+                  }}
+                >
+                  إغلاق
+                </Button>
+              </>
+            )}
+          </DialogActions>
+        </Dialog>
 
         {/* Sample Label Modal - Same as CheckIn.tsx */}
         <Dialog open={showSampleModal} onClose={() => setShowSampleModal(false)} maxWidth="md" fullWidth>
@@ -1003,7 +1571,10 @@ const PatientRegistration: React.FC = () => {
                           <strong>Sample Size:</strong> {sampleLabel.sample_size}
                         </Typography>
                         <Typography variant="body2" gutterBottom>
-                          <strong>Date:</strong> {sampleLabel.sample_date}
+                          <strong>Attendance Date:</strong> {sampleLabel.attendance_date || 'N/A'}
+                        </Typography>
+                        <Typography variant="body2" gutterBottom>
+                          <strong>Delivery Date:</strong> {sampleLabel.delivery_date || 'N/A'}
                         </Typography>
                         <Typography variant="body2" gutterBottom>
                           <strong>Time:</strong> {sampleLabel.sample_time}
@@ -1063,7 +1634,10 @@ const PatientRegistration: React.FC = () => {
                             <strong>Sample Size:</strong> ${sampleLabel.sample_size}
                           </div>
                           <div style="margin-bottom: 5px;">
-                            <strong>Date:</strong> ${sampleLabel.sample_date}
+                            <strong>Attendance Date:</strong> ${sampleLabel.attendance_date || 'N/A'}
+                          </div>
+                          <div style="margin-bottom: 5px;">
+                            <strong>Delivery Date:</strong> ${sampleLabel.delivery_date || 'N/A'}
                           </div>
                           <div style="margin-bottom: 5px;">
                             <strong>Time:</strong> ${sampleLabel.sample_time}

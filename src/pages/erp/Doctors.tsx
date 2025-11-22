@@ -46,51 +46,6 @@ interface Doctor {
   updated_at: string;
 }
 
-interface Patient {
-  id: number;
-  name: string;
-  phone: string;
-  whatsapp_number?: string;
-  gender: string;
-  visits_count: number;
-  visits?: Visit[];
-  total_paid?: number;
-  total_amount?: number;
-  remaining_balance?: number;
-  total_tests?: number;
-  lab_numbers?: string[];
-  attendance_dates?: string[];
-  delivery_dates?: string[];
-}
-
-interface Visit {
-  id: number;
-  visit_number: string;
-  visit_date: string;
-  final_amount: number;
-  status: string;
-  lab_request?: {
-    lab_no: string;
-  };
-  visit_tests?: VisitTest[];
-  invoice?: Invoice;
-}
-
-interface VisitTest {
-  id: number;
-  labTest: {
-    name: string;
-  };
-  status: string;
-}
-
-interface Invoice {
-  id: number;
-  amount_paid: number | string;
-  balance: number | string;
-  status: string;
-}
-
 const Doctors: React.FC = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);

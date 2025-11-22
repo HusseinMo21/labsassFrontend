@@ -608,24 +608,55 @@ const PathologyRecordForm: React.FC = () => {
     setCopyingData(true);
     try {
       // Search for patient by lab number
+      console.log('Searching for patient with lab number:', labNo);
       const response = await axios.get(`/api/patients/search?query=${labNo}`);
       
       const patients = response.data.data || response.data;
+      console.log('Search results:', patients);
       
       if (!patients || patients.length === 0) {
+        console.error('No patients returned from search API');
         toast.error('No patient found with this lab number');
         return;
       }
 
-      // Find the patient with matching lab number
-      const patient = patients.find((p: any) => 
-        p.lab === labNo || 
-        p.labRequest?.full_lab_no === labNo || 
-        p.labRequest?.lab_no === labNo
-      );
+      // Normalize lab number for comparison (remove dashes, convert to lowercase)
+      const normalizeLabNo = (lab: string) => {
+        if (!lab) return '';
+        return lab.toString().replace(/-/g, '').toLowerCase().trim();
+      };
+
+      const normalizedSearchLabNo = normalizeLabNo(labNo);
+
+      // Find the patient with matching lab number (try multiple formats)
+      const patient = patients.find((p: any) => {
+        // Try direct matches
+        if (normalizeLabNo(p.lab) === normalizedSearchLabNo) return true;
+        if (normalizeLabNo(p.labRequest?.full_lab_no) === normalizedSearchLabNo) return true;
+        if (normalizeLabNo(p.labRequest?.lab_no) === normalizedSearchLabNo) return true;
+        
+        // Try partial matches (in case of format differences)
+        const pLab = normalizeLabNo(p.lab || '');
+        const pFullLabNo = normalizeLabNo(p.labRequest?.full_lab_no || '');
+        const pLabNo = normalizeLabNo(p.labRequest?.lab_no || '');
+        
+        // Check if search lab number is contained in any of the patient's lab numbers
+        if (pLab && (pLab.includes(normalizedSearchLabNo) || normalizedSearchLabNo.includes(pLab))) return true;
+        if (pFullLabNo && (pFullLabNo.includes(normalizedSearchLabNo) || normalizedSearchLabNo.includes(pFullLabNo))) return true;
+        if (pLabNo && (pLabNo.includes(normalizedSearchLabNo) || normalizedSearchLabNo.includes(pLabNo))) return true;
+        
+        return false;
+      });
 
       if (!patient) {
-        toast.error('No patient found with this lab number');
+        console.error('No patient found with lab number:', labNo);
+        console.error('Searched patients:', patients.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          lab: p.lab,
+          labRequest: p.labRequest
+        })));
+        toast.error(`No patient found with lab number: ${labNo}`);
         return;
       }
 
