@@ -23,13 +23,11 @@ import {
   Select,
   MenuItem,
   Chip,
-  IconButton,
   Alert,
   CircularProgress,
   Pagination,
 } from '@mui/material';
 import {
-  Edit,
   Delete,
   Search,
   Person,
@@ -271,47 +269,7 @@ const Patients: React.FC = () => {
     }
   };
 
-  const handleEdit = (patient: Patient) => {
-    setEditingPatient(patient);
-    
-    // Extract additional info from medical_history if it contains our custom format
-    let doctor = '';
-    let organization = '';
-    let status = '';
-    
-    if (patient.medical_history && patient.medical_history.includes('Doctor:')) {
-      const parts = patient.medical_history.split(', ');
-      parts.forEach(part => {
-        if (part.startsWith('Doctor: ')) doctor = part.replace('Doctor: ', '');
-        if (part.startsWith('Organization: ')) organization = part.replace('Organization: ', '');
-        if (part.startsWith('Status: ')) status = part.replace('Status: ', '');
-      });
-    }
-    
-    // Use age directly from patient data
-    const age = patient.age || '';
-    
-    setFormData({
-      name: patient.name,
-      doctor: doctor,
-      gender: patient.gender,
-      age: age.toString(),
-      address_required: patient.address,
-      address_optional: '',
-      organization: organization,
-      status: status,
-      phone: patient.phone,
-      whatsapp_number: patient.whatsapp_number || '',
-      sender: patient.sender || patient.doctor_name || '', // Use sender field as doctor name
-      // Keep existing fields for compatibility
-      address: patient.address,
-      emergency_contact: patient.emergency_contact || '',
-      emergency_phone: patient.emergency_phone || '',
-      medical_history: patient.medical_history || '',
-      allergies: patient.allergies || '',
-    });
-    setOpen(true);
-  };
+  // Removed handleEdit - no longer used after removing Edit button
 
   const resetForm = () => {
     setFormData({
@@ -347,10 +305,7 @@ const Patients: React.FC = () => {
     resetForm();
   };
 
-  const handleDeleteClick = (patient: Patient) => {
-    setPatientToDelete(patient);
-    setDeleteDialogOpen(true);
-  };
+  // Removed handleDeleteClick - no longer used after removing Delete button
 
   const handleDeleteConfirm = async () => {
     if (!patientToDelete) return;
