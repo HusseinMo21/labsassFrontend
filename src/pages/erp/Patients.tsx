@@ -26,6 +26,7 @@ import {
   Alert,
   CircularProgress,
   Pagination,
+  Badge,
 } from '@mui/material';
 import {
   Delete,
@@ -37,6 +38,9 @@ import {
   Science,
   CheckCircle,
   Pending,
+  FilterList,
+  Clear,
+  Print,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
@@ -84,6 +88,8 @@ interface Patient {
   wax_blocks_delivery_date?: string;
   wax_blocks_delivery_notes?: string;
   wax_blocks_delivered_by?: string;
+  attendance_dates?: string[];
+  delivery_dates?: string[];
 }
 
 const Patients: React.FC = () => {
@@ -99,6 +105,12 @@ const Patients: React.FC = () => {
   const [generatedCredentials, setGeneratedCredentials] = useState<{username: string, password: string} | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalPatients, setTotalPatients] = useState(0);
+  const [filters, setFilters] = useState({
+    lab_no: '',
+    attendance_date: '',
+    delivery_date: '',
+  });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -135,8 +147,12 @@ const Patients: React.FC = () => {
   });
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [filters.lab_no, filters.attendance_date, filters.delivery_date]);
+
+  useEffect(() => {
     fetchPatients();
-  }, [currentPage, search]);
+  }, [currentPage, search, filters.lab_no, filters.attendance_date, filters.delivery_date]);
 
   // Debounced search effect
   useEffect(() => {
@@ -187,11 +203,28 @@ const Patients: React.FC = () => {
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      // Add cache-busting parameter to ensure fresh data
-      const response = await axios.get(`/api/patients?page=${currentPage}&search=${search}&_t=${Date.now()}`);
+      const params: any = {
+        page: currentPage,
+        search: search,
+        _t: Date.now(),
+      };
+      
+      if (filters.lab_no.trim()) {
+        params.lab_no = filters.lab_no.trim();
+      }
+      if (filters.attendance_date) {
+        params.attendance_date = filters.attendance_date;
+      }
+      if (filters.delivery_date) {
+        params.delivery_date = filters.delivery_date;
+      }
+      
+      const queryString = new URLSearchParams(params).toString();
+      const response = await axios.get(`/api/patients?${queryString}`);
       console.log('Fetched patients data:', response.data.data);
       setPatients(response.data.data);
-      setTotalPages(response.data.last_page);
+      setTotalPages(response.data.last_page || 1);
+      setTotalPatients(response.data.total || 0);
     } catch (error) {
       toast.error('Failed to fetch patients');
     } finally {
@@ -492,6 +525,206 @@ const Patients: React.FC = () => {
     );
   };
 
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      lab_no: '',
+      attendance_date: '',
+      delivery_date: '',
+    });
+  };
+
+  const handlePrint = async () => {
+    try {
+      // Use current page patients or fetch all if filters are active
+      let allPatients: Patient[] = [];
+      let filterInfo: string[] = [];
+      
+      // If filters are active, fetch all filtered patients
+      if (filters.lab_no || filters.attendance_date || filters.delivery_date || search) {
+        const params: any = {
+          page: 1,
+          per_page: 10000, // Large number to get all results
+          search: search,
+        };
+        
+        if (filters.lab_no.trim()) {
+          params.lab_no = filters.lab_no.trim();
+        }
+        if (filters.attendance_date) {
+          params.attendance_date = filters.attendance_date;
+        }
+        if (filters.delivery_date) {
+          params.delivery_date = filters.delivery_date;
+        }
+        
+        const queryString = new URLSearchParams(params).toString();
+        const response = await axios.get(`/api/patients?${queryString}`);
+        allPatients = response.data.data || [];
+        
+        // Build filter info text
+        if (search) filterInfo.push(`Search: ${search}`);
+        if (filters.lab_no) filterInfo.push(`Lab No: ${filters.lab_no}`);
+        if (filters.attendance_date) filterInfo.push(`تاريخ الحضور: ${new Date(filters.attendance_date).toLocaleDateString('ar-EG')}`);
+        if (filters.delivery_date) filterInfo.push(`تاريخ الاستلام: ${new Date(filters.delivery_date).toLocaleDateString('ar-EG')}`);
+      } else {
+        // No filters, use current page patients
+        allPatients = patients;
+        filterInfo.push(`Page: ${currentPage}`);
+      }
+      
+      if (allPatients.length === 0) {
+        toast.info('No patients to print');
+        return;
+      }
+
+      // Create print HTML
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Please allow popups to print');
+        return;
+      }
+
+      const tableRows = allPatients.map((patient: Patient) => {
+        const attendanceDates = patient.attendance_dates && patient.attendance_dates.length > 0
+          ? patient.attendance_dates.map((d: string) => new Date(d).toLocaleDateString('ar-EG')).join(', ')
+          : 'No dates';
+        
+        const deliveryDates = patient.delivery_dates && patient.delivery_dates.length > 0
+          ? patient.delivery_dates.map((d: string) => new Date(d).toLocaleDateString('ar-EG')).join(', ')
+          : 'No dates';
+
+        return `
+          <tr>
+            <td>${patient.name || 'N/A'}</td>
+            <td>${patient.lab || '-'}</td>
+            <td>${patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : 'Unknown'}</td>
+            <td>${patient.age || 'N/A'}</td>
+            <td>${patient.phone || 'N/A'}</td>
+            <td>${patient.doctor_name || patient.sender || '-'}</td>
+            <td>${attendanceDates}</td>
+            <td>${deliveryDates}</td>
+          </tr>
+        `;
+      }).join('');
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Patients Report</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 1cm;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              border-bottom: 2px solid #000;
+              padding-bottom: 10px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 24px;
+            }
+            .filter-info {
+              margin: 10px 0;
+              font-size: 14px;
+              color: #333;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+              font-size: 11px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+              position: sticky;
+              top: 0;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .footer {
+              margin-top: 20px;
+              text-align: center;
+              font-size: 12px;
+              color: #666;
+              border-top: 1px solid #ddd;
+              padding-top: 10px;
+            }
+            @media print {
+              body { margin: 0; padding: 10px; }
+              .no-print { display: none; }
+              table { page-break-inside: auto; }
+              tr { page-break-inside: avoid; page-break-after: auto; }
+              thead { display: table-header-group; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Patients Report</h1>
+            ${filterInfo.length > 0 ? `<div class="filter-info"><strong>Filters:</strong> ${filterInfo.join(' | ')}</div>` : ''}
+            <div class="filter-info"><strong>Total Patients:</strong> ${allPatients.length}</div>
+            <div class="filter-info"><strong>Print Date:</strong> ${new Date().toLocaleString('ar-EG')}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Lab Number</th>
+                <th>Gender</th>
+                <th>Age</th>
+                <th>Phone</th>
+                <th>Doctor</th>
+                <th>تاريخ الحضور</th>
+                <th>تاريخ الاستلام</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generated on ${new Date().toLocaleString('ar-EG')}
+          </div>
+        </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      
+      // Wait for content to load then print
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+      
+    } catch (error: any) {
+      console.error('Error printing patients:', error);
+      toast.error('Failed to print patients');
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -511,7 +744,7 @@ const Patients: React.FC = () => {
       {/* Search and Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
             <TextField
               fullWidth
               placeholder="Search by name, phone, or lab number... (wait 1.5 seconds after typing)"
@@ -531,6 +764,70 @@ const Patients: React.FC = () => {
               helperText={isSearching ? "Searching..." : searchInput !== search ? "Type to search..." : ""}
             />
           </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <FilterList color="primary" />
+            <Typography variant="h6">Filters</Typography>
+          </Box>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="Lab No"
+                value={filters.lab_no}
+                onChange={(e) => handleFilterChange('lab_no', e.target.value)}
+                placeholder="Search by lab number..."
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="تاريخ الحضور"
+                type="date"
+                value={filters.attendance_date}
+                onChange={(e) => handleFilterChange('attendance_date', e.target.value)}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="تاريخ الاستلام"
+                type="date"
+                value={filters.delivery_date}
+                onChange={(e) => handleFilterChange('delivery_date', e.target.value)}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                size="small"
+              />
+            </Grid>
+          </Grid>
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {(filters.lab_no || filters.attendance_date || filters.delivery_date) && (
+              <Button
+                size="small"
+                onClick={clearFilters}
+                color="error"
+                variant="outlined"
+                startIcon={<Clear />}
+              >
+                Clear Filters
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Print />}
+              onClick={handlePrint}
+              sx={{ ml: 'auto' }}
+            >
+              Print
+            </Button>
+          </Box>
         </CardContent>
       </Card>
 
@@ -547,6 +844,8 @@ const Patients: React.FC = () => {
                   <TableCell>Age</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Doctor</TableCell>
+                  <TableCell>تاريخ الحضور</TableCell>
+                  <TableCell>تاريخ الاستلام</TableCell>
                   <TableCell align="center">Report Status</TableCell>
                   <TableCell align="center">Wax Blocks Status</TableCell>
                 </TableRow>
@@ -554,7 +853,7 @@ const Patients: React.FC = () => {
               <TableBody>
                 {patients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={10} align="center">
                       <Alert severity="info">No patients found</Alert>
                     </TableCell>
                   </TableRow>
@@ -616,6 +915,66 @@ const Patients: React.FC = () => {
                           {patient.doctor_name || patient.sender || '-'}
                         </Box>
                       </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {patient.attendance_dates && patient.attendance_dates.length > 0 ? (
+                            patient.attendance_dates.slice(0, 2).map((date, index) => (
+                              <Chip 
+                                key={index}
+                                label={new Date(date).toLocaleDateString('ar-EG')}
+                                color="info"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))
+                          ) : (
+                            <Chip 
+                              label="No dates"
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                          {patient.attendance_dates && patient.attendance_dates.length > 2 && (
+                            <Chip 
+                              label={`+${patient.attendance_dates.length - 2}`}
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {patient.delivery_dates && patient.delivery_dates.length > 0 ? (
+                            patient.delivery_dates.slice(0, 2).map((date, index) => (
+                              <Chip 
+                                key={index}
+                                label={new Date(date).toLocaleDateString('ar-EG')}
+                                color="warning"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))
+                          ) : (
+                            <Chip 
+                              label="No dates"
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                          {patient.delivery_dates && patient.delivery_dates.length > 2 && (
+                            <Chip 
+                              label={`+${patient.delivery_dates.length - 2}`}
+                              color="default"
+                              variant="outlined"
+                              size="small"
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
                           <Chip
@@ -660,16 +1019,23 @@ const Patients: React.FC = () => {
           </TableContainer>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-              <Pagination
-                count={totalPages}
-                page={currentPage}
-                onChange={(_, page) => setCurrentPage(page)}
-                color="primary"
-              />
-            </Box>
-          )}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+            <Typography variant="body2" color="text.secondary">
+              {totalPatients > 0 ? (
+                <>Showing {((currentPage - 1) * 15) + 1}-{Math.min(currentPage * 15, totalPatients)} of {totalPatients} patients</>
+              ) : (
+                <>No patients found</>
+              )}
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(_, page) => setCurrentPage(page)}
+              color="primary"
+              showFirstButton
+              showLastButton
+            />
+          </Box>
         </CardContent>
       </Card>
 
