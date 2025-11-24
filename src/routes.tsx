@@ -23,7 +23,6 @@ import LabInsightsDashboard from './pages/erp/LabInsightsDashboard';
 import EnhancedReports from './pages/erp/EnhancedReports';
 import ReviewReports from './pages/erp/ReviewReports';
 import Notifications from './pages/erp/Notifications';
-import CheckIn from './pages/erp/CheckIn';
 import UnpaidInvoices from './pages/erp/UnpaidInvoices';
 import LabRequests from './pages/erp/LabRequests';
 import StaffDashboard from './pages/erp/StaffDashboard';
@@ -325,16 +324,6 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <Notifications />
-        </ERPLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/check-in',
-    element: (
-      <ProtectedRoute>
-        <ERPLayout>
-          <CheckIn />
         </ERPLayout>
       </ProtectedRoute>
     ),

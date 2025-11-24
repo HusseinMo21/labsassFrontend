@@ -63,8 +63,8 @@ const navigationItems: NavigationItem[] = [
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['admin'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['admin'] },
   { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['admin'] },
-  { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['admin'] },
-  { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['admin'] },
+  // { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['admin'] }, // Hidden temporarily
+  // { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['admin'] }, // Hidden temporarily
   { path: '/accounts', label: 'Accounts', icon: <Business />, roles: ['admin'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['admin'] },
   { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['admin'] },
@@ -82,11 +82,10 @@ const navigationItems: NavigationItem[] = [
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },
   { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['staff'] },
   { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['staff'] },
-  { path: '/check-in', label: 'Extra Payments Management', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/unpaid-invoices', label: 'Unpaid Invoices', icon: <CreditCard />, roles: ['staff'] },
-  { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['staff'] },
+  // { path: '/visits', label: 'Visits', icon: <CalendarToday />, roles: ['staff'] }, // Hidden temporarily
   { path: '/notifications', label: 'Notifications', icon: <Notifications />, roles: ['staff'] },
-  { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['staff'] },
+  // { path: '/invoices', label: 'Invoices', icon: <Receipt />, roles: ['staff'] }, // Hidden temporarily
   { path: '/accounts', label: 'Accounts', icon: <Business />, roles: ['staff'] },
   { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
   { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['staff'] },

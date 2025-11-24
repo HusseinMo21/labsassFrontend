@@ -27,6 +27,9 @@ import {
   IconButton,
   Tooltip,
   Pagination,
+  CircularProgress,
+  Divider,
+  InputAdornment,
 } from '@mui/material';
 import {
   Receipt,
@@ -39,6 +42,12 @@ import {
   Schedule,
   Add,
   Search,
+  AttachMoney,
+  Payment,
+  MonetizationOn,
+  CreditCard,
+  AccountBalance,
+  LocalAtm,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -136,6 +145,12 @@ const UnpaidInvoices: React.FC = () => {
   // Final payment receipt state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  
+  // Extra payment modal state
+  const [showExtraPaymentModal, setShowExtraPaymentModal] = useState(false);
+  const [selectedPatientForExtraPayment, setSelectedPatientForExtraPayment] = useState<Invoice | null>(null);
+  const [extraPaymentAmount, setExtraPaymentAmount] = useState('');
+  const [submittingExtraPayment, setSubmittingExtraPayment] = useState(false);
 
   useEffect(() => {
     fetchSummary();
@@ -243,6 +258,60 @@ const UnpaidInvoices: React.FC = () => {
       notes: '',
     });
     setShowPaymentModal(true);
+  };
+
+  const handleAddExtraPayment = (invoice: Invoice) => {
+    setSelectedPatientForExtraPayment(invoice);
+    setExtraPaymentAmount('');
+    setShowExtraPaymentModal(true);
+  };
+
+  const handleSubmitExtraPayment = async () => {
+    if (!selectedPatientForExtraPayment || !extraPaymentAmount) {
+      toast.error('Please enter payment amount');
+      return;
+    }
+
+    const amount = parseFloat(extraPaymentAmount);
+    if (amount <= 0) {
+      toast.error('Payment amount must be greater than 0');
+      return;
+    }
+
+    setSubmittingExtraPayment(true);
+    try {
+      // Get patient ID from invoice
+      const patientId = selectedPatientForExtraPayment.visit?.patient?.id;
+      if (!patientId) {
+        toast.error('Patient ID not found');
+        return;
+      }
+
+      // Submit extra payment
+      const response = await axios.post(`/api/patients/${patientId}/extra-payment`, {
+        amount: amount,
+        payment_method: 'cash', // Default to cash
+        notes: 'Extra payment',
+      });
+
+      toast.success('Extra payment added successfully');
+      setShowExtraPaymentModal(false);
+      setSelectedPatientForExtraPayment(null);
+      setExtraPaymentAmount('');
+      
+      // Refresh invoices list
+      fetchInvoices();
+      fetchSummary();
+      
+      // Navigate to receipt if needed
+      if (response.data.receipt_data) {
+        // Handle receipt generation
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to add extra payment');
+    } finally {
+      setSubmittingExtraPayment(false);
+    }
   };
 
   const getStatusChip = (invoice: Invoice) => {
@@ -496,7 +565,7 @@ const UnpaidInvoices: React.FC = () => {
                     {getStatusChip(invoice)}
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Tooltip title="Add Payment">
                         <IconButton
                                 size="small"
@@ -506,6 +575,23 @@ const UnpaidInvoices: React.FC = () => {
                         >
                           <Add />
                         </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Add Extra Payment">
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => handleAddExtraPayment(invoice)}
+                          sx={{ 
+                            backgroundColor: '#1976d2',
+                            '&:hover': { backgroundColor: '#1565c0' },
+                            minWidth: 'auto',
+                            px: 1.5,
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          Extra Payment
+                        </Button>
                       </Tooltip>
                             <Tooltip title="Print Original Receipt">
                               <IconButton
@@ -666,6 +752,86 @@ const UnpaidInvoices: React.FC = () => {
                   </Button>
               </Box>
         </DialogContent>
+      </Dialog>
+
+      {/* Extra Payment Modal */}
+      <Dialog open={showExtraPaymentModal} onClose={() => setShowExtraPaymentModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AttachMoney color="primary" />
+            Add Extra Payment
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedPatientForExtraPayment && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Patient: {selectedPatientForExtraPayment.patient_name}
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Lab Number:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {selectedPatientForExtraPayment.visit?.patient?.lab || 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Phone:</Typography>
+                  <Typography variant="body1">{selectedPatientForExtraPayment.patient_phone}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Total Amount:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {formatCurrency(selectedPatientForExtraPayment.total_amount)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Amount Paid:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
+                    {formatCurrency(selectedPatientForExtraPayment.amount_paid)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Remaining Balance:</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: 'error.main' }}>
+                    {formatCurrency(selectedPatientForExtraPayment.remaining_balance)}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          <Divider sx={{ my: 2 }} />
+
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Extra Payment Amount"
+                type="number"
+                value={extraPaymentAmount}
+                onChange={(e) => setExtraPaymentAmount(e.target.value)}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">EGP</InputAdornment>,
+                }}
+                placeholder="Enter additional amount"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowExtraPaymentModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitExtraPayment}
+            disabled={submittingExtraPayment || !extraPaymentAmount}
+            startIcon={submittingExtraPayment ? <CircularProgress size={20} /> : <Payment />}
+          >
+            {submittingExtraPayment ? 'Processing...' : 'Add Payment'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
