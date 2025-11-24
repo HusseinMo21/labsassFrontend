@@ -127,59 +127,111 @@ const PatientRegistration: React.FC = () => {
     return gender || 'male';
   };
 
-  // Function to fetch receipt data and generate PDF
+  // Function to print receipt - opens print dialog directly without downloading
   const handleReceiptPrint = async () => {
     if (!patientCredentials?.visitId) return;
     
     setLoadingReceipt(true);
     try {
-      // Generate PDF using the new receipt template
-      const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt`, {
-        responseType: 'blob'
+      const timestamp = new Date().getTime();
+      const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_prevent_download=1&_inline=1`;
+      
+      // Always use axios with blob to prevent downloads and IDM interception
+      const response = await axios.get(pdfUrl, {
+        responseType: 'blob',
+        headers: {
+          'Accept': 'application/pdf',
+        },
       });
-      
+
+      // Create blob URL from response (blob URLs prevent downloads)
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
+      const blobUrl = window.URL.createObjectURL(blob);
       
-      // Open PDF in new tab for viewing
-      const printWindow = window.open(url, '_blank');
-      if (!printWindow) {
-        alert('Popup blocked. Please allow popups for this site.');
-        return;
-      }
+      // Create hidden iframe for printing (avoids IDM and download)
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.display = 'none';
+      printFrame.src = blobUrl;
       
-      // Clean up the URL after a delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
+      document.body.appendChild(printFrame);
       
-      toast.success('Receipt opened in new tab. You can print or download from there.');
-    } catch (error) {
-      console.error('Failed to generate receipt:', error);
-      toast.error('Failed to generate receipt: ' + ((error as any)?.message || 'Unknown error'));
+      // Wait for PDF to load, then trigger print
+      printFrame.onload = () => {
+        setTimeout(() => {
+          try {
+            if (printFrame.contentWindow) {
+              printFrame.contentWindow.focus();
+              printFrame.contentWindow.print();
+            }
+          } catch (error) {
+            console.error('Print error:', error);
+            toast.error('Failed to print. Please try again.');
+          }
+          
+          // Clean up after printing
+          setTimeout(() => {
+            if (document.body.contains(printFrame)) {
+              document.body.removeChild(printFrame);
+            }
+            window.URL.revokeObjectURL(blobUrl);
+          }, 2000);
+        }, 500);
+      };
+      
+      // Handle errors
+      printFrame.onerror = () => {
+        toast.error('Failed to load PDF for printing');
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+        window.URL.revokeObjectURL(blobUrl);
+      };
+      
+      toast.success('Opening print dialog...');
+    } catch (error: any) {
+      console.error('Failed to print receipt:', error);
+      toast.error('Failed to print receipt: ' + (error?.response?.data?.message || error?.message || 'Unknown error'));
     } finally {
       setLoadingReceipt(false);
     }
   };
 
-  // Function to preview receipt
+  // Function to preview receipt - opens modal with PDF view without downloading
   const handlePreviewReceipt = async () => {
     if (!patientCredentials?.visitId) return;
     
     setLoadingReceipt(true);
+    setReceiptPreviewUrl(null); // Reset previous URL
+    
     try {
-      // Fetch PDF as blob
-      const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt`, {
-        responseType: 'blob'
-      });
+      const timestamp = new Date().getTime();
+      const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_prevent_download=1&_inline=1`;
       
+      // Always use axios with blob to prevent downloads and IDM interception
+      const response = await axios.get(pdfUrl, {
+        responseType: 'blob',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      });
+
+      // Create blob URL from response (blob URLs prevent downloads)
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      setReceiptPreviewUrl(url);
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Set blob URL for iframe (blob URLs don't trigger downloads)
+      setReceiptPreviewUrl(blobUrl);
       setShowPreviewModal(true);
-    } catch (error) {
-      console.error('Failed to load receipt for preview:', error);
-      toast.error('Failed to load receipt: ' + ((error as any)?.message || 'Unknown error'));
+      toast.success('Receipt preview loaded');
+    } catch (error: any) {
+      console.error('Failed to open preview:', error);
+      toast.error('Failed to open preview: ' + (error?.response?.data?.message || error?.message || 'Unknown error'));
     } finally {
       setLoadingReceipt(false);
     }
@@ -575,9 +627,18 @@ const PatientRegistration: React.FC = () => {
       }
 
       console.log('Submitting patient data:', patientData);
+      console.log('Financial data being sent:', {
+        total_amount: patientData.total_amount,
+        amount_paid_cash: patientData.amount_paid_cash,
+        amount_paid_card: patientData.amount_paid_card,
+        amount_paid: patientData.amount_paid,
+        additional_payment_method: patientData.additional_payment_method,
+      });
 
       // Submit to backend
       const response = await axios.post('/api/patients', patientData);
+      
+      console.log('Backend response:', response.data);
       
       toast.success('Patient registered successfully!');
       console.log('Patient registration response:', response.data);
@@ -1238,11 +1299,15 @@ const PatientRegistration: React.FC = () => {
           onClose={() => {
             setShowPreviewModal(false);
             setIsEditing(false);
-            // Clean up blob URL when closing
-            if (receiptPreviewUrl) {
-              window.URL.revokeObjectURL(receiptPreviewUrl);
-              setReceiptPreviewUrl(null);
+            // Clean up blob URL when closing to free memory
+            if (receiptPreviewUrl && receiptPreviewUrl.startsWith('blob:')) {
+              try {
+                window.URL.revokeObjectURL(receiptPreviewUrl);
+              } catch (e) {
+                // Ignore errors when revoking URL
+              }
             }
+            setReceiptPreviewUrl(null);
           }} 
           maxWidth="lg" 
           fullWidth
@@ -1426,7 +1491,7 @@ const PatientRegistration: React.FC = () => {
                 </Grid>
               </Box>
             ) : (
-              <Box sx={{ height: 'calc(90vh - 120px)', width: '100%' }}>
+              <Box sx={{ height: 'calc(90vh - 120px)', width: '100%', position: 'relative', backgroundColor: '#f5f5f5' }}>
                 {receiptPreviewUrl ? (
                   <iframe
                     id="receipt-preview-iframe"
@@ -1435,12 +1500,30 @@ const PatientRegistration: React.FC = () => {
                       width: '100%',
                       height: '100%',
                       border: 'none',
+                      backgroundColor: '#f5f5f5',
                     }}
                     title="Receipt Preview"
+                    onLoad={() => {
+                      console.log('PDF iframe loaded successfully');
+                    }}
+                    onError={() => {
+                      console.error('PDF iframe failed to load');
+                      toast.error('Failed to load PDF. Please try again.');
+                    }}
                   />
                 ) : (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <CircularProgress />
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    height: '100%',
+                    flexDirection: 'column',
+                    gap: 2
+                  }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="body1" color="text.secondary">
+                      Loading receipt preview...
+                    </Typography>
                   </Box>
                 )}
               </Box>
