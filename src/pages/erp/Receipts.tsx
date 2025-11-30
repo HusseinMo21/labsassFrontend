@@ -1062,9 +1062,9 @@ const Receipts: React.FC = () => {
         setDetailsOpen(false);
       }} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">
+          <Box component="span">
             {isEditing ? 'تعديل بيانات الإيصال' : 'Receipt Details'} - {selectedReceipt?.receipt_number}
-          </Typography>
+          </Box>
           {!isEditing && (
             <Button
               variant="contained"
