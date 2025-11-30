@@ -56,6 +56,10 @@ interface Shift {
   cash_collected: number;
   other_payments_collected: number;
   payment_breakdown: Record<string, number>;
+  total_expenses?: number;
+  expenses_breakdown?: Record<string, Array<{id: number; description: string; amount: number; payment_method?: string}>>;
+  expenses_list?: Array<{id: number; description: string; amount: number; category?: string; payment_method?: string; expense_date?: string}>;
+  final_cash_in_bucket?: number;
   notes?: string;
 }
 
@@ -74,6 +78,9 @@ interface ShiftReport {
     cash_collected: number;
     other_payments_collected: number;
     payment_breakdown: Record<string, number>;
+    total_expenses?: number;
+    expense_breakdown?: Record<string, Array<{id: number; description: string; amount: number; payment_method?: string}>>;
+    expenses_list?: Array<{id: number; description: string; amount: number; category?: string; payment_method?: string; expense_date?: string}>;
     notes?: string;
   };
   patients: Array<{
@@ -99,6 +106,9 @@ const ShiftManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [shiftType, setShiftType] = useState('AM');
   const [closeNotes, setCloseNotes] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [shiftsByDate, setShiftsByDate] = useState<Shift[]>([]);
+  const [loadingShiftsByDate, setLoadingShiftsByDate] = useState(false);
 
   useEffect(() => {
     fetchCurrentShift();
@@ -135,6 +145,37 @@ const ShiftManagement: React.FC = () => {
         toast.error('Failed to fetch shift history: ' + (error.response?.data?.message || error.message));
       }
     }
+  };
+
+  const fetchShiftsByDate = async (date: string) => {
+    if (!date) {
+      setShiftsByDate([]);
+      return;
+    }
+
+    setLoadingShiftsByDate(true);
+    try {
+      const response = await axios.get('/api/shifts/by-date', {
+        params: { date }
+      });
+      if (response.data.success) {
+        setShiftsByDate(response.data.data);
+        if (response.data.data.length === 0) {
+          toast.info('No shifts found for the selected date');
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch shifts by date:', error);
+      toast.error('Failed to fetch shifts: ' + (error.response?.data?.message || error.message));
+      setShiftsByDate([]);
+    } finally {
+      setLoadingShiftsByDate(false);
+    }
+  };
+
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    fetchShiftsByDate(date);
   };
 
   const handleOpenShift = async () => {
@@ -298,6 +339,98 @@ const ShiftManagement: React.FC = () => {
                 </tbody>
               </table>
               
+              <!-- Payment Breakdown -->
+              <div style="margin: 30px 0; padding: 20px; background-color: #f9f9f9; border-radius: 5px;">
+                <h3 style="margin-top: 0; color: #333;">Payment Breakdown</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px; border: 1px solid #ddd;">
+                    <div style="font-size: 24px; font-weight: bold; color: #1976d2;">
+                      EGP ${(parseFloat(reportData.shift_info.total_collected) || 0).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Total Collected</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px; border: 1px solid #ddd;">
+                    <div style="font-size: 24px; font-weight: bold; color: #4caf50;">
+                      EGP ${(parseFloat(reportData.shift_info.cash_collected) || 0).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Cash Collected</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px; border: 1px solid #ddd;">
+                    <div style="font-size: 24px; font-weight: bold; color: #f44336;">
+                      EGP ${(parseFloat(reportData.shift_info.total_expenses) || 0).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Expenses</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px; border: 1px solid #ddd;">
+                    <div style="font-size: 24px; font-weight: bold; color: #1976d2;">
+                      EGP ${((parseFloat(reportData.shift_info.cash_collected) || 0) - (parseFloat(reportData.shift_info.total_expenses) || 0)).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Final Cash in Bucket</div>
+                  </div>
+                </div>
+                ${reportData.shift_info.other_payments_collected && parseFloat(reportData.shift_info.other_payments_collected) > 0 ? `
+                <div style="margin-top: 15px;">
+                  <h4 style="margin: 0 0 10px 0; color: #333;">Other Payments</h4>
+                  <div style="color: #666;">EGP ${(parseFloat(reportData.shift_info.other_payments_collected) || 0).toFixed(2)}</div>
+                </div>
+                ` : ''}
+              </div>
+
+              <!-- Expenses Breakdown -->
+              ${reportData.shift_info.expenses_list && reportData.shift_info.expenses_list.length > 0 ? `
+              <div style="margin: 30px 0;">
+                <h3 style="color: #333;">Expenses Breakdown</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th>Amount</th>
+                      <th>Category</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${reportData.shift_info.expenses_list.map((expense: any) => `
+                      <tr>
+                        <td>${expense.description || 'N/A'}</td>
+                        <td style="color: #f44336; font-weight: bold;">- EGP ${(parseFloat(expense.amount) || 0).toFixed(2)}</td>
+                        <td>${expense.category || 'General'}</td>
+                      </tr>
+                    `).join('')}
+                    <tr style="background-color: #f5f5f5; font-weight: bold;">
+                      <td>Total Expenses</td>
+                      <td style="color: #f44336;">- EGP ${(parseFloat(reportData.shift_info.total_expenses) || 0).toFixed(2)}</td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              ` : ''}
+
+              <!-- Cash Summary -->
+              <div style="margin: 30px 0; padding: 20px; background-color: #e3f2fd; border-radius: 5px;">
+                <h3 style="margin-top: 0; color: #333;">Cash Summary</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px;">
+                    <div style="font-size: 20px; font-weight: bold; color: #4caf50;">
+                      EGP ${(parseFloat(reportData.shift_info.cash_collected) || 0).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Cash Collected</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px;">
+                    <div style="font-size: 20px; font-weight: bold; color: #f44336;">
+                      - EGP ${(parseFloat(reportData.shift_info.total_expenses) || 0).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Expenses</div>
+                  </div>
+                  <div style="text-align: center; padding: 15px; background-color: #fff; border-radius: 5px;">
+                    <div style="font-size: 20px; font-weight: bold; color: #1976d2;">
+                      EGP ${((parseFloat(reportData.shift_info.cash_collected) || 0) - (parseFloat(reportData.shift_info.total_expenses) || 0)).toFixed(2)}
+                    </div>
+                    <div style="color: #666; margin-top: 5px;">Final Cash in Bucket</div>
+                  </div>
+                </div>
+              </div>
+
               ${reportData.shift_info.payment_breakdown && Object.keys(reportData.shift_info.payment_breakdown).length > 0 ? `
               <div class="payment-methods">
                 <h3>Payment Methods Breakdown</h3>
@@ -448,6 +581,28 @@ const ShiftManagement: React.FC = () => {
                       </Typography>
                     </Box>
                   </Grid>
+                  {currentShift.expenses_list && currentShift.expenses_list.length > 0 && (
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
+                        <Typography variant="h6" color="error.dark">
+                          {formatCurrency(currentShift.total_expenses || 0)}
+                        </Typography>
+                        <Typography variant="caption" color="error.dark">
+                          Expenses
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                      <Typography variant="h6" color="warning.dark">
+                        {formatCurrency(currentShift.final_cash_in_bucket ?? (currentShift.cash_collected || 0))}
+                      </Typography>
+                      <Typography variant="caption" color="warning.dark">
+                        Final Cash in Bucket
+                      </Typography>
+                    </Box>
+                  </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
                       <Typography variant="h6" color="info.dark">
@@ -458,27 +613,90 @@ const ShiftManagement: React.FC = () => {
                       </Typography>
                     </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
-                      <Typography variant="h6" color="primary.dark">
-                        {formatCurrency(currentShift.total_collected || 0)}
-                      </Typography>
-                      <Typography variant="caption" color="primary.dark">
-                        Total Collected
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                      <Typography variant="h6" color="text.primary">
-                        {Object.keys(currentShift.payment_breakdown || {}).length}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Payment Methods
-                      </Typography>
-                    </Box>
-                  </Grid>
                 </Grid>
+                
+                {/* Expenses Breakdown */}
+                {currentShift.expenses_list && currentShift.expenses_list.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="h6" gutterBottom>
+                      Expenses Breakdown
+                    </Typography>
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Description</TableCell>
+                            <TableCell align="right">Amount</TableCell>
+                            <TableCell>Category</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {currentShift.expenses_list.map((expense) => (
+                            <TableRow key={expense.id}>
+                              <TableCell>{expense.description}</TableCell>
+                              <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                                - {formatCurrency(expense.amount)}
+                              </TableCell>
+                              <TableCell>{expense.category || 'General'}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow sx={{ bgcolor: 'error.light' }}>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Total Expenses</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', color: 'error.dark' }}>
+                              - {formatCurrency(currentShift.total_expenses || 0)}
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+                
+                {/* Cash Summary */}
+                <Box sx={{ mt: 3 }}>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    Cash Summary
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
+                        <Typography variant="body2" color="success.dark" gutterBottom>
+                          Cash Collected
+                        </Typography>
+                        <Typography variant="h5" color="success.dark" fontWeight="bold">
+                          {formatCurrency(currentShift.cash_collected || 0)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    {currentShift.expenses_list && currentShift.expenses_list.length > 0 && (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <Box sx={{ p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
+                            <Typography variant="body2" color="error.dark" gutterBottom>
+                              Expenses
+                            </Typography>
+                            <Typography variant="h5" color="error.dark" fontWeight="bold">
+                              - {formatCurrency(currentShift.total_expenses || 0)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Box sx={{ p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                            <Typography variant="body2" color="warning.dark" gutterBottom>
+                              Final Cash in Bucket
+                            </Typography>
+                            <Typography variant="h5" color="warning.dark" fontWeight="bold">
+                              {formatCurrency(currentShift.final_cash_in_bucket ?? (currentShift.cash_collected || 0))}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </>
+                    )}
+                  </Grid>
+                </Box>
                 
                 {/* Detailed Payment Methods */}
                 {currentShift.payment_breakdown && Object.keys(currentShift.payment_breakdown).length > 0 && (
@@ -542,6 +760,195 @@ const ShiftManagement: React.FC = () => {
               >
                 Start Shift
               </Button>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Shifts by Date */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            View Shifts by Date
+          </Typography>
+          <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              label="Select Date"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              sx={{ minWidth: 200 }}
+            />
+            {selectedDate && (
+              <Typography variant="body2" color="text.secondary">
+                {new Date(selectedDate).toLocaleDateString('en-GB', { 
+                  day: '2-digit', 
+                  month: '2-digit', 
+                  year: 'numeric' 
+                })}
+              </Typography>
+            )}
+          </Box>
+
+          {loadingShiftsByDate ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : selectedDate && shiftsByDate.length > 0 ? (
+            <Box>
+              <Typography variant="subtitle1" gutterBottom sx={{ mb: 2 }}>
+                Found {shiftsByDate.length} shift(s) on this date
+              </Typography>
+              {shiftsByDate.map((shift) => {
+                const openedAt = new Date(shift.opened_at);
+                const timeString = openedAt.toLocaleTimeString('en-US', { 
+                  hour: '2-digit', 
+                  minute: '2-digit',
+                  hour12: true 
+                });
+                const shiftPeriod = openedAt.getHours() < 12 ? 'AM' : 'PM';
+                
+                return (
+                  <Card key={shift.id} sx={{ mb: 2, border: '1px solid', borderColor: 'divider' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Box>
+                          <Typography variant="h6" gutterBottom>
+                            {shift.shift_type} Shift - {shiftPeriod}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Opened: {openedAt.toLocaleString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </Typography>
+                          {shift.closed_at && (
+                            <Typography variant="body2" color="text.secondary">
+                              Closed: {new Date(shift.closed_at).toLocaleString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </Typography>
+                          )}
+                          <Typography variant="body2" color="text.secondary">
+                            Duration: {shift.duration}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={shift.status.toUpperCase()}
+                          color={shift.status === 'open' ? 'success' : 'default'}
+                          sx={{ mb: 1 }}
+                        />
+                      </Box>
+
+                      <Grid container spacing={2} sx={{ mb: 2 }}>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Patients</Typography>
+                          <Typography variant="body1" fontWeight="bold">{shift.patients_served || 0}</Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Visits</Typography>
+                          <Typography variant="body1" fontWeight="bold">{shift.visits_processed || 0}</Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Cash Collected</Typography>
+                          <Typography variant="body1" fontWeight="bold" color="success.main">
+                            {formatCurrency(shift.cash_collected || 0)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Expenses</Typography>
+                          <Typography variant="body1" fontWeight="bold" color="error.main">
+                            {formatCurrency(shift.total_expenses || 0)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Final Cash in Bucket</Typography>
+                          <Typography variant="body1" fontWeight="bold" color="primary.main">
+                            {formatCurrency(shift.final_cash_in_bucket ?? (shift.cash_collected || 0))}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Total Collected</Typography>
+                          <Typography variant="body1" fontWeight="bold">
+                            {formatCurrency(shift.total_collected || 0)}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+
+                      {shift.expenses_list && shift.expenses_list.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom>
+                            Expenses:
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {shift.expenses_list.map((expense) => (
+                              <Chip
+                                key={expense.id}
+                                label={`${expense.description}: ${formatCurrency(expense.amount)}`}
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+
+                      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                        <Button
+                          variant="contained"
+                          startIcon={<Print />}
+                          onClick={() => handlePrintReport(shift)}
+                          size="small"
+                        >
+                          Print Report
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<Visibility />}
+                          onClick={async () => {
+                            try {
+                              const response = await axios.get(`/api/shifts/${shift.id}/report`);
+                              if (response.data.success) {
+                                setShiftReport(response.data.data);
+                                setSelectedShift(shift);
+                                setReportDialog(true);
+                              }
+                            } catch (error: any) {
+                              toast.error('Failed to load shift report: ' + (error.response?.data?.message || error.message));
+                            }
+                          }}
+                          size="small"
+                        >
+                          View Details
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+          ) : selectedDate ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                No shifts found for the selected date
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Please select a date to view shifts
+              </Typography>
             </Box>
           )}
         </CardContent>
