@@ -109,11 +109,49 @@ const ShiftManagement: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [shiftsByDate, setShiftsByDate] = useState<Shift[]>([]);
   const [loadingShiftsByDate, setLoadingShiftsByDate] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     fetchCurrentShift();
     fetchShiftHistory();
   }, []);
+
+  // Update current time every second for the timer (more accurate)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // Update every second for real-time display
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Calculate elapsed time for current shift
+  const calculateElapsedTime = (openedAt: string): string => {
+    if (!openedAt) return '0h 0m';
+    
+    const opened = new Date(openedAt);
+    const now = currentTime;
+    const diffMs = now.getTime() - opened.getTime();
+    
+    if (diffMs < 0) return '0h 0m'; // Handle negative time
+    
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    
+    if (diffMinutes < 1) {
+      return '0h 0m';
+    }
+    
+    const hours = diffHours;
+    const minutes = diffMinutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
 
   const fetchCurrentShift = async () => {
     try {
@@ -719,7 +757,7 @@ const ShiftManagement: React.FC = () => {
               </Grid>
               
               <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                   {(currentShift.status === 'open' || !currentShift.closed_at) && (
                     <>
                       <Button
@@ -730,14 +768,38 @@ const ShiftManagement: React.FC = () => {
                       >
                         View/Print Shift Details
                       </Button>
-                    <Button
-                      variant="contained"
-                      color="error"
-                      startIcon={<Stop />}
-                      onClick={() => setCloseShiftDialog(true)}
-                    >
-                      End Shift
-                    </Button>
+                      
+                      {/* Timer Display */}
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 2,
+                          py: 1,
+                          bgcolor: 'primary.light',
+                          borderRadius: 1,
+                          border: '1px solid',
+                          borderColor: 'primary.main',
+                        }}
+                      >
+                        <Schedule sx={{ color: 'primary.dark' }} />
+                        <Typography variant="h6" sx={{ color: 'primary.dark', fontWeight: 'bold' }}>
+                          {currentShift.opened_at ? calculateElapsedTime(currentShift.opened_at) : '0h 0m'}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'primary.dark' }}>
+                          Worked
+                        </Typography>
+                      </Box>
+                      
+                      <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<Stop />}
+                        onClick={() => setCloseShiftDialog(true)}
+                      >
+                        End Shift
+                      </Button>
                     </>
                   )}
                 </Box>
@@ -952,9 +1014,16 @@ const ShiftManagement: React.FC = () => {
       {/* Shift History */}
       <Card>
         <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Shift History
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Shift History
+            </Typography>
+            {shiftHistory && shiftHistory.length > 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Total: {shiftHistory.length} closed shift(s)
+              </Typography>
+            )}
+          </Box>
           
           <TableContainer component={Paper}>
             <Table>
