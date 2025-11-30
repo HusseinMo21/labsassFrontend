@@ -426,6 +426,18 @@ const Receipts: React.FC = () => {
           patientUpdateData.previous_tests = editingReceipt.previous_tests;
         }
         
+        // Update financial data in patient table (important for UnpaidInvoices page)
+        if (editingReceipt.total_amount !== undefined) {
+          patientUpdateData.total_amount = editingReceipt.total_amount;
+        }
+        
+        if (editingReceipt.upfront_payment !== undefined) {
+          patientUpdateData.amount_paid = editingReceipt.upfront_payment;
+        }
+        
+        // Note: remaining_balance is calculated, not stored in patient table
+        // It will be calculated as total_amount - amount_paid
+        
         await axios.put(`/api/patients/${selectedReceipt.patient.id}`, patientUpdateData);
       }
 
