@@ -804,11 +804,6 @@ const ShiftManagement: React.FC = () => {
               </Typography>
               {shiftsByDate.map((shift) => {
                 const openedAt = new Date(shift.opened_at);
-                const timeString = openedAt.toLocaleTimeString('en-US', { 
-                  hour: '2-digit', 
-                  minute: '2-digit',
-                  hour12: true 
-                });
                 const shiftPeriod = openedAt.getHours() < 12 ? 'AM' : 'PM';
                 
                 return (

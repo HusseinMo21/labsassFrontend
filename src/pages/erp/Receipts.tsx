@@ -26,6 +26,9 @@ import {
   Alert,
   Pagination,
   CircularProgress,
+  FormControl,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Search,
@@ -71,6 +74,16 @@ interface Receipt {
   patient_name?: string;
   patient_age?: number;
   patient_phone?: string;
+  patient_gender?: string;
+  organization?: string;
+  referring_doctor?: string;
+  attendance_day?: string;
+  delivery_day?: string;
+  number_of_samples?: number;
+  sample_size?: string;
+  sample_type?: string;
+  previous_tests?: string;
+  medical_history?: string;
   tests?: Array<{
     name: string;
     price: number;
@@ -238,11 +251,184 @@ const Receipts: React.FC = () => {
     }
   };
 
+  const handleLoadReceiptForEdit = async () => {
+    if (!selectedReceipt?.id || !selectedReceipt?.patient?.id) {
+      toast.error('Receipt ID or Patient ID not found');
+      return;
+    }
+
+    try {
+      // Fetch both patient and visit data
+      const [patientResponse, visitResponse] = await Promise.all([
+        axios.get(`/api/patients/${selectedReceipt.patient.id}`),
+        axios.get(`/api/visits/${selectedReceipt.id}`)
+      ]);
+
+      const patient = patientResponse.data;
+      const visit = visitResponse.data;
+
+      // Parse visit metadata to get payment details
+      let metadata: any = {};
+      let paymentDetails: any = {};
+      try {
+        metadata = visit.metadata ? (typeof visit.metadata === 'string' ? JSON.parse(visit.metadata) : visit.metadata) : {};
+        paymentDetails = metadata.payment_details || {};
+      } catch (e) {
+        console.error('Failed to parse visit metadata:', e);
+      }
+
+      // Helper function to format date for input field
+      const formatDateForInput = (dateString: string) => {
+        if (!dateString) return '';
+        try {
+          const date = new Date(dateString);
+          return date.toISOString().split('T')[0];
+        } catch {
+          return '';
+        }
+      };
+
+      // Get payment amounts from visit metadata or patient record
+      const totalAmount = visit.total_amount || selectedReceipt.total_amount || 0;
+      const amountPaidCash = paymentDetails.amount_paid_cash || selectedReceipt.payment_breakdown?.cash || 0;
+      const amountPaidCard = paymentDetails.amount_paid_card || selectedReceipt.payment_breakdown?.card || 0;
+      const additionalPaymentMethod = paymentDetails.additional_payment_method || selectedReceipt.payment_breakdown?.card_method || 'Fawry';
+
+      // Helper function to map gender values
+      const mapGender = (gender: string) => {
+        if (gender === 'male') return 'ذكر';
+        if (gender === 'female') return 'أنثى';
+        return gender || 'ذكر';
+      };
+
+      // Helper function to get day name from date
+      const getDayNameFromDate = (dateString: string) => {
+        if (!dateString) return 'السبت';
+        try {
+          const date = new Date(dateString);
+          const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+          return days[date.getDay()];
+        } catch {
+          return 'السبت';
+        }
+      };
+
+      // Get patient data from visit metadata if available
+      const patientDataFromMetadata = metadata.patient_data || {};
+
+      // Update editingReceipt with all data
+      const updatedReceipt: Receipt = {
+        ...selectedReceipt,
+        patient: {
+          ...selectedReceipt.patient,
+          name: patient.name || patientDataFromMetadata.name || selectedReceipt.patient.name,
+          phone: patient.phone || patientDataFromMetadata.phone || selectedReceipt.patient.phone,
+        },
+        patient_name: patient.name || patientDataFromMetadata.name || selectedReceipt.patient.name,
+        patient_age: patient.age || patientDataFromMetadata.age || selectedReceipt.patient_age,
+        patient_phone: patient.phone || patientDataFromMetadata.phone || selectedReceipt.patient.phone,
+        patient_gender: mapGender(patient.gender || patientDataFromMetadata.gender),
+        organization: patient.organization || patientDataFromMetadata.organization || '',
+        referring_doctor: patient.doctor || patientDataFromMetadata.doctor || patientDataFromMetadata.referring_doctor || '',
+        lab_number: patient.lab || patient.lab_number || patientDataFromMetadata.lab_number || selectedReceipt.lab_number,
+        attendance_day: patient.day_of_week || patientDataFromMetadata.attendance_day || 
+                       (visit.visit_date ? getDayNameFromDate(visit.visit_date) : 'السبت'),
+        delivery_day: patient.day_of_week || patientDataFromMetadata.delivery_day || 
+                     (visit.expected_delivery_date ? getDayNameFromDate(visit.expected_delivery_date) : 'السبت'),
+        number_of_samples: patient.number_of_samples || patientDataFromMetadata.number_of_samples || 1,
+        sample_size: patient.sample_size || patientDataFromMetadata.sample_size || 'صغيرة جدا',
+        sample_type: patient.sample_type || patientDataFromMetadata.sample_type || 'Pathology',
+        previous_tests: patient.previous_tests || patientDataFromMetadata.previous_tests || 'نعم',
+        medical_history: patient.medical_history || patientDataFromMetadata.medical_history || '',
+        total_amount: totalAmount,
+        final_amount: totalAmount - (selectedReceipt.discount_amount || 0),
+        upfront_payment: amountPaidCash + amountPaidCard,
+        remaining_balance: (totalAmount - (selectedReceipt.discount_amount || 0)) - (amountPaidCash + amountPaidCard),
+        payment_method: additionalPaymentMethod !== 'Fawry' ? additionalPaymentMethod : 'cash',
+        payment_breakdown: {
+          cash: amountPaidCash,
+          card: amountPaidCard,
+          card_method: additionalPaymentMethod,
+        },
+        visit_date: formatDateForInput(visit.visit_date || selectedReceipt.visit_date),
+        expected_delivery_date: formatDateForInput(visit.expected_delivery_date || selectedReceipt.expected_delivery_date),
+      };
+
+      setEditingReceipt(updatedReceipt);
+      setIsEditing(true);
+    } catch (error: any) {
+      console.error('Failed to load receipt data:', error);
+      toast.error('Failed to load receipt data for editing: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
   const handleSaveReceipt = async () => {
     if (!editingReceipt || !selectedReceipt) return;
     
     setSaving(true);
     try {
+      // Helper function to map gender for backend
+      const mapGenderForBackend = (gender: string) => {
+        if (gender === 'ذكر') return 'male';
+        if (gender === 'أنثى') return 'female';
+        return gender || 'male';
+      };
+
+      // Update patient data first
+      if (selectedReceipt.patient?.id) {
+        const patientUpdateData: any = {
+          name: editingReceipt.patient_name || editingReceipt.patient.name,
+          phone: editingReceipt.patient_phone || editingReceipt.patient.phone,
+        };
+        
+        if (editingReceipt.patient_age) {
+          patientUpdateData.age = editingReceipt.patient_age;
+        }
+        
+        if (editingReceipt.patient_gender) {
+          patientUpdateData.gender = mapGenderForBackend(editingReceipt.patient_gender);
+        }
+        
+        if (editingReceipt.organization) {
+          patientUpdateData.organization = editingReceipt.organization;
+        }
+        
+        if (editingReceipt.referring_doctor) {
+          patientUpdateData.doctor = editingReceipt.referring_doctor;
+        }
+        
+        if (editingReceipt.lab_number) {
+          patientUpdateData.lab = editingReceipt.lab_number;
+          patientUpdateData.lab_number = editingReceipt.lab_number;
+        }
+        
+        if (editingReceipt.sample_type) {
+          patientUpdateData.sample_type = editingReceipt.sample_type;
+        }
+        
+        if (editingReceipt.sample_size) {
+          patientUpdateData.sample_size = editingReceipt.sample_size;
+        }
+        
+        if (editingReceipt.number_of_samples) {
+          patientUpdateData.number_of_samples = editingReceipt.number_of_samples;
+        }
+        
+        if (editingReceipt.attendance_day) {
+          patientUpdateData.day_of_week = editingReceipt.attendance_day;
+        }
+        
+        if (editingReceipt.medical_history) {
+          patientUpdateData.medical_history = editingReceipt.medical_history;
+        }
+        
+        if (editingReceipt.previous_tests) {
+          patientUpdateData.previous_tests = editingReceipt.previous_tests;
+        }
+        
+        await axios.put(`/api/patients/${selectedReceipt.patient.id}`, patientUpdateData);
+      }
+
       // Update the visit with edited data
       const updateData: any = {
         total_amount: editingReceipt.total_amount,
@@ -252,7 +438,15 @@ const Receipts: React.FC = () => {
         payment_method: editingReceipt.payment_method,
       };
 
-      // Update visit metadata to include financial data
+      if (editingReceipt.visit_date) {
+        updateData.visit_date = editingReceipt.visit_date;
+      }
+
+      if (editingReceipt.expected_delivery_date) {
+        updateData.expected_delivery_date = editingReceipt.expected_delivery_date;
+      }
+
+      // Update visit metadata to include financial data and patient data
       const visitResponse = await axios.get(`/api/visits/${selectedReceipt.id}`);
       const visit = visitResponse.data;
       
@@ -271,6 +465,55 @@ const Receipts: React.FC = () => {
         }
       }
       
+      // Update patient data in metadata
+      const patientData = metadata.patient_data || {};
+      patientData.name = editingReceipt.patient_name || editingReceipt.patient.name;
+      patientData.phone = editingReceipt.patient_phone || editingReceipt.patient.phone;
+      if (editingReceipt.patient_age) {
+        patientData.age = editingReceipt.patient_age;
+      }
+      if (editingReceipt.patient_gender) {
+        patientData.gender = mapGenderForBackend(editingReceipt.patient_gender);
+      }
+      if (editingReceipt.organization) {
+        patientData.organization = editingReceipt.organization;
+      }
+      if (editingReceipt.referring_doctor) {
+        patientData.doctor = editingReceipt.referring_doctor;
+        patientData.referring_doctor = editingReceipt.referring_doctor;
+      }
+      if (editingReceipt.lab_number) {
+        patientData.lab_number = editingReceipt.lab_number;
+      }
+      if (editingReceipt.sample_type) {
+        patientData.sample_type = editingReceipt.sample_type;
+      }
+      if (editingReceipt.sample_size) {
+        patientData.sample_size = editingReceipt.sample_size;
+      }
+      if (editingReceipt.number_of_samples) {
+        patientData.number_of_samples = editingReceipt.number_of_samples;
+      }
+      if (editingReceipt.attendance_day) {
+        patientData.attendance_day = editingReceipt.attendance_day;
+      }
+      if (editingReceipt.delivery_day) {
+        patientData.delivery_day = editingReceipt.delivery_day;
+      }
+      if (editingReceipt.visit_date) {
+        patientData.attendance_date = editingReceipt.visit_date;
+      }
+      if (editingReceipt.expected_delivery_date) {
+        patientData.delivery_date = editingReceipt.expected_delivery_date;
+      }
+      if (editingReceipt.medical_history) {
+        patientData.medical_history = editingReceipt.medical_history;
+      }
+      if (editingReceipt.previous_tests) {
+        patientData.previous_tests = editingReceipt.previous_tests;
+      }
+      metadata.patient_data = patientData;
+      
       const financialData = metadata.financial_data || {};
       const paymentDetails = metadata.payment_details || {};
       
@@ -279,16 +522,13 @@ const Receipts: React.FC = () => {
       financialData.amount_paid = editingReceipt.upfront_payment;
       financialData.remaining_balance = editingReceipt.remaining_balance;
       
-      // Update payment breakdown based on payment method
-      const paymentMethod = editingReceipt.payment_method?.toLowerCase() || 'cash';
-      if (paymentMethod === 'cash') {
-        paymentDetails.amount_paid_cash = editingReceipt.upfront_payment;
-        paymentDetails.amount_paid_card = 0;
-      } else {
-        paymentDetails.amount_paid_cash = 0;
-        paymentDetails.amount_paid_card = editingReceipt.upfront_payment;
-        paymentDetails.additional_payment_method = editingReceipt.payment_method;
-      }
+      // Update payment breakdown from editingReceipt.payment_breakdown
+      const cashAmount = editingReceipt.payment_breakdown?.cash || 0;
+      const cardAmount = editingReceipt.payment_breakdown?.card || 0;
+      
+      paymentDetails.amount_paid_cash = cashAmount;
+      paymentDetails.amount_paid_card = cardAmount;
+      paymentDetails.additional_payment_method = editingReceipt.payment_breakdown?.card_method || 'Fawry';
       paymentDetails.total_paid = editingReceipt.upfront_payment;
       
       metadata.financial_data = financialData;
@@ -821,30 +1061,575 @@ const Receipts: React.FC = () => {
         setIsEditing(false);
         setDetailsOpen(false);
       }} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Receipt Details - {selectedReceipt?.receipt_number}
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">
+            {isEditing ? 'تعديل بيانات الإيصال' : 'Receipt Details'} - {selectedReceipt?.receipt_number}
+          </Typography>
+          {!isEditing && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Edit />}
+              onClick={handleLoadReceiptForEdit}
+              sx={{ 
+                borderRadius: 1,
+                px: 3,
+                py: 1,
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+              }}
+            >
+              Edit
+            </Button>
+          )}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: isEditing ? 1 : 3, position: 'relative', height: isEditing ? 'calc(90vh - 120px)' : 'auto', overflowY: isEditing ? 'auto' : 'visible' }}>
           {editingReceipt && (
-            <Grid container spacing={3} sx={{ mt: 1 }}>
+            <>
+              {isEditing ? (
+                <Box sx={{ width: '100%', p: 1, overflowY: 'auto', height: '100%' }}>
+                  <Typography variant="caption" sx={{ mb: 1, color: '#d32f2f', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600, display: 'block' }}>
+                    تعديل بيانات الإيصال
+                  </Typography>
+                  <Grid container spacing={0.5}>
+                    {/* Name */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        الاسم *
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={editingReceipt.patient_name || editingReceipt.patient.name}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          patient_name: e.target.value,
+                          patient: { ...editingReceipt.patient, name: e.target.value }
+                        })}
+                        required
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Age */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        السن *
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={editingReceipt.patient_age || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          patient_age: parseInt(e.target.value) || 0
+                        })}
+                        required
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Phone */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        رقم الموبايل
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={editingReceipt.patient_phone || editingReceipt.patient.phone}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          patient_phone: e.target.value,
+                          patient: { ...editingReceipt.patient, phone: e.target.value }
+                        })}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Organization */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        الجهة
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={editingReceipt.organization || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          organization: e.target.value
+                        })}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Gender */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        النوع
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.patient_gender || 'ذكر'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            patient_gender: e.target.value
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="ذكر">ذكر</MenuItem>
+                          <MenuItem value="أنثى">أنثى</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Lab Number */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        Lab Number
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={editingReceipt.lab_number || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          lab_number: e.target.value
+                        })}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Referring Doctor */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        الدكتور المرسل
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={editingReceipt.referring_doctor || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          referring_doctor: e.target.value
+                        })}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Attendance Date */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        تاريخ الحضور
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        value={editingReceipt.visit_date || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          visit_date: e.target.value
+                        })}
+                        InputLabelProps={{ shrink: true }}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Attendance Day */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        يوم الحضور
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.attendance_day || 'السبت'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            attendance_day: e.target.value
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="السبت">السبت</MenuItem>
+                          <MenuItem value="الأحد">الأحد</MenuItem>
+                          <MenuItem value="الاثنين">الاثنين</MenuItem>
+                          <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                          <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                          <MenuItem value="الخميس">الخميس</MenuItem>
+                          <MenuItem value="الجمعة">الجمعة</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Delivery Date */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        ميعاد التسليم
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        value={editingReceipt.expected_delivery_date || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          expected_delivery_date: e.target.value
+                        })}
+                        InputLabelProps={{ shrink: true }}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Delivery Day */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        يوم التسليم
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.delivery_day || 'السبت'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            delivery_day: e.target.value
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="السبت">السبت</MenuItem>
+                          <MenuItem value="الأحد">الأحد</MenuItem>
+                          <MenuItem value="الاثنين">الاثنين</MenuItem>
+                          <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                          <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                          <MenuItem value="الخميس">الخميس</MenuItem>
+                          <MenuItem value="الجمعة">الجمعة</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Number of Samples */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        عدد العينات
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        value={editingReceipt.number_of_samples || 1}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          number_of_samples: parseInt(e.target.value) || 1
+                        })}
+                        inputProps={{ min: 1, max: 10 }}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Sample Size */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        حجم العينة
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.sample_size || 'صغيرة جدا'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            sample_size: e.target.value
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="صغيرة جدا">صغيرة جدا</MenuItem>
+                          <MenuItem value="صغيرة">صغيرة</MenuItem>
+                          <MenuItem value="متوسطة">متوسطة</MenuItem>
+                          <MenuItem value="كبيرة">كبيرة</MenuItem>
+                          <MenuItem value="كبيرة جدا">كبيرة جدا</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Sample Type */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        نوع العينة
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.sample_type || 'Pathology'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            sample_type: e.target.value
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="Pathology">Pathology</MenuItem>
+                          <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
+                          <MenuItem value="سائل">سائل</MenuItem>
+                          <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
+                          <MenuItem value="frozen">frozen</MenuItem>
+                          <MenuItem value="اخرى">اخرى</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Previous Tests */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        هل سبق لك تحاليل باثولوجي
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.previous_tests || 'نعم'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            previous_tests: e.target.value
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="نعم">نعم</MenuItem>
+                          <MenuItem value="لا">لا</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Total Amount */}
+                    <Grid item xs={6}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        إجمالي المبلغ
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        value={editingReceipt.total_amount}
+                        onChange={(e) => {
+                          const newTotal = parseFloat(e.target.value) || 0;
+                          setEditingReceipt({
+                            ...editingReceipt,
+                            total_amount: newTotal,
+                            final_amount: newTotal - (editingReceipt.discount_amount || 0),
+                            remaining_balance: (newTotal - (editingReceipt.discount_amount || 0)) - editingReceipt.upfront_payment
+                          });
+                        }}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Amount Paid Cash */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        المبلغ المدفوع نقداً
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        value={editingReceipt.payment_breakdown?.cash || 0}
+                        onChange={(e) => {
+                          const cash = parseFloat(e.target.value) || 0;
+                          const card = editingReceipt.payment_breakdown?.card || 0;
+                          setEditingReceipt({
+                            ...editingReceipt,
+                            upfront_payment: cash + card,
+                            remaining_balance: editingReceipt.final_amount - (cash + card),
+                            payment_breakdown: {
+                              ...editingReceipt.payment_breakdown,
+                              cash,
+                              card,
+                              card_method: editingReceipt.payment_breakdown?.card_method || 'Fawry'
+                            }
+                          });
+                        }}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Amount Paid Card */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        المبلغ المدفوع ب {editingReceipt.payment_breakdown?.card_method || 'Fawry'}
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        value={editingReceipt.payment_breakdown?.card || 0}
+                        onChange={(e) => {
+                          const card = parseFloat(e.target.value) || 0;
+                          const cash = editingReceipt.payment_breakdown?.cash || 0;
+                          setEditingReceipt({
+                            ...editingReceipt,
+                            upfront_payment: cash + card,
+                            remaining_balance: editingReceipt.final_amount - (cash + card),
+                            payment_breakdown: {
+                              ...editingReceipt.payment_breakdown,
+                              cash,
+                              card,
+                              card_method: editingReceipt.payment_breakdown?.card_method || 'Fawry'
+                            }
+                          });
+                        }}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                    {/* Payment Method */}
+                    <Grid item xs={4}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        طريقة الدفع الإضافية
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={editingReceipt.payment_breakdown?.card_method || 'Fawry'}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            payment_breakdown: {
+                              ...editingReceipt.payment_breakdown,
+                              card_method: e.target.value,
+                              cash: editingReceipt.payment_breakdown?.cash || 0,
+                              card: editingReceipt.payment_breakdown?.card || 0
+                            }
+                          })}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          <MenuItem value="Fawry">Fawry</MenuItem>
+                          <MenuItem value="InstaPay">InstaPay</MenuItem>
+                          <MenuItem value="VodafoneCash">VodafoneCash</MenuItem>
+                          <MenuItem value="Card">Card</MenuItem>
+                          <MenuItem value="Other">Other</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    {/* Medical History */}
+                    <Grid item xs={12}>
+                      <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                        التاريخ المرضي
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={1.5}
+                        value={editingReceipt.medical_history || ''}
+                        onChange={(e) => setEditingReceipt({
+                          ...editingReceipt,
+                          medical_history: e.target.value
+                        })}
+                        size="small"
+                        sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              ) : (
+                <Grid container spacing={3} sx={{ mt: 1 }}>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Patient Information</Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2"><strong>Name:</strong> {editingReceipt.patient.name}</Typography>
-                  <Typography variant="body2"><strong>Phone:</strong> {editingReceipt.patient.phone}</Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Name:</strong></Typography>
+                  {isEditing ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={editingReceipt.patient_name || editingReceipt.patient.name}
+                      onChange={(e) => setEditingReceipt({
+                        ...editingReceipt,
+                        patient_name: e.target.value,
+                        patient: { ...editingReceipt.patient, name: e.target.value }
+                      })}
+                      sx={{ mb: 2 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ mb: 2 }}>{editingReceipt.patient.name}</Typography>
+                  )}
+                  
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Age:</strong></Typography>
+                  {isEditing ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={editingReceipt.patient_age || ''}
+                      onChange={(e) => setEditingReceipt({
+                        ...editingReceipt,
+                        patient_age: parseInt(e.target.value) || 0
+                      })}
+                      sx={{ mb: 2 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ mb: 2 }}>{editingReceipt.patient_age || 'N/A'}</Typography>
+                  )}
+                  
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Phone:</strong></Typography>
+                  {isEditing ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={editingReceipt.patient_phone || editingReceipt.patient.phone}
+                      onChange={(e) => setEditingReceipt({
+                        ...editingReceipt,
+                        patient_phone: e.target.value,
+                        patient: { ...editingReceipt.patient, phone: e.target.value }
+                      })}
+                      sx={{ mb: 2 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ mb: 2 }}>{editingReceipt.patient.phone}</Typography>
+                  )}
+                  
                   {editingReceipt.patient.email && (
-                    <Typography variant="body2"><strong>Email:</strong> {editingReceipt.patient.email}</Typography>
+                    <>
+                      <Typography variant="body2" sx={{ mb: 1 }}><strong>Email:</strong></Typography>
+                      <Typography variant="body2" sx={{ mb: 2 }}>{editingReceipt.patient.email}</Typography>
+                    </>
                   )}
                 </Box>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>Receipt Information</Typography>
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2"><strong>Receipt #:</strong> {editingReceipt.receipt_number}</Typography>
-                  <Typography variant="body2"><strong>Lab #:</strong> {editingReceipt.lab_number || 'N/A'}</Typography>
-                  <Typography variant="body2"><strong>Visit #:</strong> {editingReceipt.visit_number}</Typography>
-                  <Typography variant="body2"><strong>Date:</strong> {new Date(editingReceipt.visit_date).toLocaleDateString()}</Typography>
-                  <Typography variant="body2"><strong>Time:</strong> {editingReceipt.visit_time}</Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Receipt #:</strong> {editingReceipt.receipt_number}</Typography>
+                  
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Lab #:</strong></Typography>
+                  {isEditing ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={editingReceipt.lab_number || ''}
+                      onChange={(e) => setEditingReceipt({
+                        ...editingReceipt,
+                        lab_number: e.target.value
+                      })}
+                      sx={{ mb: 2 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ mb: 2 }}>{editingReceipt.lab_number || 'N/A'}</Typography>
+                  )}
+                  
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Visit #:</strong> {editingReceipt.visit_number}</Typography>
+                  
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Date:</strong></Typography>
+                  {isEditing ? (
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="date"
+                      value={editingReceipt.visit_date ? new Date(editingReceipt.visit_date).toISOString().split('T')[0] : ''}
+                      onChange={(e) => setEditingReceipt({
+                        ...editingReceipt,
+                        visit_date: e.target.value
+                      })}
+                      sx={{ mb: 2 }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ mb: 2 }}>{new Date(editingReceipt.visit_date).toLocaleDateString()}</Typography>
+                  )}
+                  
+                  <Typography variant="body2" sx={{ mb: 1 }}><strong>Time:</strong> {editingReceipt.visit_time}</Typography>
+                  
+                  {editingReceipt.expected_delivery_date && (
+                    <>
+                      <Typography variant="body2" sx={{ mb: 1 }}><strong>Expected Delivery Date:</strong></Typography>
+                      {isEditing ? (
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="date"
+                          value={editingReceipt.expected_delivery_date ? new Date(editingReceipt.expected_delivery_date).toISOString().split('T')[0] : ''}
+                          onChange={(e) => setEditingReceipt({
+                            ...editingReceipt,
+                            expected_delivery_date: e.target.value
+                          })}
+                          sx={{ mb: 2 }}
+                        />
+                      ) : (
+                        <Typography variant="body2" sx={{ mb: 2 }}>
+                          {new Date(editingReceipt.expected_delivery_date).toLocaleDateString()}
+                        </Typography>
+                      )}
+                    </>
+                  )}
                 </Box>
               </Grid>
               <Grid item xs={12}>
@@ -941,25 +1726,95 @@ const Receipts: React.FC = () => {
                 </Box>
                 
                 {/* Payment Breakdown */}
-                {editingReceipt.payment_breakdown && (editingReceipt.payment_breakdown.cash > 0 || editingReceipt.payment_breakdown.card > 0) && (
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Payment Breakdown:
-                    </Typography>
-                    {editingReceipt.payment_breakdown.cash > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Paid Cash:</Typography>
-                        <Typography variant="body2" color="success.main">{formatCurrency(editingReceipt.payment_breakdown.cash)}</Typography>
-                      </Box>
-                    )}
-                    {editingReceipt.payment_breakdown.card > 0 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2">Paid with {editingReceipt.payment_breakdown.card_method}:</Typography>
-                        <Typography variant="body2" color="success.main">{formatCurrency(editingReceipt.payment_breakdown.card)}</Typography>
-                      </Box>
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                    Payment Breakdown:
+                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
+                    <Typography variant="body2">Paid Cash:</Typography>
+                    {isEditing ? (
+                      <TextField
+                        type="number"
+                        size="small"
+                        value={editingReceipt.payment_breakdown?.cash || 0}
+                        onChange={(e) => {
+                          const cash = parseFloat(e.target.value) || 0;
+                          const card = editingReceipt.payment_breakdown?.card || 0;
+                          setEditingReceipt({
+                            ...editingReceipt,
+                            upfront_payment: cash + card,
+                            remaining_balance: editingReceipt.final_amount - (cash + card),
+                            payment_breakdown: {
+                              ...editingReceipt.payment_breakdown,
+                              cash,
+                              card,
+                              card_method: editingReceipt.payment_breakdown?.card_method || 'Fawry'
+                            }
+                          });
+                        }}
+                        sx={{ width: 150 }}
+                        inputProps={{ min: 0, step: 0.01 }}
+                      />
+                    ) : (
+                      <Typography variant="body2" color="success.main">
+                        {formatCurrency(editingReceipt.payment_breakdown?.cash || 0)}
+                      </Typography>
                     )}
                   </Box>
-                )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
+                    <Typography variant="body2">Paid with {editingReceipt.payment_breakdown?.card_method || 'Card'}:</Typography>
+                    {isEditing ? (
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <FormControl size="small" sx={{ width: 120 }}>
+                          <Select
+                            value={editingReceipt.payment_breakdown?.card_method || 'Fawry'}
+                            onChange={(e) => setEditingReceipt({
+                              ...editingReceipt,
+                              payment_breakdown: {
+                                ...editingReceipt.payment_breakdown,
+                                card_method: e.target.value,
+                                cash: editingReceipt.payment_breakdown?.cash || 0,
+                                card: editingReceipt.payment_breakdown?.card || 0
+                              }
+                            })}
+                          >
+                            <MenuItem value="Fawry">Fawry</MenuItem>
+                            <MenuItem value="InstaPay">InstaPay</MenuItem>
+                            <MenuItem value="VodafoneCash">VodafoneCash</MenuItem>
+                            <MenuItem value="Card">Card</MenuItem>
+                            <MenuItem value="Other">Other</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={editingReceipt.payment_breakdown?.card || 0}
+                          onChange={(e) => {
+                            const card = parseFloat(e.target.value) || 0;
+                            const cash = editingReceipt.payment_breakdown?.cash || 0;
+                            setEditingReceipt({
+                              ...editingReceipt,
+                              upfront_payment: cash + card,
+                              remaining_balance: editingReceipt.final_amount - (cash + card),
+                              payment_breakdown: {
+                                ...editingReceipt.payment_breakdown,
+                                cash,
+                                card,
+                                card_method: editingReceipt.payment_breakdown?.card_method || 'Fawry'
+                              }
+                            });
+                          }}
+                          sx={{ width: 150 }}
+                          inputProps={{ min: 0, step: 0.01 }}
+                        />
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="success.main">
+                        {formatCurrency(editingReceipt.payment_breakdown?.card || 0)}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
                 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                   <Typography variant="body2">Remaining Balance:</Typography>
@@ -990,6 +1845,8 @@ const Receipts: React.FC = () => {
                 )}
               </Grid>
             </Grid>
+              )}
+            </>
           )}
         </DialogContent>
         <DialogActions>
@@ -1009,13 +1866,6 @@ const Receipts: React.FC = () => {
                 }}
               >
                 Print Receipt
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<Edit />}
-                onClick={() => setIsEditing(true)}
-              >
-                Edit
               </Button>
             </>
           ) : (
