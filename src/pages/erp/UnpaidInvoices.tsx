@@ -44,10 +44,6 @@ import {
   Search,
   AttachMoney,
   Payment,
-  MonetizationOn,
-  CreditCard,
-  AccountBalance,
-  LocalAtm,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';

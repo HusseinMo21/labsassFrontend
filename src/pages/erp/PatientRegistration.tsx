@@ -26,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from '../../config/axios';
+import { config } from '../../config/environment';
 
 interface PatientFormData {
   name: string;
@@ -134,7 +135,7 @@ const PatientRegistration: React.FC = () => {
     setLoadingReceipt(true);
     try {
       const timestamp = new Date().getTime();
-      const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_prevent_download=1&_inline=1`;
+      const pdfUrl = `${config.API_ORIGIN}/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_prevent_download=1&_inline=1`;
       
       // Always use axios with blob to prevent downloads and IDM interception
       const response = await axios.get(pdfUrl, {
@@ -211,7 +212,7 @@ const PatientRegistration: React.FC = () => {
     
     try {
       const timestamp = new Date().getTime();
-      const pdfUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_prevent_download=1&_inline=1`;
+      const pdfUrl = `${config.API_ORIGIN}/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_prevent_download=1&_inline=1`;
       
       // Always use axios with blob to prevent downloads and IDM interception
       const response = await axios.get(pdfUrl, {
@@ -397,7 +398,28 @@ const PatientRegistration: React.FC = () => {
         try {
           const visitResponse = await axios.get(`/api/visits/${patientCredentials.visitId}`);
           const visit = visitResponse.data;
-          const metadata = visit.metadata ? JSON.parse(visit.metadata) : {};
+          const metadata = visit.metadata ? (typeof visit.metadata === 'string' ? JSON.parse(visit.metadata) : visit.metadata) : {};
+          
+          // Update patient data in metadata
+          const patientData = metadata.patient_data || {};
+          patientData.name = formData.name;
+          patientData.age = parseInt(formData.age);
+          patientData.phone = formData.phone;
+          patientData.gender = mapGenderForBackend(formData.gender);
+          patientData.organization = formData.organization;
+          patientData.doctor = formData.referring_doctor;
+          patientData.referring_doctor = formData.referring_doctor;
+          patientData.sample_type = formData.sample_type;
+          patientData.sample_size = formData.sample_size;
+          patientData.number_of_samples = parseInt(formData.number_of_samples) || 1;
+          patientData.attendance_day = formData.attendance_day;
+          patientData.delivery_day = formData.delivery_day;
+          patientData.attendance_date = formData.attendance_date;
+          patientData.delivery_date = formData.delivery_date;
+          patientData.medical_history = formData.medical_history;
+          patientData.previous_tests = formData.previous_tests;
+          patientData.lab_number = formData.lab_number;
+          metadata.patient_data = patientData;
           
           // Update payment details in metadata
           const paymentDetails = metadata.payment_details || {};
@@ -405,11 +427,18 @@ const PatientRegistration: React.FC = () => {
           paymentDetails.amount_paid_card = additionalPaymentAmount;
           paymentDetails.additional_payment_method = formData.additional_payment_method;
           paymentDetails.total_paid = totalPaid;
-          
           metadata.payment_details = paymentDetails;
+          
+          // Update financial data in metadata
+          const financialData = metadata.financial_data || {};
+          financialData.total_amount = totalAmount;
+          financialData.final_amount = totalAmount;
+          metadata.financial_data = financialData;
           
           // Update visit
           await axios.put(`/api/visits/${patientCredentials.visitId}`, {
+            visit_date: formData.attendance_date || visit.visit_date,
+            expected_delivery_date: formData.delivery_date || visit.expected_delivery_date,
             total_amount: totalAmount,
             upfront_payment: totalPaid,
             billing_status: billingStatus,
@@ -425,25 +454,29 @@ const PatientRegistration: React.FC = () => {
       setIsEditing(false);
       
       // Refresh the receipt preview by fetching new PDF
+      // Add a small delay to ensure database is updated
       if (patientCredentials.visitId) {
-        try {
-          // Clean up old blob URL
-          if (receiptPreviewUrl) {
-            window.URL.revokeObjectURL(receiptPreviewUrl);
+        setTimeout(async () => {
+          try {
+            // Clean up old blob URL
+            if (receiptPreviewUrl) {
+              window.URL.revokeObjectURL(receiptPreviewUrl);
+            }
+            
+            // Fetch updated PDF with timestamp to avoid cache
+            const timestamp = new Date().getTime();
+            const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt?t=${timestamp}&_refresh=1`, {
+              responseType: 'blob'
+            });
+            
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            setReceiptPreviewUrl(url);
+          } catch (error) {
+            console.error('Failed to refresh receipt preview:', error);
+            toast.error('Failed to refresh receipt preview');
           }
-          
-          // Fetch updated PDF
-          const response = await axios.get(`/api/check-in/visits/${patientCredentials.visitId}/unpaid-invoice-receipt`, {
-            responseType: 'blob'
-          });
-          
-          const blob = new Blob([response.data], { type: 'application/pdf' });
-          const url = window.URL.createObjectURL(blob);
-          setReceiptPreviewUrl(url);
-        } catch (error) {
-          console.error('Failed to refresh receipt preview:', error);
-          toast.error('Failed to refresh receipt preview');
-        }
+        }, 500); // Wait 500ms for database to update
       }
     } catch (error: any) {
       console.error('Failed to update patient:', error);
@@ -523,6 +556,26 @@ const PatientRegistration: React.FC = () => {
       if (response.data && response.data.data && response.data.data.length > 0) {
         const patient = response.data.data[0];
         
+        // Get the latest visit if available
+        const latestVisit = patient.visits && patient.visits.length > 0 ? patient.visits[0] : null;
+        
+        // Parse visit metadata if available
+        let visitMetadata: any = {};
+        let patientDataFromMetadata: any = {};
+        let paymentDetails: any = {};
+        
+        if (latestVisit && latestVisit.metadata) {
+          try {
+            visitMetadata = typeof latestVisit.metadata === 'string' 
+              ? JSON.parse(latestVisit.metadata) 
+              : latestVisit.metadata;
+            patientDataFromMetadata = visitMetadata.patient_data || {};
+            paymentDetails = visitMetadata.payment_details || {};
+          } catch (e) {
+            console.error('Failed to parse visit metadata:', e);
+          }
+        }
+        
         // Helper function to format date for input field
         const formatDateForInput = (dateString: string) => {
           if (!dateString) return '';
@@ -541,30 +594,71 @@ const PatientRegistration: React.FC = () => {
           return gender || 'ذكر';
         };
 
+        // Get attendance date from visit or patient
+        const attendanceDate = latestVisit?.visit_date 
+          || patientDataFromMetadata.attendance_date 
+          || patient.attendance_date 
+          || '';
+        
+        // Get delivery date from visit or patient
+        const deliveryDate = latestVisit?.expected_delivery_date 
+          || patientDataFromMetadata.delivery_date 
+          || patient.delivery_date 
+          || '';
+        
+        // Get referring doctor from visit metadata, patient data, or patient record
+        const referringDoctor = patientDataFromMetadata.referring_doctor 
+          || patientDataFromMetadata.doctor 
+          || latestVisit?.referring_doctor 
+          || patient.doctor 
+          || '';
+        
+        // Get number of samples from visit metadata or patient record
+        const numberOfSamples = patientDataFromMetadata.number_of_samples 
+          || patient.number_of_samples?.toString() 
+          || '';
+        
+        // Get payment amounts from visit metadata or patient record
+        const amountPaidCash = paymentDetails.amount_paid_cash 
+          || latestVisit?.upfront_payment 
+          || patient.amount_paid_cash?.toString() 
+          || '';
+        
+        const amountPaidCard = paymentDetails.amount_paid_card 
+          || patient.amount_paid_card?.toString() 
+          || '';
+        
+        const additionalPaymentMethod = paymentDetails.additional_payment_method 
+          || patient.additional_payment_method 
+          || 'Fawry';
+        
+        const totalAmount = latestVisit?.total_amount 
+          || patientDataFromMetadata.total_amount 
+          || patient.total_amount?.toString() 
+          || '';
 
-
-        // Fill the form with existing patient data
-    setFormData({
-      name: patient.name || '',
+        // Fill the form with existing patient data (prioritize visit data, then patient data)
+        setFormData({
+          name: patient.name || '',
           age: patient.age?.toString() || '',
-      phone: patient.phone || '',
+          phone: patient.phone || '',
           lab_number: patient.lab || patient.lab_number || searchValue,
           gender: mapGender(patient.gender),
-      organization: patient.organization || '',
-          attendance_day: patient.day_of_week || 'السبت',
-          delivery_day: patient.day_of_week || 'السبت',
-          delivery_date: formatDateForInput(patient.delivery_date),
-          referring_doctor: patient.doctor || '',
-          sample_size: patient.sample_size || 'صغيرة جدا',
-          number_of_samples: patient.number_of_samples?.toString() || '',
-          attendance_date: formatDateForInput(patient.attendance_date),
+          organization: patient.organization || '',
+          attendance_day: attendanceDate ? getDayNameFromDate(attendanceDate) : (patient.day_of_week || 'السبت'),
+          delivery_day: deliveryDate ? getDayNameFromDate(deliveryDate) : (patient.day_of_week || 'السبت'),
+          delivery_date: formatDateForInput(deliveryDate),
+          referring_doctor: referringDoctor,
+          sample_size: patientDataFromMetadata.sample_size || patient.sample_size || 'صغيرة جدا',
+          number_of_samples: numberOfSamples,
+          attendance_date: formatDateForInput(attendanceDate),
           previous_tests: patient.previous_tests || 'نعم',
-          sample_type: patient.sample_type || 'Pathology',
-      medical_history: patient.medical_history || '',
-          total_amount: patient.total_amount?.toString() || '',
-          amount_paid_cash: patient.amount_paid_cash?.toString() || '',
-          amount_paid_card: patient.amount_paid_card?.toString() || '',
-          additional_payment_method: patient.additional_payment_method || 'Fawry',
+          sample_type: patientDataFromMetadata.sample_type || patient.sample_type || 'Pathology',
+          medical_history: patient.medical_history || '',
+          total_amount: totalAmount,
+          amount_paid_cash: amountPaidCash.toString(),
+          amount_paid_card: amountPaidCard.toString(),
+          additional_payment_method: additionalPaymentMethod,
         });
         
         toast.success('Patient found! Form filled with existing data.');
@@ -1351,16 +1445,21 @@ const PatientRegistration: React.FC = () => {
               </Button>
             )}
           </DialogTitle>
-          <DialogContent sx={{ p: 0, position: 'relative' }}>
+          <DialogContent sx={{ p: 0, position: 'relative', height: 'calc(90vh - 120px)' }}>
             {isEditing ? (
-              <Box sx={{ p: 3, maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
-                <Typography variant="h6" sx={{ mb: 3, color: '#d32f2f', textAlign: 'center' }}>
+              <Box sx={{ 
+                width: '100%', 
+                p: 1, 
+                overflowY: 'auto',
+                height: '100%'
+              }}>
+                <Typography variant="caption" sx={{ mb: 1, color: '#d32f2f', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600, display: 'block' }}>
                   تعديل بيانات المريض
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={0.5}>
                   {/* Name */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       الاسم *
                     </Typography>
                     <TextField
@@ -1369,11 +1468,12 @@ const PatientRegistration: React.FC = () => {
                       onChange={(e) => handleInputChange('name', e.target.value)}
                       required
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                   {/* Age */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       السن *
                     </Typography>
                     <TextField
@@ -1382,11 +1482,12 @@ const PatientRegistration: React.FC = () => {
                       onChange={(e) => handleInputChange('age', e.target.value)}
                       required
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                   {/* Phone */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       رقم الموبايل
                     </Typography>
                     <TextField
@@ -1394,11 +1495,12 @@ const PatientRegistration: React.FC = () => {
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                   {/* Organization */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       الجهة
                     </Typography>
                     <TextField
@@ -1406,26 +1508,41 @@ const PatientRegistration: React.FC = () => {
                       value={formData.organization}
                       onChange={(e) => handleInputChange('organization', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                   {/* Gender */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       النوع
                     </Typography>
                     <FormControl fullWidth size="small">
                       <Select
                         value={formData.gender}
                         onChange={(e) => handleInputChange('gender', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
                       >
                         <MenuItem value="ذكر">ذكر</MenuItem>
                         <MenuItem value="أنثى">أنثى</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
+                  {/* Lab Number */}
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      Lab Number
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.lab_number}
+                      onChange={(e) => handleInputChange('lab_number', e.target.value)}
+                      size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                    />
+                  </Grid>
                   {/* Referring Doctor */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       الدكتور المرسل
                     </Typography>
                     <TextField
@@ -1433,11 +1550,154 @@ const PatientRegistration: React.FC = () => {
                       value={formData.referring_doctor}
                       onChange={(e) => handleInputChange('referring_doctor', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
+                  {/* Attendance Date */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      تاريخ الحضور
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      value={formData.attendance_date}
+                      onChange={(e) => handleDateChange('attendance_date', e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                    />
+                  </Grid>
+                  {/* Attendance Day */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      يوم الحضور
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.attendance_day}
+                        onChange={(e) => handleInputChange('attendance_day', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                      >
+                        <MenuItem value="السبت">السبت</MenuItem>
+                        <MenuItem value="الأحد">الأحد</MenuItem>
+                        <MenuItem value="الاثنين">الاثنين</MenuItem>
+                        <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                        <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                        <MenuItem value="الخميس">الخميس</MenuItem>
+                        <MenuItem value="الجمعة">الجمعة</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  {/* Delivery Date */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      ميعاد التسليم
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      value={formData.delivery_date}
+                      onChange={(e) => handleDateChange('delivery_date', e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                    />
+                  </Grid>
+                  {/* Delivery Day */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      يوم التسليم
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.delivery_day}
+                        onChange={(e) => handleInputChange('delivery_day', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                      >
+                        <MenuItem value="السبت">السبت</MenuItem>
+                        <MenuItem value="الأحد">الأحد</MenuItem>
+                        <MenuItem value="الاثنين">الاثنين</MenuItem>
+                        <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
+                        <MenuItem value="الأربعاء">الأربعاء</MenuItem>
+                        <MenuItem value="الخميس">الخميس</MenuItem>
+                        <MenuItem value="الجمعة">الجمعة</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  {/* Number of Samples */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      عدد العينات
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      value={formData.number_of_samples}
+                      onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
+                      inputProps={{ min: 1, max: 10 }}
+                      size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                    />
+                  </Grid>
+                  {/* Sample Size */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      حجم العينة
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.sample_size}
+                        onChange={(e) => handleInputChange('sample_size', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                      >
+                        <MenuItem value="صغيرة جدا">صغيرة جدا</MenuItem>
+                        <MenuItem value="صغيرة">صغيرة</MenuItem>
+                        <MenuItem value="متوسطة">متوسطة</MenuItem>
+                        <MenuItem value="كبيرة">كبيرة</MenuItem>
+                        <MenuItem value="كبيرة جدا">كبيرة جدا</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  {/* Sample Type */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      نوع العينة
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.sample_type}
+                        onChange={(e) => handleInputChange('sample_type', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                      >
+                        <MenuItem value="Pathology">Pathology</MenuItem>
+                        <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
+                        <MenuItem value="سائل">سائل</MenuItem>
+                        <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
+                        <MenuItem value="frozen">frozen</MenuItem>
+                        <MenuItem value="اخرى">اخرى</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  {/* Previous Tests */}
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      هل سبق لك تحاليل باثولوجي
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.previous_tests}
+                        onChange={(e) => handleInputChange('previous_tests', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                      >
+                        <MenuItem value="نعم">نعم</MenuItem>
+                        <MenuItem value="لا">لا</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
                   {/* Total Amount */}
-                  <Grid item xs={12} md={4}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       إجمالي المبلغ
                     </Typography>
                     <TextField
@@ -1446,11 +1706,12 @@ const PatientRegistration: React.FC = () => {
                       value={formData.total_amount}
                       onChange={(e) => handleInputChange('total_amount', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                   {/* Amount Paid Cash */}
-                  <Grid item xs={12} md={4}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       المبلغ المدفوع نقداً
                     </Typography>
                     <TextField
@@ -1459,11 +1720,12 @@ const PatientRegistration: React.FC = () => {
                       value={formData.amount_paid_cash}
                       onChange={(e) => handleInputChange('amount_paid_cash', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                   {/* Amount Paid Card */}
-                  <Grid item xs={12} md={4}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       المبلغ المدفوع ب {formData.additional_payment_method}
                     </Typography>
                     <TextField
@@ -1472,26 +1734,51 @@ const PatientRegistration: React.FC = () => {
                       value={formData.amount_paid_card}
                       onChange={(e) => handleInputChange('amount_paid_card', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
+                  </Grid>
+                  {/* Payment Method */}
+                  <Grid item xs={4}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
+                      طريقة الدفع الإضافية
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={formData.additional_payment_method}
+                        onChange={(e) => handleInputChange('additional_payment_method', e.target.value)}
+                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                      >
+                        <MenuItem value="Fawry">Fawry</MenuItem>
+                        <MenuItem value="InstaPay">InstaPay</MenuItem>
+                        <MenuItem value="VodafoneCash">VodafoneCash</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Grid>
                   {/* Medical History */}
                   <Grid item xs={12}>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       التاريخ المرضي
                     </Typography>
                     <TextField
                       fullWidth
                       multiline
-                      rows={3}
+                      rows={1.5}
                       value={formData.medical_history}
                       onChange={(e) => handleInputChange('medical_history', e.target.value)}
                       size="small"
+                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
                 </Grid>
               </Box>
             ) : (
-              <Box sx={{ height: 'calc(90vh - 120px)', width: '100%', position: 'relative', backgroundColor: '#f5f5f5' }}>
+              <Box sx={{ 
+                width: '100%', 
+                height: '100%', 
+                position: 'relative', 
+                backgroundColor: '#f5f5f5' 
+              }}>
                 {receiptPreviewUrl ? (
                   <iframe
                     id="receipt-preview-iframe"

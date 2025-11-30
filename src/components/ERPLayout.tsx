@@ -22,7 +22,6 @@ import {
   Menu as MenuIcon,
   Dashboard,
   People,
-  CalendarToday,
   Receipt,
   Person,
   Inventory,

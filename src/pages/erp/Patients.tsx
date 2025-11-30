@@ -26,7 +26,6 @@ import {
   Alert,
   CircularProgress,
   Pagination,
-  Badge,
 } from '@mui/material';
 import {
   Delete,
@@ -111,6 +110,8 @@ const Patients: React.FC = () => {
     attendance_date: '',
     delivery_date: '',
   });
+  const [labNoInput, setLabNoInput] = useState('');
+  const [labNoTimeout, setLabNoTimeout] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -191,11 +192,44 @@ const Patients: React.FC = () => {
     };
   }, [searchInput, search]);
 
-  // Cleanup timeout on unmount
+  // Debounced Lab No filter effect
+  useEffect(() => {
+    // Clear existing timeout
+    if (labNoTimeout) {
+      clearTimeout(labNoTimeout);
+    }
+    
+    // If lab no input is empty, update filter immediately
+    if (labNoInput === '') {
+      setFilters(prev => ({ ...prev, lab_no: '' }));
+      setCurrentPage(1);
+      return;
+    }
+    
+    // Set new timeout for debounced filter
+    const timeout = setTimeout(() => {
+      setFilters(prev => ({ ...prev, lab_no: labNoInput }));
+      setCurrentPage(1); // Reset to first page when filtering
+    }, 1500); // Wait 1.5 seconds after user stops typing
+    
+    setLabNoTimeout(timeout);
+    
+    // Cleanup function
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [labNoInput]);
+
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (searchTimeout) {
         clearTimeout(searchTimeout);
+      }
+      if (labNoTimeout) {
+        clearTimeout(labNoTimeout);
       }
     };
   }, []);
@@ -533,6 +567,7 @@ const Patients: React.FC = () => {
   };
 
   const clearFilters = () => {
+    setLabNoInput('');
     setFilters({
       lab_no: '',
       attendance_date: '',
@@ -773,10 +808,11 @@ const Patients: React.FC = () => {
               <TextField
                 fullWidth
                 label="Lab No"
-                value={filters.lab_no}
-                onChange={(e) => handleFilterChange('lab_no', e.target.value)}
-                placeholder="Search by lab number..."
+                value={labNoInput}
+                onChange={(e) => setLabNoInput(e.target.value)}
+                placeholder="Search by lab number... (wait 1.5 seconds after typing)"
                 size="small"
+                helperText={labNoInput !== filters.lab_no && labNoInput !== '' ? "Type to search..." : ""}
               />
             </Grid>
             <Grid item xs={12} md={4}>
