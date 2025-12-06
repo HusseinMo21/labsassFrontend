@@ -88,9 +88,13 @@ interface ShiftReport {
     lab_number: string;
     total_amount: number;
     paid_amount: number;
+    cash_paid?: number;
+    other_paid?: number;
+    other_payment_method?: string;
     remaining_amount: number;
     type: string;
-    sender: string;
+    doctor: string;
+    organization?: string;
     visit_date: string;
   }>;
 }
@@ -486,10 +490,13 @@ const ShiftManagement: React.FC = () => {
                     <th>Patient</th>
                     <th>Lab Number</th>
                     <th>Total</th>
-                    <th>Paid</th>
+                    <th>Total Paid</th>
+                    <th>Cash</th>
+                    <th>Other Payment</th>
                     <th>Remaining</th>
                     <th>Type</th>
-                    <th>Sender</th>
+                    <th>Doctor</th>
+                    <th>Organization</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -499,9 +506,12 @@ const ShiftManagement: React.FC = () => {
                       <td>${patient.lab_number || 'N/A'}</td>
                       <td>EGP ${(parseFloat(patient.total_amount) || 0).toFixed(2)}</td>
                       <td>EGP ${(parseFloat(patient.paid_amount) || 0).toFixed(2)}</td>
+                      <td>EGP ${(parseFloat(patient.cash_paid) || 0).toFixed(2)}</td>
+                      <td>EGP ${(parseFloat(patient.other_paid) || 0).toFixed(2)} ${patient.other_payment_method ? `(${patient.other_payment_method})` : ''}</td>
                       <td>EGP ${(parseFloat(patient.remaining_amount) || 0).toFixed(2)}</td>
                       <td>${patient.type || 'N/A'}</td>
-                      <td>${patient.sender || 'N/A'}</td>
+                      <td>${patient.doctor || patient.sender || 'N/A'}</td>
+                      <td>${patient.organization || ''}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1279,10 +1289,13 @@ const ShiftManagement: React.FC = () => {
                       <TableCell>Patient</TableCell>
                       <TableCell>Lab Number</TableCell>
                       <TableCell>Total</TableCell>
-                      <TableCell>Paid</TableCell>
+                      <TableCell>Total Paid</TableCell>
+                      <TableCell>Cash</TableCell>
+                      <TableCell>Other Payment</TableCell>
                       <TableCell>Remaining</TableCell>
                       <TableCell>Type</TableCell>
-                      <TableCell>Sender</TableCell>
+                      <TableCell>Doctor</TableCell>
+                      <TableCell>Organization</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1292,13 +1305,21 @@ const ShiftManagement: React.FC = () => {
                         <TableCell>{patient.lab_number || 'Unknown'}</TableCell>
                         <TableCell>{formatCurrency(patient.total_amount || 0)}</TableCell>
                         <TableCell>{formatCurrency(patient.paid_amount || 0)}</TableCell>
+                        <TableCell>{formatCurrency(patient.cash_paid || 0)}</TableCell>
+                        <TableCell>
+                          {patient.other_paid && patient.other_paid > 0 
+                            ? `${formatCurrency(patient.other_paid)} (${patient.other_payment_method || 'Other'})`
+                            : formatCurrency(0)
+                          }
+                        </TableCell>
                         <TableCell>{formatCurrency(patient.remaining_amount || 0)}</TableCell>
                         <TableCell>{patient.type || 'Unknown'}</TableCell>
-                        <TableCell>{patient.sender || 'Unknown'}</TableCell>
+                        <TableCell>{patient.doctor || patient.sender || 'Unknown'}</TableCell>
+                        <TableCell>{patient.organization || ''}</TableCell>
                       </TableRow>
                     )) : (
                       <TableRow>
-                        <TableCell colSpan={7} align="center">
+                        <TableCell colSpan={10} align="center">
                           <Typography variant="body2" color="text.secondary">
                             No patients found for this shift
                           </Typography>

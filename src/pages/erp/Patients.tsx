@@ -916,9 +916,17 @@ const Patients: React.FC = () => {
                       <TableCell>{getGenderChip(patient.gender)}</TableCell>
                       <TableCell>
                         {(() => {
-                          // If age is directly available, use it
-                          if (patient.age && patient.age > 0) {
-                            return patient.age;
+                          // If age is directly available (as string like "25M,5D" or number), use it
+                          if (patient.age !== null && patient.age !== undefined && patient.age !== '') {
+                            // Check if it's a string format (contains letters) or numeric
+                            const ageStr = String(patient.age);
+                            if (ageStr.match(/[MDY]/i)) {
+                              // It's a format like "25M,5D" - display as-is
+                              return ageStr;
+                            } else if (!isNaN(Number(ageStr)) && Number(ageStr) > 0) {
+                              // It's a numeric age - display as-is
+                              return ageStr;
+                            }
                           }
                           
                           // If birth_date is available, calculate age from it

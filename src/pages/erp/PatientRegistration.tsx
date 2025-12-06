@@ -352,7 +352,7 @@ const PatientRegistration: React.FC = () => {
       const patientData: any = {
         name: formData.name,
         phone: formData.phone,
-        age: parseInt(formData.age),
+        age: formData.age, // Send age as string to preserve formats like "25M,5D"
         gender: mapGenderForBackend(formData.gender),
         organization: formData.organization,
         doctor: formData.referring_doctor,
@@ -403,7 +403,7 @@ const PatientRegistration: React.FC = () => {
           // Update patient data in metadata
           const patientData = metadata.patient_data || {};
           patientData.name = formData.name;
-          patientData.age = parseInt(formData.age);
+          patientData.age = formData.age; // Send age as string to preserve formats like "25M,5D"
           patientData.phone = formData.phone;
           patientData.gender = mapGenderForBackend(formData.gender);
           patientData.organization = formData.organization;
@@ -695,7 +695,7 @@ const PatientRegistration: React.FC = () => {
       const patientData: any = {
         name: formData.name,
         phone: formData.phone,
-        age: parseInt(formData.age),
+        age: formData.age, // Send age as string to preserve formats like "25M,5D"
         gender: mapGenderForBackend(formData.gender), // Convert Arabic to English for backend
         organization: formData.organization,
         doctor: formData.referring_doctor,
@@ -882,7 +882,7 @@ const PatientRegistration: React.FC = () => {
                   </Typography>
               <TextField
                 fullWidth
-                    placeholder="السن"
+                    placeholder="مثال: 25 أو 25M أو 5D أو 25M,5D"
                     value={formData.age}
                     onChange={(e) => handleInputChange('age', e.target.value)}
                     required
@@ -1315,7 +1315,7 @@ const PatientRegistration: React.FC = () => {
               startIcon={<Preview />}
               onClick={handlePreviewReceipt}
               sx={{ 
-                backgroundColor: '#4caf50',
+                backgroundColor: '#000000',
                 color: 'white',
                 borderRadius: 1,
                 px: 4,
@@ -1324,7 +1324,7 @@ const PatientRegistration: React.FC = () => {
                 fontWeight: 'bold',
                 minWidth: 140,
                 '&:hover': {
-                  backgroundColor: '#45a049',
+                  backgroundColor: '#333333',
                 }
               }}
             >
@@ -1337,7 +1337,7 @@ const PatientRegistration: React.FC = () => {
               onClick={handleReceiptPrint}
               disabled={loadingReceipt}
               sx={{ 
-                backgroundColor: '#1976d2',
+                backgroundColor: '#000000',
                 color: 'white',
                 borderRadius: 1,
                 px: 4,
@@ -1345,6 +1345,13 @@ const PatientRegistration: React.FC = () => {
                 fontSize: '1rem',
                 fontWeight: 'bold',
                 minWidth: 120,
+                '&:hover': {
+                  backgroundColor: '#333333',
+                },
+                '&:disabled': {
+                  backgroundColor: '#666666',
+                  color: 'white',
+                }
               }}
             >
               {loadingReceipt ? 'جاري التحميل...' : 'طباعة الإيصال'}
@@ -1356,7 +1363,7 @@ const PatientRegistration: React.FC = () => {
               onClick={handleSamplePrint}
               disabled={loadingSample}
               sx={{ 
-                backgroundColor: '#9c27b0',
+                backgroundColor: '#000000',
                 color: 'white',
                 borderRadius: 1,
                 px: 4,
@@ -1364,6 +1371,13 @@ const PatientRegistration: React.FC = () => {
                 fontSize: '1rem',
                 fontWeight: 'bold',
                 minWidth: 120,
+                '&:hover': {
+                  backgroundColor: '#333333',
+                },
+                '&:disabled': {
+                  backgroundColor: '#666666',
+                  color: 'white',
+                }
               }}
             >
               {loadingSample ? 'جاري التحميل...' : 'طباعة العينة'}
