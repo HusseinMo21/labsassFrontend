@@ -481,29 +481,28 @@ const OrganizationPatientsView: React.FC<OrganizationPatientsViewProps> = ({ org
           <Alert severity="info">No patients found for this organization</Alert>
         ) : (
           <>
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
+            <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: '100%', overflowX: 'hidden' }}>
+              <Table size="small" sx={{ tableLayout: 'auto' }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Lab No</TableCell>
-                    <TableCell>Patient Name</TableCell>
-                    <TableCell>تاريخ الحضور</TableCell>
-                    <TableCell>تاريخ الاستلام</TableCell>
-                    <TableCell>Total Paid</TableCell>
-                    <TableCell>Remaining</TableCell>
-                    <TableCell>Phone</TableCell>
-                    <TableCell>WhatsApp</TableCell>
-                    <TableCell>Gender</TableCell>
-                    <TableCell>Visits</TableCell>
-                    <TableCell>Total Amount</TableCell>
-                    <TableCell>Tests</TableCell>
-                    <TableCell align="center">Actions</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Lab No</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Patient Name</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>تاريخ الحضور</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>تاريخ الاستلام</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Paid</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Remaining</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Phone</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Gender</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Visits</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Total</TableCell>
+                    <TableCell sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Tests</TableCell>
+                    <TableCell align="center" sx={{ padding: '12px 8px', fontSize: '0.95rem', fontWeight: 600 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {patients.map((patient) => (
                     <TableRow key={patient.id} hover>
-                      <TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                           {patient.lab_numbers && patient.lab_numbers.length > 0 ? (
                             patient.lab_numbers.slice(0, 2).map((labNo, index) => (
@@ -513,6 +512,7 @@ const OrganizationPatientsView: React.FC<OrganizationPatientsViewProps> = ({ org
                                 color="secondary"
                                 variant="outlined"
                                 size="small"
+                                sx={{ height: '28px', fontSize: '0.85rem' }}
                               />
                             ))
                           ) : (
@@ -521,6 +521,7 @@ const OrganizationPatientsView: React.FC<OrganizationPatientsViewProps> = ({ org
                               color="default"
                               variant="outlined"
                               size="small"
+                              sx={{ height: '28px', fontSize: '0.85rem' }}
                             />
                           )}
                           {patient.lab_numbers && patient.lab_numbers.length > 2 && (
@@ -529,34 +530,37 @@ const OrganizationPatientsView: React.FC<OrganizationPatientsViewProps> = ({ org
                               color="default"
                               variant="outlined"
                               size="small"
+                              sx={{ height: '28px', fontSize: '0.85rem' }}
                             />
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Person color="primary" />
-                          {patient.name}
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Person color="primary" sx={{ fontSize: '1.2rem' }} />
+                          <Typography variant="body2" sx={{ fontSize: '0.95rem' }}>{patient.name}</Typography>
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                           {patient.attendance_dates && patient.attendance_dates.length > 0 ? (
                             patient.attendance_dates.slice(0, 2).map((date, index) => (
                               <Chip 
                                 key={index}
-                                label={new Date(date).toLocaleDateString('ar-EG')}
+                                label={new Date(date).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}
                                 color="info"
                                 variant="outlined"
                                 size="small"
+                                sx={{ height: '28px', fontSize: '0.85rem' }}
                               />
                             ))
                           ) : (
                             <Chip 
-                              label="No dates"
+                              label="-"
                               color="default"
                               variant="outlined"
                               size="small"
+                              sx={{ height: '28px', fontSize: '0.85rem' }}
                             />
                           )}
                           {patient.attendance_dates && patient.attendance_dates.length > 2 && (
@@ -565,28 +569,31 @@ const OrganizationPatientsView: React.FC<OrganizationPatientsViewProps> = ({ org
                               color="default"
                               variant="outlined"
                               size="small"
+                              sx={{ height: '28px', fontSize: '0.85rem' }}
                             />
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                           {patient.delivery_dates && patient.delivery_dates.length > 0 ? (
                             patient.delivery_dates.slice(0, 2).map((date, index) => (
                               <Chip 
                                 key={index}
-                                label={new Date(date).toLocaleDateString('ar-EG')}
+                                label={new Date(date).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}
                                 color="warning"
                                 variant="outlined"
                                 size="small"
+                                sx={{ height: '28px', fontSize: '0.85rem' }}
                               />
                             ))
                           ) : (
                             <Chip 
-                              label="No dates"
+                              label="-"
                               color="default"
                               variant="outlined"
                               size="small"
+                              sx={{ height: '28px', fontSize: '0.85rem' }}
                             />
                           )}
                           {patient.delivery_dates && patient.delivery_dates.length > 2 && (
@@ -595,72 +602,48 @@ const OrganizationPatientsView: React.FC<OrganizationPatientsViewProps> = ({ org
                               color="default"
                               variant="outlined"
                               size="small"
+                              sx={{ height: '28px', fontSize: '0.85rem' }}
                             />
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`EGP ${(Number(patient.total_paid) || 0).toFixed(2)}`}
-                          color="success"
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`EGP ${(Number(patient.remaining_balance) || 0).toFixed(2)}`}
-                          color={Number(patient.remaining_balance) > 0 ? "error" : "success"}
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Phone fontSize="small" color="action" />
-                          {patient.phone}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {patient.whatsapp_number ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <WhatsApp fontSize="small" color="success" />
-                            {patient.whatsapp_number}
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No WhatsApp
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={patient.gender === 'male' ? 'Male' : 'Female'}
-                          color={patient.gender === 'male' ? 'primary' : 'secondary'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge badgeContent={patient.visits_count} color="primary">
-                          <Typography variant="body2">
-                            {patient.visits_count} visits
-                          </Typography>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          EGP {(Number(patient.total_amount) || 0).toFixed(2)}
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.95rem', fontWeight: 500, color: 'success.main' }}>
+                          {(Number(patient.total_paid) || 0).toFixed(0)}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`${patient.total_tests || 0} tests`}
-                          color="info"
-                          variant="outlined"
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.95rem', fontWeight: 500, color: Number(patient.remaining_balance) > 0 ? 'error.main' : 'success.main' }}>
+                          {(Number(patient.remaining_balance) || 0).toFixed(0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.95rem' }}>{patient.phone}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Chip
+                          label={patient.gender === 'male' ? 'M' : 'F'}
+                          color={patient.gender === 'male' ? 'primary' : 'secondary'}
                           size="small"
+                          sx={{ height: '28px', fontSize: '0.85rem' }}
                         />
                       </TableCell>
-                      <TableCell align="center">
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                          {patient.visits_count}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                          {(Number(patient.total_amount) || 0).toFixed(0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ padding: '10px 8px' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.95rem' }}>
+                          {patient.total_tests || 0}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={{ padding: '10px 8px' }}>
                         {(patient.whatsapp_number || patient.phone) && (
                           <Tooltip title="Contact via WhatsApp">
                             <IconButton

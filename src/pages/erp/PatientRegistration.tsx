@@ -94,6 +94,24 @@ const PatientRegistration: React.FC = () => {
     labNumber?: string;
     patientId?: number;
   } | null>(null);
+  const [organizationInputMode, setOrganizationInputMode] = useState<'select' | 'manual'>('select');
+  
+  // Predefined organization options
+  const organizationOptions = [
+    'كفر الدوار',
+    'سموحة',
+    'ايليت',
+    'شلالات',
+    'مار مرقس',
+    'ابراهيم عبيد',
+    'عقبة بن نافع',
+    'شركة الرياض',
+    'ابوقير للاسمدة',
+    'الباشا',
+    'الفا',
+    'الحرمين',
+    'سموحة الدولي'
+  ];
 
   const handleInputChange = (field: keyof PatientFormData, value: string) => {
     setFormData(prev => ({
@@ -637,6 +655,17 @@ const PatientRegistration: React.FC = () => {
           || patient.total_amount?.toString() 
           || '';
 
+        // Determine organization input mode based on loaded data
+        const loadedOrganization = patient.organization || patientDataFromMetadata.organization || 
+                     (typeof patient.organization_id === 'string' ? patient.organization_id : '') || '';
+        if (loadedOrganization && organizationOptions.includes(loadedOrganization)) {
+          setOrganizationInputMode('select');
+        } else if (loadedOrganization) {
+          setOrganizationInputMode('manual');
+        } else {
+          setOrganizationInputMode('select');
+        }
+
         // Fill the form with existing patient data (prioritize visit data, then patient data)
         setFormData({
           name: patient.name || '',
@@ -644,7 +673,7 @@ const PatientRegistration: React.FC = () => {
           phone: patient.phone || '',
           lab_number: patient.lab || patient.lab_number || searchValue,
           gender: mapGender(patient.gender),
-          organization: patient.organization || '',
+          organization: loadedOrganization,
           attendance_day: attendanceDate ? getDayNameFromDate(attendanceDate) : (patient.day_of_week || 'السبت'),
           delivery_day: deliveryDate ? getDayNameFromDate(deliveryDate) : (patient.day_of_week || 'السبت'),
           delivery_date: formatDateForInput(deliveryDate),
@@ -750,6 +779,7 @@ const PatientRegistration: React.FC = () => {
         }
         
         // Reset form
+        setOrganizationInputMode('select');
         setFormData({
           name: '',
         age: '',
@@ -915,17 +945,53 @@ const PatientRegistration: React.FC = () => {
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
                     الجهة
                   </Typography>
-              <TextField
-                fullWidth
-                    placeholder="الجهة"
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <FormControl fullWidth>
+                  <Select
+                    value={
+                      organizationInputMode === 'manual' 
+                        ? 'manual' 
+                        : organizationOptions.includes(formData.organization)
+                          ? formData.organization
+                          : ''
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'manual') {
+                        setOrganizationInputMode('manual');
+                        // Keep existing value if switching to manual mode
+                        if (!formData.organization || organizationOptions.includes(formData.organization)) {
+                          handleInputChange('organization', '');
+                        }
+                      } else {
+                        setOrganizationInputMode('select');
+                        handleInputChange('organization', value);
+                      }
+                    }}
+                    sx={{
+                      borderRadius: 1,
+                    }}
+                  >
+                    {organizationOptions.map((org) => (
+                      <MenuItem key={org} value={org}>{org}</MenuItem>
+                    ))}
+                    <MenuItem value="manual">أخرى (إدخال يدوي)</MenuItem>
+                  </Select>
+                </FormControl>
+                {organizationInputMode === 'manual' && (
+                  <TextField
+                    fullWidth
+                    placeholder="أدخل الجهة يدوياً"
                     value={formData.organization}
                     onChange={(e) => handleInputChange('organization', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
                         borderRadius: 1,
-                  }
-                }}
-              />
+                      }
+                    }}
+                  />
+                )}
+              </Box>
             </Grid>
             <Grid item xs={12} md={4}>
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
@@ -1517,13 +1583,48 @@ const PatientRegistration: React.FC = () => {
                     <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
                       الجهة
                     </Typography>
-                    <TextField
-                      fullWidth
-                      value={formData.organization}
-                      onChange={(e) => handleInputChange('organization', e.target.value)}
-                      size="small"
-                      sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
-                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={
+                            organizationInputMode === 'manual' 
+                              ? 'manual' 
+                              : organizationOptions.includes(formData.organization)
+                                ? formData.organization
+                                : ''
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === 'manual') {
+                              setOrganizationInputMode('manual');
+                              // Keep existing value if switching to manual mode
+                              if (!formData.organization || organizationOptions.includes(formData.organization)) {
+                                handleInputChange('organization', '');
+                              }
+                            } else {
+                              setOrganizationInputMode('select');
+                              handleInputChange('organization', value);
+                            }
+                          }}
+                          sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
+                        >
+                          {organizationOptions.map((org) => (
+                            <MenuItem key={org} value={org}>{org}</MenuItem>
+                          ))}
+                          <MenuItem value="manual">أخرى (إدخال يدوي)</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {organizationInputMode === 'manual' && (
+                        <TextField
+                          fullWidth
+                          placeholder="أدخل الجهة يدوياً"
+                          value={formData.organization}
+                          onChange={(e) => handleInputChange('organization', e.target.value)}
+                          size="small"
+                          sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
+                        />
+                      )}
+                    </Box>
                   </Grid>
                   {/* Gender */}
                   <Grid item xs={6}>

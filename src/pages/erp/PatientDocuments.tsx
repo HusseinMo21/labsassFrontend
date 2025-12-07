@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Box,
@@ -49,6 +49,7 @@ interface Visit {
 const PatientDocuments: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { } = useAuth();
   const [loading, setLoading] = useState(true);
   const [visit, setVisit] = useState<Visit | null>(null);
@@ -228,7 +229,10 @@ const PatientDocuments: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Tooltip title="Go Back">
-          <IconButton onClick={() => navigate('/reports')} sx={{ bgcolor: 'white' }}>
+          <IconButton onClick={() => {
+            const returnUrl = (location.state as { returnUrl?: string })?.returnUrl || '/reports';
+            navigate(returnUrl);
+          }} sx={{ bgcolor: 'white' }}>
             <ArrowBack />
           </IconButton>
         </Tooltip>

@@ -576,6 +576,18 @@ const PathologyRecordForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.patient_name || !formData.patient_name.trim()) {
+      toast.error('Patient name is required');
+      return;
+    }
+    
+    if (!formData.lab_no || !formData.lab_no.trim()) {
+      toast.error('Lab number is required');
+      return;
+    }
+    
     setSaving(true);
 
     try {
@@ -611,8 +623,10 @@ const PathologyRecordForm: React.FC = () => {
       });
 
       toast.success('Report saved successfully!');
-      // Navigate back to Reports page with saved state
-      navigate(returnUrl);
+      // Navigate to documents page for this visit
+      navigate(`/documents/${visitId}`, {
+        state: { returnUrl: returnUrl }
+      });
     } catch (error) {
       console.error('Failed to save report:', error);
       toast.error('Failed to save report');
@@ -884,10 +898,7 @@ const PathologyRecordForm: React.FC = () => {
                   name="referred_by"
                   value={formData.referred_by}
                   onChange={(e) => handleInputChange('referred_by', e.target.value)}
-                  required
-                  placeholder="Referred by : *"
-                  error={!formData.referred_by}
-                  helperText={!formData.referred_by ? "Referred by is required" : ""}
+                  placeholder="Referred by"
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={4}>
@@ -926,10 +937,7 @@ const PathologyRecordForm: React.FC = () => {
                   name="age"
                   value={formData.age}
                   onChange={(e) => handleInputChange('age', e.target.value)}
-                  required
-                  placeholder="Age: *"
-                  error={!formData.age}
-                  helperText={!formData.age ? "Age is required" : ""}
+                  placeholder="Age"
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={4}>
