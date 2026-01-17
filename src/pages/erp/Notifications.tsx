@@ -103,11 +103,17 @@ const Notifications: React.FC = () => {
 
   const formatPhoneNumber = (phone: string) => {
     // Remove any non-digit characters
-    const cleaned = phone.replace(/\D/g, '');
+    let cleaned = phone.replace(/\D/g, '');
     
-    // If it doesn't start with country code, add Egypt's country code (20)
-    if (!cleaned.startsWith('20') && cleaned.length === 10) {
-      return `20${cleaned}`;
+    // Handle Egyptian phone numbers
+    // If it starts with 0, remove it (Egyptian local format)
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // If it doesn't start with country code (20), add Egypt's country code
+    if (!cleaned.startsWith('20')) {
+      cleaned = `20${cleaned}`;
     }
     
     return cleaned;

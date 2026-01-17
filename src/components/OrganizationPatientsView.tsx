@@ -15,7 +15,6 @@ import {
   CircularProgress,
   Pagination,
   Tooltip,
-  Badge,
   AppBar,
   Toolbar,
   TextField,
@@ -26,7 +25,6 @@ import {
 } from '@mui/material';
 import {
   Person,
-  Phone,
   WhatsApp,
   ArrowBack,
   Business,

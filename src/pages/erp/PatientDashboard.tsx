@@ -38,21 +38,6 @@ const PatientDashboard: React.FC = () => {
       try {
         const response = await axios.get('/api/patient/me');
         setPatientData(response.data);
-        
-        // Fetch reports statistics
-        try {
-          const reportsResponse = await axios.get('/api/patient/reports');
-          const reports = reportsResponse.data?.data || reportsResponse.data || [];
-          const completed = reports.filter((r: any) => r.test_status === 'completed').length;
-          const pending = reports.filter((r: any) => r.test_status !== 'completed').length;
-          setStats({
-            totalReports: reports.length,
-            completedReports: completed,
-            pendingReports: pending,
-          });
-        } catch (error) {
-          console.error('Error fetching reports stats:', error);
-        }
       } catch (error) {
         console.error('Error fetching patient data:', error);
       } finally {
@@ -60,8 +45,39 @@ const PatientDashboard: React.FC = () => {
       }
     };
 
+    const fetchReportsStats = async () => {
+      try {
+        const reportsResponse = await axios.get('/api/patient/my-reports');
+        console.log('Reports response:', reportsResponse.data);
+        const reports = reportsResponse.data?.reports || reportsResponse.data || [];
+        console.log('Parsed reports:', reports, 'Count:', reports.length);
+        
+        // Enhanced reports with status 'delivered' are the completed ones
+        const completed = reports.filter((r: any) => r.status === 'delivered').length;
+        const pending = reports.filter((r: any) => r.status !== 'delivered').length;
+        
+        console.log('Stats calculated:', { total: reports.length, completed, pending });
+        
+        setStats({
+          totalReports: reports.length,
+          completedReports: completed,
+          pendingReports: pending,
+        });
+      } catch (error: any) {
+        console.error('Error fetching reports stats:', error);
+        console.error('Error response:', error.response?.data);
+        // Set stats to 0 on error to avoid showing stale data
+        setStats({
+          totalReports: 0,
+          completedReports: 0,
+          pendingReports: 0,
+        });
+      }
+    };
+
     if (user) {
       fetchPatientData();
+      fetchReportsStats(); // Fetch stats separately to avoid blocking
     }
   }, [user]);
 

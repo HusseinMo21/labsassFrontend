@@ -917,7 +917,7 @@ const Patients: React.FC = () => {
                       <TableCell>
                         {(() => {
                           // If age is directly available (as string like "25M,5D" or number), use it
-                          if (patient.age !== null && patient.age !== undefined && patient.age !== '') {
+                          if (patient.age !== null && patient.age !== undefined && String(patient.age) !== '') {
                             // Check if it's a string format (contains letters) or numeric
                             const ageStr = String(patient.age);
                             if (ageStr.match(/[MDY]/i)) {

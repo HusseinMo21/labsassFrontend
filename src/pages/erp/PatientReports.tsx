@@ -70,7 +70,8 @@ const PatientReports: React.FC = () => {
   const handlePrintReport = async (report: PatientReport) => {
     try {
       console.log('Starting PDF generation for report:', report);
-      const response = await axios.get(`/api/reports/${report.id}/print`, {
+      // Use the patient-specific endpoint for printing their own reports
+      const response = await axios.get(`/api/patient/my-reports/${report.id}/print`, {
         responseType: 'blob',
       });
       
@@ -137,6 +138,7 @@ const PatientReports: React.FC = () => {
       pending: { color: 'warning', label: 'Pending' },
       in_progress: { color: 'info', label: 'In Progress' },
       completed: { color: 'success', label: 'Completed' },
+      delivered: { color: 'success', label: 'Delivered' },
       cancelled: { color: 'error', label: 'Cancelled' },
     };
 
@@ -252,7 +254,7 @@ const PatientReports: React.FC = () => {
                           </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                              {report.status === 'completed' ? (
+                              {report.status === 'delivered' ? (
                                 <Tooltip title="Download Report">
                                   <IconButton
                                     size="small"
@@ -263,7 +265,7 @@ const PatientReports: React.FC = () => {
                                   </IconButton>
                                 </Tooltip>
                               ) : (
-                                <Tooltip title="Report not yet completed">
+                                <Tooltip title="Report not yet delivered">
                                   <IconButton size="small" disabled>
                                     <PictureAsPdf />
                                   </IconButton>

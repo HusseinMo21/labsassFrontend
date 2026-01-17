@@ -37,6 +37,7 @@ import {
   QrCodeScanner,
   AttachMoney,
   Schedule,
+  Today,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -76,6 +77,7 @@ const navigationItems: NavigationItem[] = [
   // Staff - Limited access (including Extra Payments Management and Unpaid Invoices)
   { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
   { path: '/shift-management', label: 'Shift Management', icon: <Schedule />, roles: ['staff'] },
+  { path: '/today-clients', label: 'Today Clients', icon: <Today />, roles: ['staff'] },
   { path: '/patients', label: 'Patients Search', icon: <People />, roles: ['staff'] },
   { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['staff'] },
   { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },

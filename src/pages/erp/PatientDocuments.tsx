@@ -230,8 +230,8 @@ const PatientDocuments: React.FC = () => {
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Tooltip title="Go Back">
           <IconButton onClick={() => {
-            const returnUrl = (location.state as { returnUrl?: string })?.returnUrl || '/reports';
-            navigate(returnUrl);
+            // Navigate back to the specific report page for this visit
+            navigate(`/reports/${visitId}`);
           }} sx={{ bgcolor: 'white' }}>
             <ArrowBack />
           </IconButton>

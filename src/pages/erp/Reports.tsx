@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -148,11 +148,140 @@ interface FinancialData {
   };
 }
 
+// Memoized table row component for better performance
+const VisitTableRow = React.memo<{
+  visit: Visit & { formattedDate: string };
+  userRole?: string;
+  onTestReport: (visit: Visit) => void;
+  onViewDocuments: (visit: Visit) => void;
+  onViewImage: (visit: Visit) => void;
+  onMarkCompleted: (visit: Visit) => void;
+  onReportedBy: (visit: Visit) => void;
+  onCheckedBy: (visit: Visit) => void;
+}>(({ 
+  visit, 
+  userRole, 
+  onTestReport, 
+  onViewDocuments, 
+  onViewImage, 
+  onMarkCompleted, 
+  onReportedBy, 
+  onCheckedBy 
+}) => {
+  return (
+    <TableRow>
+      <TableCell>
+        <Typography variant="body2" fontWeight="bold">
+          {visit.lab_number || visit.labRequest?.full_lab_no || 'N/A'}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Box>
+          <Typography variant="body2" fontWeight="bold">
+            {visit.patient?.name || 'Unknown Patient'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            #{visit.patient?.id || 'N/A'} • {visit.patient?.phone || 'N/A'}
+          </Typography>
+        </Box>
+      </TableCell>
+      <TableCell>
+        <Typography variant="body2">
+          {visit.formattedDate}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Typography variant="body2">
+          {visit.visit_tests?.length || 0} tests
+        </Typography>
+        {visit.visit_tests?.map((test) => (
+          <Typography key={test.id} variant="caption" display="block">
+            {test.lab_test?.name || 'Unknown Test'}
+          </Typography>
+        ))}
+      </TableCell>
+      <TableCell>
+        {visit.image_path ? (
+          <Button
+            size="small"
+            startIcon={<Image />}
+            onClick={() => onViewImage(visit)}
+          >
+            View
+          </Button>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No Image
+          </Typography>
+        )}
+      </TableCell>
+      <TableCell>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Description />}
+            onClick={() => onTestReport(visit)}
+          >
+            Report
+          </Button>
+          {userRole === 'admin' ? (
+            <>
+              <Button
+                size="small"
+                variant="contained"
+                color="success"
+                startIcon={<CheckCircle />}
+                onClick={() => onMarkCompleted(visit)}
+              >
+                Completed
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="info"
+                startIcon={<Person />}
+                onClick={() => onReportedBy(visit)}
+              >
+                Reported By
+              </Button>
+            </>
+          ) : userRole === 'doctor' ? (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                startIcon={<Person />}
+                onClick={() => onCheckedBy(visit)}
+              >
+                Checked By
+              </Button>
+            </>
+          ) : null}
+          <Button
+            size="small"
+            variant="outlined"
+            color="secondary"
+            startIcon={<Folder />}
+            onClick={() => onViewDocuments(visit)}
+          >
+            Documents
+          </Button>
+        </Box>
+      </TableCell>
+    </TableRow>
+  );
+});
+
+VisitTableRow.displayName = 'VisitTableRow';
+
 const Reports: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const [patientsData, setPatientsData] = useState<PatientsData | null>(null);
   const [testsData, setTestsData] = useState<TestsData | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
@@ -264,21 +393,59 @@ const Reports: React.FC = () => {
     end_date: '', // Empty by default to show all visits
   });
 
-  // Separate effects for better performance
+  // Load visits first (priority), then summary data
   useEffect(() => {
-    fetchReportData();
+    // Fetch visits immediately on mount (without debounce)
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        let params: any = {
+          page: currentPage,
+          per_page: 15,
+        };
+
+        // Role-based filtering
+        if (user?.role === 'doctor') {
+          params.exclude_completed = 'true';
+        } else {
+          params.exclude_completed = 'true';
+        }
+
+        // Add status filter
+        if (statusFilter !== 'all') {
+          params.test_status = statusFilter;
+        }
+
+        // Add date range (only if both dates are provided)
+        if (dateRange.start_date && dateRange.end_date) {
+          params.start_date = dateRange.start_date;
+          params.end_date = dateRange.end_date;
+        }
+
+        const response = await axios.get('/api/visits', { params });
+        setVisits(response.data.data || []);
+        setTotalPages(response.data.last_page || 1);
+      } catch (error) {
+        console.error('Failed to fetch visits:', error);
+        toast.error('Failed to load reports');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+    
+    // Fetch summary data after a short delay (non-blocking)
+    // This allows the main table to render first
+    const summaryTimeout = setTimeout(() => {
+      fetchReportData();
+    }, 200);
+    
+    return () => clearTimeout(summaryTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only fetch once on mount
 
-  // Debounce search term to reduce API calls
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchVisits();
-    }, searchTerm ? 300 : 0); // 300ms delay for search, immediate for other filters
-
-    return () => clearTimeout(timeoutId);
-  }, [currentPage, searchTerm, statusFilter, dateRange]);
-
-  const fetchVisits = async () => {
+  const fetchVisits = useCallback(async () => {
     try {
       setLoading(true);
       let params: any = {
@@ -321,9 +488,6 @@ const Reports: React.FC = () => {
 
       const response = await axios.get('/api/visits', { params });
       
-      console.log('Fetched visits data:', response.data.data);
-      console.log('Sample visit checked_by_doctors:', response.data.data?.[0]?.checked_by_doctors);
-      
       setVisits(response.data.data || []);
       setTotalPages(response.data.last_page || 1);
     } catch (error) {
@@ -332,28 +496,63 @@ const Reports: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchTerm, statusFilter, dateRange, user?.role]);
 
-  const fetchReportData = async () => {
-    setLoading(true);
+  // Track if initial load is done
+  const initialLoadDone = useRef(false);
+
+  // Debounce search term and date range to reduce API calls (only after initial load)
+  useEffect(() => {
+    // Skip debounce on initial mount - initial load is handled separately
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      fetchVisits();
+    }, searchTerm || dateRange.start_date || dateRange.end_date ? 300 : 0); // 300ms delay for search/date changes, immediate for other filters
+
+    return () => clearTimeout(timeoutId);
+  }, [fetchVisits, searchTerm, dateRange.start_date, dateRange.end_date, statusFilter, currentPage]);
+
+  const fetchReportData = useCallback(async () => {
+    setLoadingSummary(true);
     try {
+      // Fetch summary data in parallel but don't block main loading
       const [patientsResponse, testsResponse, financialResponse] = await Promise.all([
         axios.get('/api/reports/patients'),
         axios.get('/api/reports/tests'),
         axios.get('/api/reports/financial')
       ]);
 
-          setPatientsData(patientsResponse.data);
-          setTestsData(testsResponse.data);
-          setFinancialData(financialResponse.data);
+      setPatientsData(patientsResponse.data);
+      setTestsData(testsResponse.data);
+      setFinancialData(financialResponse.data);
     } catch (error) {
       console.error('Failed to fetch report data:', error);
+      // Don't show error toast for summary data - it's not critical
     } finally {
-      setLoading(false);
+      setLoadingSummary(false);
     }
-  };
+  }, []);
 
-  const handleTestReport = (visit: Visit) => {
+  // Memoize sorted and formatted visits for performance
+  const sortedVisits = useMemo(() => {
+    return [...visits].sort((a, b) => 
+      new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
+    );
+  }, [visits]);
+
+  // Memoize formatted visits with pre-formatted dates
+  const formattedVisits = useMemo(() => {
+    return sortedVisits.map(visit => ({
+      ...visit,
+      formattedDate: new Date(visit.visit_date).toLocaleDateString(),
+    }));
+  }, [sortedVisits]);
+
+  const handleTestReport = useCallback((visit: Visit) => {
     // Navigate to the new ReportForm component with return URL
     // Build return URL with current state
     const params = new URLSearchParams();
@@ -368,22 +567,22 @@ const Reports: React.FC = () => {
     }
     const returnUrl = `/reports${params.toString() ? `?${params.toString()}` : ''}`;
     navigate(`/reports/${visit.id}`, { state: { returnUrl } });
-  };
+  }, [currentPage, searchTerm, statusFilter, navigate]);
 
-  const handleViewDocuments = (visit: Visit) => {
+  const handleViewDocuments = useCallback((visit: Visit) => {
     // Navigate to the documents component
     navigate(`/documents/${visit.id}`);
-  };
+  }, [navigate]);
 
-  const handleViewImage = (visit: Visit) => {
+  const handleViewImage = useCallback((visit: Visit) => {
     setSelectedImageVisit(visit);
     setShowImageModal(true);
-  };
+  }, []);
 
-  const handleReplaceImage = (visit: Visit) => {
+  const handleReplaceImage = useCallback((visit: Visit) => {
     setSelectedImageVisit(visit);
     setShowReplaceImageModal(true);
-  };
+  }, []);
 
   const handleRemoveImage = async (visit: Visit) => {
     if (!window.confirm('Are you sure you want to remove this image? This action cannot be undone.')) {
@@ -432,12 +631,11 @@ const Reports: React.FC = () => {
 
   // Removed handleTestResults - no longer used after removing Results button
 
-  const handleResultsSubmit = async (e: React.FormEvent) => {
+  const handleResultsSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedVisit) return;
+    
     try {
-      console.log('Updating test results for visit:', selectedVisit?.id);
-      
-      
       const visitTests = Object.keys(resultsData).map((testId) => ({
         id: parseInt(testId),
         result_value: resultsData[parseInt(testId)].result_value,
@@ -462,9 +660,9 @@ const Reports: React.FC = () => {
       const message = (error as any).response?.data?.message || 'Failed to update results';
       toast.error(message);
     }
-  };
+  }, [selectedVisit, resultsData, fetchVisits]);
 
-  const handleResultChange = (testId: number, field: string, value: string) => {
+  const handleResultChange = useCallback((testId: number, field: string, value: string) => {
     setResultsData((prev) => ({
       ...prev,
       [testId]: {
@@ -472,14 +670,14 @@ const Reports: React.FC = () => {
         [field]: value,
       },
     }));
-  };
+  }, []);
 
-  const handleMarkCompleted = (visit: Visit) => {
+  const handleMarkCompleted = useCallback((visit: Visit) => {
     setVisitToComplete(visit);
     setShowCompleteModal(true);
-  };
+  }, []);
 
-  const confirmMarkCompleted = async () => {
+  const confirmMarkCompleted = useCallback(async () => {
     if (!visitToComplete) return;
 
     setLoading(true);
@@ -499,15 +697,15 @@ const Reports: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [visitToComplete, fetchVisits]);
 
-  const handleCheckedBy = (visit: Visit) => {
+  const handleCheckedBy = useCallback((visit: Visit) => {
     setVisitToCheck(visit);
     setDoctorName('');
     setShowCheckedByModal(true);
-  };
+  }, []);
 
-  const confirmMarkAsChecked = async () => {
+  const confirmMarkAsChecked = useCallback(async () => {
     if (!visitToCheck || !doctorName.trim()) {
       toast.error('Please enter a doctor name');
       return;
@@ -541,14 +739,14 @@ const Reports: React.FC = () => {
       console.error('Error response:', (error as any)?.response?.data);
       toast.error('Failed to mark report as checked');
     }
-  };
+  }, [visitToCheck, doctorName, fetchVisits]);
 
-  const handleReportedBy = (visit: Visit) => {
+  const handleReportedBy = useCallback((visit: Visit) => {
     setVisitToShowReportedBy(visit);
     setShowReportedByModal(true);
-  };
+  }, []);
 
-  const handleExport = async (type: string) => {
+  const handleExport = useCallback(async (type: string) => {
     try {
       const response = await axios.get('/api/reports/export', {
         params: {
@@ -573,7 +771,7 @@ const Reports: React.FC = () => {
       console.error('Export error:', error);
       toast.error('Failed to export report');
     }
-  };
+  }, [dateRange]);
 
   // const handlePrintReport = async (_: Visit) => {
   //   try {
@@ -658,9 +856,13 @@ const Reports: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <People color="primary" sx={{ fontSize: 40 }} />
                 <Box>
-                  <Typography variant="h4" component="div">
-                    {patientsData?.summary.total_patients || 0}
-                  </Typography>
+                  {loadingSummary ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <Typography variant="h4" component="div">
+                      {patientsData?.summary.total_patients || 0}
+                    </Typography>
+                  )}
                   <Typography color="text.secondary">
                     Total Patients
                   </Typography>
@@ -675,9 +877,13 @@ const Reports: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Science color="primary" sx={{ fontSize: 40 }} />
                 <Box>
-                  <Typography variant="h4" component="div">
-                    {testsData?.summary.total_tests || 0}
-                  </Typography>
+                  {loadingSummary ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <Typography variant="h4" component="div">
+                      {testsData?.summary.total_tests || 0}
+                    </Typography>
+                  )}
                   <Typography color="text.secondary">
                     Total Tests
                   </Typography>
@@ -692,9 +898,13 @@ const Reports: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Assessment color="primary" sx={{ fontSize: 40 }} />
                 <Box>
-                  <Typography variant="h4" component="div">
-                    {testsData?.summary.completed_tests || 0}
-                  </Typography>
+                  {loadingSummary ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <Typography variant="h4" component="div">
+                      {testsData?.summary.completed_tests || 0}
+                    </Typography>
+                  )}
                   <Typography color="text.secondary">
                     Completed Tests
                   </Typography>
@@ -709,9 +919,13 @@ const Reports: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <AttachMoney color="primary" sx={{ fontSize: 40 }} />
                 <Box>
-                  <Typography variant="h4" component="div">
-                    ${financialData?.summary.total_revenue || 0}
-                  </Typography>
+                  {loadingSummary ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <Typography variant="h4" component="div">
+                      ${financialData?.summary.total_revenue || 0}
+                    </Typography>
+                  )}
                   <Typography color="text.secondary">
                     Total Revenue
                   </Typography>
@@ -804,109 +1018,18 @@ const Reports: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {visits.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()).map((visit) => (
-                      <TableRow key={visit.id}>
-                      <TableCell>
-                          <Typography variant="body2" fontWeight="bold">
-                          {visit.lab_number || visit.labRequest?.full_lab_no || 'N/A'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                            <Typography variant="body2" fontWeight="bold">
-                              {visit.patient?.name || 'Unknown Patient'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                              #{visit.patient?.id || 'N/A'} • {visit.patient?.phone || 'N/A'}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                          <Typography variant="body2">
-                            {new Date(visit.visit_date).toLocaleDateString()}
-                          </Typography>
-                      </TableCell>
-                      <TableCell>
-                          <Typography variant="body2">
-                            {visit.visit_tests?.length || 0} tests
-                          </Typography>
-                          {visit.visit_tests?.map((test) => (
-                            <Typography key={test.id} variant="caption" display="block">
-                              {test.lab_test?.name || 'Unknown Test'}
-                            </Typography>
-                          ))}
-                      </TableCell>
-                        <TableCell>
-                        {visit.image_path ? (
-                            <Button
-                              size="small"
-                              startIcon={<Image />}
-                              onClick={() => handleViewImage(visit)}
-                            >
-                              View
-                            </Button>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No Image
-                            </Typography>
-                        )}
-                      </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<Description />}
-                              onClick={() => handleTestReport(visit)}
-                            >
-                              Report
-                            </Button>
-                            {user?.role === 'admin' ? (
-                              <>
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  color="success"
-                                  startIcon={<CheckCircle />}
-                                  onClick={() => handleMarkCompleted(visit)}
-                                >
-                                  Completed
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="info"
-                                  startIcon={<Person />}
-                                  onClick={() => handleReportedBy(visit)}
-                                >
-                                  Reported By
-                                </Button>
-                              </>
-                            ) : user?.role === 'doctor' ? (
-                              <>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="primary"
-                                  startIcon={<Person />}
-                                  onClick={() => handleCheckedBy(visit)}
-                                >
-                                  Checked By
-                                </Button>
-                              </>
-                            ) : null}
-                            <Button
-                              size="small"
-                              variant="outlined"
-                            color="secondary"
-                            startIcon={<Folder />}
-                            onClick={() => handleViewDocuments(visit)}
-                          >
-                            Documents
-                            </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
+                  {formattedVisits.map((visit) => (
+                    <VisitTableRow
+                      key={visit.id}
+                      visit={visit}
+                      userRole={user?.role}
+                      onTestReport={handleTestReport}
+                      onViewDocuments={handleViewDocuments}
+                      onViewImage={handleViewImage}
+                      onMarkCompleted={handleMarkCompleted}
+                      onReportedBy={handleReportedBy}
+                      onCheckedBy={handleCheckedBy}
+                    />
                   ))}
                 </TableBody>
               </Table>

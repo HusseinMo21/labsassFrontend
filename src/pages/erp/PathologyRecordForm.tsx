@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import TemplateSaveModal from '../../components/TemplateSaveModal';
@@ -28,6 +28,8 @@ import {
   ContentCopy,
   Fullscreen,
   FullscreenExit,
+  Add,
+  Delete,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -132,6 +134,55 @@ const PathologyRecordForm: React.FC = () => {
   // Expandable field dialog state
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [expandedValue, setExpandedValue] = useState('');
+
+  // Structured list points for all fields
+  const [clinicalDataPoints, setClinicalDataPoints] = useState<string[]>(['']);
+  const [natureOfSpecimenPoints, setNatureOfSpecimenPoints] = useState<string[]>(['']);
+  const [grossPathologyPoints, setGrossPathologyPoints] = useState<string[]>(['']);
+  const [microscopicExaminationPoints, setMicroscopicExaminationPoints] = useState<string[]>(['']);
+  const [conclusionPoints, setConclusionPoints] = useState<string[]>(['']);
+  const [recommendationsPoints, setRecommendationsPoints] = useState<string[]>(['']);
+
+  // Helper function to parse any field string into array of points
+  const parseFieldData = (data: string | undefined): string[] => {
+    if (!data || data.trim() === '' || data === '.' || data === '---') {
+      return [''];
+    }
+    
+    // Try to parse as structured format (numbered points like "1-point1\n2-point2")
+    // Or simple newline-separated points
+    const lines = data.split('\n').filter(line => line.trim() !== '');
+    
+    if (lines.length === 0) {
+      return [''];
+    }
+    
+    // Check if lines start with numbers (like "1-", "2-", etc.)
+    const parsedPoints = lines.map(line => {
+      // Remove leading number and dash/period if present (e.g., "1-point" -> "point")
+      const match = line.match(/^\d+[-.)]\s*(.+)$/);
+      if (match) {
+        return match[1].trim();
+      }
+      // Remove leading dash or bullet if present
+      const match2 = line.match(/^[-•]\s*(.+)$/);
+      if (match2) {
+        return match2[1].trim();
+      }
+      return line.trim();
+    });
+    
+    return parsedPoints.length > 0 ? parsedPoints : [''];
+  };
+
+  // Helper function to format any field points as string
+  const formatFieldData = (points: string[]): string => {
+    const validPoints = points.filter(p => p.trim() !== '');
+    if (validPoints.length === 0) {
+      return '';
+    }
+    return validPoints.map((point, index) => `${index + 1}-${point.trim()}`).join('\n');
+  };
 
   const [formData, setFormData] = useState({
     // Patient Information
@@ -468,6 +519,14 @@ const PathologyRecordForm: React.FC = () => {
       
       setFormData(newFormData);
       
+      // Initialize all field points from the loaded data
+      setClinicalDataPoints(parseFieldData(newFormData.clinical_data));
+      setNatureOfSpecimenPoints(parseFieldData(newFormData.nature_of_specimen));
+      setGrossPathologyPoints(parseFieldData(newFormData.gross_pathology));
+      setMicroscopicExaminationPoints(parseFieldData(newFormData.microscopic_examination));
+      setConclusionPoints(parseFieldData(newFormData.conclusion));
+      setRecommendationsPoints(parseFieldData(newFormData.recommendations));
+      
     } catch (error) {
       console.error('Failed to fetch visit data:', error);
       toast.error('Failed to load visit data');
@@ -507,15 +566,115 @@ const PathologyRecordForm: React.FC = () => {
     setExpandedValue('');
   };
 
+  // Reusable component for structured list fields - COMPLETELY INDEPENDENT
+  const StructuredListField = ({
+    points: initialPoints,
+    setPoints,
+    fieldName,
+    placeholder,
+    imagePlacement,
+    disabled = false,
+  }: {
+    points: string[];
+    setPoints: (points: string[]) => void;
+    fieldName: string;
+    placeholder: string;
+    imagePlacement: string;
+    disabled?: boolean;
+  }) => {
+    // Store initial points in ref - never read from props again
+    const initialPointsRef = useRef<string[]>(initialPoints);
+    
+    // Local state - completely independent, initialized once from ref
+    const [localPoints, setLocalPoints] = useState<string[]>(() => initialPointsRef.current);
+
+    // Simple input handler - ONLY updates local state, nothing else
+    const handlePointChange = (index: number, value: string) => {
+      setLocalPoints(prev => {
+        const newPoints = [...prev];
+        newPoints[index] = value;
+        return newPoints;
+      });
+    };
+
+    // Handle delete
+    const handleDelete = (index: number) => {
+      setLocalPoints(prev => prev.filter((_, i) => i !== index));
+    };
+
+    return (
+      <Box>
+        {localPoints.map((point, index) => (
+          <Box key={`${fieldName}-${index}-${localPoints.length}`} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'flex-start' }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                minWidth: '30px', 
+                pt: 1.5, 
+                fontWeight: 'bold',
+                color: 'text.secondary'
+              }}
+            >
+              {index + 1}-
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              minRows={3}
+              maxRows={10}
+              value={point || ''}
+              onChange={(e) => handlePointChange(index, e.target.value)}
+              onBlur={() => {
+                // Update parent state on blur so save can read it, but child won't re-render
+                setPoints(localPoints);
+              }}
+              placeholder={`${placeholder} ${index + 1}`}
+              disabled={disabled}
+              sx={{ 
+                '& .MuiInputBase-root': {
+                  alignItems: 'flex-start',
+                }
+              }}
+            />
+            {localPoints.length > 1 && (
+              <IconButton
+                size="small"
+                onClick={() => handleDelete(index)}
+                sx={{ mt: 0.5 }}
+                color="error"
+              >
+                <Delete fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        ))}
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<Add />}
+          onClick={() => {
+            setLocalPoints(prev => [...prev, '']);
+          }}
+          disabled={disabled}
+          sx={{ mt: 1 }}
+        >
+          Add Point
+        </Button>
+      </Box>
+    );
+  };
+
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
     if (templateId && Array.isArray(templates)) {
       const template = templates.find(t => t.id.toString() === templateId);
       if (template) {
+        const clinicalData = template.clinical_data || '';
         setFormData(prev => ({
           ...prev,
           // Pathology Details - All fields
-          clinical_data: template.clinical_data || prev.clinical_data,
+          clinical_data: clinicalData,
           nature_of_specimen: template.specimen_information || prev.nature_of_specimen,
           gross_pathology: template.gross_examination || prev.gross_pathology,
           microscopic_examination: template.microscopic_description || template.microscopic || prev.microscopic_examination,
@@ -526,6 +685,13 @@ const PathologyRecordForm: React.FC = () => {
           // Document Type
           type_of_analysis: template.type_of_analysis || prev.type_of_analysis,
         }));
+        // Update all field points
+        setClinicalDataPoints(parseFieldData(clinicalData));
+        setNatureOfSpecimenPoints(parseFieldData(pathologyData.nature_of_specimen || ''));
+        setGrossPathologyPoints(parseFieldData(pathologyData.gross_pathology || ''));
+        setMicroscopicExaminationPoints(parseFieldData(pathologyData.microscopic_examination || ''));
+        setConclusionPoints(parseFieldData(pathologyData.conclusion || ''));
+        setRecommendationsPoints(parseFieldData(pathologyData.recommendations || ''));
       }
     }
   };
@@ -574,62 +740,149 @@ const PathologyRecordForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const saveReport = async () => {
     // Validate required fields
     if (!formData.patient_name || !formData.patient_name.trim()) {
       toast.error('Patient name is required');
-      return;
+      return false;
     }
     
     if (!formData.lab_no || !formData.lab_no.trim()) {
       toast.error('Lab number is required');
-      return;
+      return false;
     }
+
+    // Get current points from the StructuredListField components
+    // We need to read them directly from state at save time
+    // Format all points into formData before saving
+    const updatedFormData = {
+      ...formData,
+      clinical_data: formatFieldData(clinicalDataPoints),
+      nature_of_specimen: formatFieldData(natureOfSpecimenPoints),
+      gross_pathology: formatFieldData(grossPathologyPoints),
+      microscopic_examination: formatFieldData(microscopicExaminationPoints),
+      conclusion: formatFieldData(conclusionPoints),
+      recommendations: formatFieldData(recommendationsPoints),
+    };
+
+    const formDataToSend = new FormData();
+    
+    // Add all form fields
+    Object.entries(updatedFormData).forEach(([key, value]) => {
+      if (key !== 'image' && value !== null) {
+        formDataToSend.append(key, value.toString());
+      }
+    });
+
+    // Keep the current status when "Record Now" is pressed (don't auto-complete)
+    // Only admin can mark as completed via "Mark as Complete" button
+    formDataToSend.set('test_status', updatedFormData.test_status || 'pending');
+
+    // Debug: Log the form data being sent
+    console.log('Form data being sent:', updatedFormData);
+    console.log('FormDataToSend entries:');
+    for (let [key, value] of formDataToSend.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+
+    // Add image if selected
+    if (updatedFormData.image) {
+      formDataToSend.append('image', updatedFormData.image);
+    }
+
+    await axios.post(`/api/visits/${visitId}/report`, formDataToSend, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     setSaving(true);
 
     try {
-      const formDataToSend = new FormData();
-      
-      // Add all form fields
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key !== 'image' && value !== null) {
-          formDataToSend.append(key, value.toString());
-        }
-      });
-
-      // Keep the current status when "Record Now" is pressed (don't auto-complete)
-      // Only admin can mark as completed via "Mark as Complete" button
-      formDataToSend.set('test_status', formData.test_status || 'pending');
-
-      // Debug: Log the form data being sent
-      console.log('Form data being sent:', formData);
-      console.log('FormDataToSend entries:');
-      for (let [key, value] of formDataToSend.entries()) {
-        console.log(`${key}: ${value}`);
+      const success = await saveReport();
+      if (success) {
+        toast.success('Report saved successfully!');
+        // Navigate to documents page for this visit
+        navigate(`/documents/${visitId}`, {
+          state: { returnUrl: returnUrl }
+        });
       }
-
-      // Add image if selected
-      if (formData.image) {
-        formDataToSend.append('image', formData.image);
-      }
-
-      await axios.post(`/api/visits/${visitId}/report`, formDataToSend, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      toast.success('Report saved successfully!');
-      // Navigate to documents page for this visit
-      navigate(`/documents/${visitId}`, {
-        state: { returnUrl: returnUrl }
-      });
     } catch (error) {
       console.error('Failed to save report:', error);
       toast.error('Failed to save report');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRecordAndPrint = async () => {
+    setSaving(true);
+
+    try {
+      // First save the report
+      const success = await saveReport();
+      if (!success) {
+        return;
+      }
+
+      toast.success('Report saved! Opening print dialog...');
+
+      // Then print the document with header
+      const endpoint = `/api/visits/${visitId}/report/pdf/with-header`;
+      const response = await axios.get(endpoint);
+      const documentData = response.data;
+      
+      // Convert base64 to binary
+      const binaryString = atob(documentData.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create an iframe to load the PDF and then print it
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      
+      iframe.onload = () => {
+        try {
+          // Wait a bit for the PDF to fully load
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+            // Clean up after printing
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+              URL.revokeObjectURL(blobUrl);
+            }, 1000);
+          }, 500);
+        } catch (error) {
+          console.error('Error printing:', error);
+          // Fallback: open in new window
+          window.open(blobUrl, '_blank');
+          document.body.removeChild(iframe);
+          toast.info('PDF opened in a new tab. Please use the browser\'s print function.');
+        }
+      };
+      
+      iframe.onerror = () => {
+        // Fallback: open in new window if iframe fails
+        window.open(blobUrl, '_blank');
+        document.body.removeChild(iframe);
+        toast.info('PDF opened in a new tab. Please use the browser\'s print function.');
+      };
+    } catch (error) {
+      console.error('Failed to save and print report:', error);
+      toast.error('Failed to save and print report');
     } finally {
       setSaving(false);
     }
@@ -807,9 +1060,10 @@ const PathologyRecordForm: React.FC = () => {
     if (!sourcePatientData) return;
 
     const pathologyData = sourcePatientData.pathologyData;
+    const clinicalData = pathologyData.clinical_data || '';
     
     const newFormData = {
-      clinical_data: pathologyData.clinical_data || '',
+      clinical_data: clinicalData,
       nature_of_specimen: pathologyData.nature_of_specimen || '',
       gross_pathology: pathologyData.gross_pathology || '',
       microscopic_examination: pathologyData.microscopic_examination || '',
@@ -821,6 +1075,14 @@ const PathologyRecordForm: React.FC = () => {
       ...prev,
       ...newFormData,
     }));
+
+        // Update all field points
+        setClinicalDataPoints(parseFieldData(clinicalData));
+        setNatureOfSpecimenPoints(parseFieldData(template.specimen_information || ''));
+        setGrossPathologyPoints(parseFieldData(template.gross_examination || ''));
+        setMicroscopicExaminationPoints(parseFieldData(template.microscopic_description || template.microscopic || ''));
+        setConclusionPoints(parseFieldData(template.diagnosis || ''));
+        setRecommendationsPoints(parseFieldData(template.recommendations || ''));
 
     toast.success('Pathology details copied successfully!');
     setCopyModalOpen(false);
@@ -1056,36 +1318,14 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <Box sx={{ position: 'relative' }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    name="clinical_data"
-                    value={formData.clinical_data}
-                    onChange={(e) => handleInputChange('clinical_data', e.target.value)}
-                    required={formData.image_placement !== 'clinical_data'}
-                    placeholder="Clinical data: *"
-                    disabled={formData.image_placement === 'clinical_data'}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => handleExpandField('clinical_data')}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                      '&:hover': {
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                      },
-                    }}
-                  >
-                    <Fullscreen fontSize="small" />
-                  </IconButton>
-                </Box>
+                <StructuredListField
+                  points={clinicalDataPoints}
+                  setPoints={setClinicalDataPoints}
+                  fieldName="clinical_data"
+                  placeholder="Point"
+                  imagePlacement={formData.image_placement}
+                  disabled={formData.image_placement === 'clinical_data'}
+                />
               )}
             </Box>
 
@@ -1113,36 +1353,14 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <Box sx={{ position: 'relative' }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    name="nature_of_specimen"
-                    value={formData.nature_of_specimen}
-                    onChange={(e) => handleInputChange('nature_of_specimen', e.target.value)}
-                    required={formData.image_placement !== 'nature_of_specimen'}
-                    placeholder="Nature of specimen: *"
-                    disabled={formData.image_placement === 'nature_of_specimen'}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => handleExpandField('nature_of_specimen')}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                      '&:hover': {
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                      },
-                    }}
-                  >
-                    <Fullscreen fontSize="small" />
-                  </IconButton>
-                </Box>
+                <StructuredListField
+                  points={natureOfSpecimenPoints}
+                  setPoints={setNatureOfSpecimenPoints}
+                  fieldName="nature_of_specimen"
+                  placeholder="Point"
+                  imagePlacement={formData.image_placement}
+                  disabled={formData.image_placement === 'nature_of_specimen'}
+                />
               )}
             </Box>
 
@@ -1170,35 +1388,14 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <Box sx={{ position: 'relative' }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    name="gross_pathology"
-                    value={formData.gross_pathology}
-                    onChange={(e) => handleInputChange('gross_pathology', e.target.value)}
-                    placeholder="Gross Pathology"
-                    disabled={formData.image_placement === 'gross_pathology'}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => handleExpandField('gross_pathology')}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                      '&:hover': {
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                      },
-                    }}
-                  >
-                    <Fullscreen fontSize="small" />
-                  </IconButton>
-                </Box>
+                <StructuredListField
+                  points={grossPathologyPoints}
+                  setPoints={setGrossPathologyPoints}
+                  fieldName="gross_pathology"
+                  placeholder="Point"
+                  imagePlacement={formData.image_placement}
+                  disabled={formData.image_placement === 'gross_pathology'}
+                />
               )}
             </Box>
 
@@ -1226,35 +1423,14 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <Box sx={{ position: 'relative' }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    name="microscopic_examination"
-                    value={formData.microscopic_examination}
-                    onChange={(e) => handleInputChange('microscopic_examination', e.target.value)}
-                    placeholder="Microscopic examination"
-                    disabled={formData.image_placement === 'microscopic_examination'}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => handleExpandField('microscopic_examination')}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                      '&:hover': {
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                      },
-                    }}
-                  >
-                    <Fullscreen fontSize="small" />
-                  </IconButton>
-                </Box>
+                <StructuredListField
+                  points={microscopicExaminationPoints}
+                  setPoints={setMicroscopicExaminationPoints}
+                  fieldName="microscopic_examination"
+                  placeholder="Point"
+                  imagePlacement={formData.image_placement}
+                  disabled={formData.image_placement === 'microscopic_examination'}
+                />
               )}
             </Box>
 
@@ -1282,35 +1458,14 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <Box sx={{ position: 'relative' }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    name="conclusion"
-                    value={formData.conclusion}
-                    onChange={(e) => handleInputChange('conclusion', e.target.value)}
-                    placeholder="Conclusion"
-                    disabled={formData.image_placement === 'conclusion'}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() => handleExpandField('conclusion')}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                      '&:hover': {
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                      },
-                    }}
-                  >
-                    <Fullscreen fontSize="small" />
-                  </IconButton>
-                </Box>
+                <StructuredListField
+                  points={conclusionPoints}
+                  setPoints={setConclusionPoints}
+                  fieldName="conclusion"
+                  placeholder="Point"
+                  imagePlacement={formData.image_placement}
+                  disabled={formData.image_placement === 'conclusion'}
+                />
               )}
             </Box>
 
@@ -1319,34 +1474,14 @@ const PathologyRecordForm: React.FC = () => {
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                 Recommendations
               </Typography>
-              <Box sx={{ position: 'relative' }}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  name="recommendations"
-                  value={formData.recommendations}
-                  onChange={(e) => handleInputChange('recommendations', e.target.value)}
-                  placeholder="Recommendations"
-                />
-                <IconButton
-                  size="small"
-                  onClick={() => handleExpandField('recommendations')}
-                  sx={{
-                    position: 'absolute',
-                    bottom: 8,
-                    right: 8,
-                    bgcolor: 'background.paper',
-                    boxShadow: 1,
-                    '&:hover': {
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                    },
-                  }}
-                >
-                  <Fullscreen fontSize="small" />
-                </IconButton>
-              </Box>
+              <StructuredListField
+                points={recommendationsPoints}
+                setPoints={setRecommendationsPoints}
+                fieldName="recommendations"
+                placeholder="Point"
+                imagePlacement={formData.image_placement}
+                disabled={false}
+              />
             </Box>
           </Box>
 
@@ -1482,22 +1617,40 @@ const PathologyRecordForm: React.FC = () => {
                 size="small"
               />
             </Box>
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              sx={{ 
-                bgcolor: 'error.main', 
-                color: 'white',
-                px: 6,
-                py: 2,
-                fontSize: '1.1rem',
-                fontWeight: 'bold'
-              }}
-              disabled={saving}
-            >
-              {saving ? <CircularProgress size={24} color="inherit" /> : 'Record Now'}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                sx={{ 
+                  bgcolor: 'error.main', 
+                  color: 'white',
+                  px: 6,
+                  py: 2,
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold'
+                }}
+                disabled={saving}
+              >
+                {saving ? <CircularProgress size={24} color="inherit" /> : 'Record Now'}
+              </Button>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleRecordAndPrint}
+                sx={{ 
+                  bgcolor: 'primary.main', 
+                  color: 'white',
+                  px: 6,
+                  py: 2,
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold'
+                }}
+                disabled={saving}
+              >
+                {saving ? <CircularProgress size={24} color="inherit" /> : 'Record and Print'}
+              </Button>
+            </Box>
           </Box>
         </Box>
       </Paper>

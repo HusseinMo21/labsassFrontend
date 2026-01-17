@@ -1314,7 +1314,7 @@ const ShiftManagement: React.FC = () => {
                         </TableCell>
                         <TableCell>{formatCurrency(patient.remaining_amount || 0)}</TableCell>
                         <TableCell>{patient.type || 'Unknown'}</TableCell>
-                        <TableCell>{patient.doctor || patient.sender || 'Unknown'}</TableCell>
+                        <TableCell>{patient.doctor || 'Unknown'}</TableCell>
                         <TableCell>{patient.organization || ''}</TableCell>
                       </TableRow>
                     )) : (

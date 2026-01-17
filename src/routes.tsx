@@ -37,6 +37,7 @@ import PatientRegistration from './pages/erp/PatientRegistration';
 import PathologyRecordForm from './pages/erp/PathologyRecordForm';
 import PatientDocuments from './pages/erp/PatientDocuments';
 import ShiftManagement from './pages/ShiftManagement';
+import TodayClients from './pages/erp/TodayClients';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -366,6 +367,17 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <ShiftManagement />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Today Clients
+  {
+    path: '/today-clients',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <TodayClients />
         </ERPLayout>
       </ProtectedRoute>
     ),
