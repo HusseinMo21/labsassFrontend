@@ -152,6 +152,7 @@ interface FinancialData {
 const VisitTableRow = React.memo<{
   visit: Visit & { formattedDate: string };
   userRole?: string;
+  userName?: string;
   onTestReport: (visit: Visit) => void;
   onViewDocuments: (visit: Visit) => void;
   onViewImage: (visit: Visit) => void;
@@ -161,6 +162,7 @@ const VisitTableRow = React.memo<{
 }>(({ 
   visit, 
   userRole, 
+  userName,
   onTestReport, 
   onViewDocuments, 
   onViewImage, 
@@ -248,15 +250,20 @@ const VisitTableRow = React.memo<{
             </>
           ) : userRole === 'doctor' ? (
             <>
-              <Button
-                size="small"
-                variant="outlined"
-                color="primary"
-                startIcon={<Person />}
-                onClick={() => onCheckedBy(visit)}
-              >
-                Checked By
-              </Button>
+              {/* Only show "Checked By" button if the current user has already checked this report */}
+              {visit.checked_by_doctors && 
+               userName && 
+               visit.checked_by_doctors.includes(userName) && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<Person />}
+                  onClick={() => onCheckedBy(visit)}
+                >
+                  Checked By
+                </Button>
+              )}
             </>
           ) : null}
           <Button
@@ -302,7 +309,6 @@ const Reports: React.FC = () => {
   const [visitToComplete, setVisitToComplete] = useState<Visit | null>(null);
   const [showCheckedByModal, setShowCheckedByModal] = useState(false);
   const [visitToCheck, setVisitToCheck] = useState<Visit | null>(null);
-  const [doctorName, setDoctorName] = useState('');
   const [showReportedByModal, setShowReportedByModal] = useState(false);
   const [visitToShowReportedBy, setVisitToShowReportedBy] = useState<Visit | null>(null);
   const [totalPages, setTotalPages] = useState(1);
@@ -440,7 +446,7 @@ const Reports: React.FC = () => {
     const summaryTimeout = setTimeout(() => {
       fetchReportData();
     }, 200);
-    
+
     return () => clearTimeout(summaryTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only fetch once on mount
@@ -526,9 +532,9 @@ const Reports: React.FC = () => {
         axios.get('/api/reports/financial')
       ]);
 
-      setPatientsData(patientsResponse.data);
-      setTestsData(testsResponse.data);
-      setFinancialData(financialResponse.data);
+          setPatientsData(patientsResponse.data);
+          setTestsData(testsResponse.data);
+          setFinancialData(financialResponse.data);
     } catch (error) {
       console.error('Failed to fetch report data:', error);
       // Don't show error toast for summary data - it's not critical
@@ -634,7 +640,7 @@ const Reports: React.FC = () => {
   const handleResultsSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVisit) return;
-    
+      
     try {
       const visitTests = Object.keys(resultsData).map((testId) => ({
         id: parseInt(testId),
@@ -701,45 +707,9 @@ const Reports: React.FC = () => {
 
   const handleCheckedBy = useCallback((visit: Visit) => {
     setVisitToCheck(visit);
-    setDoctorName('');
     setShowCheckedByModal(true);
   }, []);
 
-  const confirmMarkAsChecked = useCallback(async () => {
-    if (!visitToCheck || !doctorName.trim()) {
-      toast.error('Please enter a doctor name');
-      return;
-    }
-
-    try {
-      console.log('Marking visit as checked:', {
-        visitId: visitToCheck.id,
-        doctorName: doctorName.trim(),
-        currentDoctors: visitToCheck.checked_by_doctors
-      });
-
-      const response = await axios.post(`/api/visits/${visitToCheck.id}/mark-checked`, {
-        doctor_name: doctorName.trim()
-      });
-
-      console.log('Mark as checked response:', response.data);
-
-      toast.success('Report marked as checked successfully');
-      
-      // Close modal and refresh the visits list
-      setShowCheckedByModal(false);
-      setVisitToCheck(null);
-      setDoctorName('');
-      
-      // Force refresh the visits list
-      console.log('Refreshing visits list after marking as checked');
-      await fetchVisits();
-    } catch (error) {
-      console.error('Failed to mark report as checked:', error);
-      console.error('Error response:', (error as any)?.response?.data);
-      toast.error('Failed to mark report as checked');
-    }
-  }, [visitToCheck, doctorName, fetchVisits]);
 
   const handleReportedBy = useCallback((visit: Visit) => {
     setVisitToShowReportedBy(visit);
@@ -859,9 +829,9 @@ const Reports: React.FC = () => {
                   {loadingSummary ? (
                     <CircularProgress size={24} />
                   ) : (
-                    <Typography variant="h4" component="div">
-                      {patientsData?.summary.total_patients || 0}
-                    </Typography>
+                  <Typography variant="h4" component="div">
+                    {patientsData?.summary.total_patients || 0}
+                  </Typography>
                   )}
                   <Typography color="text.secondary">
                     Total Patients
@@ -880,9 +850,9 @@ const Reports: React.FC = () => {
                   {loadingSummary ? (
                     <CircularProgress size={24} />
                   ) : (
-                    <Typography variant="h4" component="div">
-                      {testsData?.summary.total_tests || 0}
-                    </Typography>
+                  <Typography variant="h4" component="div">
+                    {testsData?.summary.total_tests || 0}
+                  </Typography>
                   )}
                   <Typography color="text.secondary">
                     Total Tests
@@ -901,9 +871,9 @@ const Reports: React.FC = () => {
                   {loadingSummary ? (
                     <CircularProgress size={24} />
                   ) : (
-                    <Typography variant="h4" component="div">
-                      {testsData?.summary.completed_tests || 0}
-                    </Typography>
+                  <Typography variant="h4" component="div">
+                    {testsData?.summary.completed_tests || 0}
+                  </Typography>
                   )}
                   <Typography color="text.secondary">
                     Completed Tests
@@ -922,9 +892,9 @@ const Reports: React.FC = () => {
                   {loadingSummary ? (
                     <CircularProgress size={24} />
                   ) : (
-                    <Typography variant="h4" component="div">
-                      ${financialData?.summary.total_revenue || 0}
-                    </Typography>
+                  <Typography variant="h4" component="div">
+                    ${financialData?.summary.total_revenue || 0}
+                  </Typography>
                   )}
                   <Typography color="text.secondary">
                     Total Revenue
@@ -1023,6 +993,7 @@ const Reports: React.FC = () => {
                       key={visit.id}
                       visit={visit}
                       userRole={user?.role}
+                      userName={user?.name}
                       onTestReport={handleTestReport}
                       onViewDocuments={handleViewDocuments}
                       onViewImage={handleViewImage}
@@ -1330,61 +1301,69 @@ const Reports: React.FC = () => {
       <Dialog 
         open={showCheckedByModal} 
         onClose={() => setShowCheckedByModal(false)} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Person color="primary" />
-            <Typography variant="h6">Mark Report as Checked</Typography>
+            <Typography variant="h6">Checked By Doctors</Typography>
           </Box>
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Enter your name to mark this report as checked by you.
-          </Typography>
           {visitToCheck && (
-            <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Report Details:
-              </Typography>
-              <Typography variant="body2">
-                <strong>Visit:</strong> {visitToCheck.visit_number}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Lab No:</strong> {visitToCheck.lab_number || visitToCheck.labRequest?.full_lab_no || 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Patient:</strong> {visitToCheck.patient?.name}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date:</strong> {new Date(visitToCheck.visit_date).toLocaleDateString()}
-              </Typography>
-            </Box>
+            <>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Report Details:
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Visit:</strong> {visitToCheck.visit_number}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Lab No:</strong> {visitToCheck.lab_number || visitToCheck.labRequest?.full_lab_no || 'N/A'}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Patient:</strong> {visitToCheck.patient?.name}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Date:</strong> {new Date(visitToCheck.visit_date).toLocaleDateString()}
+                </Typography>
+              </Box>
+              
+              {visitToCheck.checked_by_doctors && visitToCheck.checked_by_doctors.length > 0 ? (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Checked by {visitToCheck.checked_by_doctors.length} doctor(s):
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {visitToCheck.checked_by_doctors.map((doctor: string, index: number) => (
+                      <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: 'primary.50', borderRadius: 1 }}>
+                        <Person color="primary" />
+                        <Typography variant="body1">{doctor}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                  {visitToCheck.last_checked_at && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                      Last checked: {new Date(visitToCheck.last_checked_at).toLocaleString()}
+                    </Typography>
+                  )}
+                </Box>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Person sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    No doctors have checked this report yet
+                  </Typography>
+                </Box>
+              )}
+            </>
           )}
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Doctor Name"
-            fullWidth
-            variant="outlined"
-            value={doctorName}
-            onChange={(e) => setDoctorName(e.target.value)}
-            placeholder="Enter your name"
-          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowCheckedByModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            color="primary"
-            startIcon={<Person />}
-            onClick={confirmMarkAsChecked}
-            disabled={!doctorName.trim()}
-          >
-            Mark as Checked
+            Close
           </Button>
         </DialogActions>
       </Dialog>

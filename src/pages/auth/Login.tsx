@@ -43,12 +43,32 @@ const Login: React.FC = () => {
 
     try {
       const result = await login(formData.login, formData.password);
-      if (result.success) {
-        if (result.user && result.user.role === 'patient') {
-          navigate('/patient/dashboard');
-        } else {
-          navigate('/dashboard');
+      if (result.success && result.user) {
+        // Redirect based on user role
+        const role = result.user.role;
+        let dashboardRoute = '/dashboard';
+        
+        switch (role) {
+          case 'admin':
+            dashboardRoute = '/admin/dashboard';
+            break;
+          case 'staff':
+            dashboardRoute = '/staff/dashboard';
+            break;
+          case 'doctor':
+            dashboardRoute = '/doctor/dashboard';
+            break;
+          case 'patient':
+            dashboardRoute = '/patient/dashboard';
+            break;
+          case 'accountant':
+            dashboardRoute = '/accountant/dashboard';
+            break;
+          default:
+            dashboardRoute = '/dashboard';
         }
+        
+        navigate(dashboardRoute);
       } else {
         setError(result.error || 'Login failed');
       }

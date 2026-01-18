@@ -66,12 +66,17 @@ interface User {
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [patients, setPatients] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPatients, setLoadingPatients] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [patientPage, setPatientPage] = useState(1);
+  const [patientTotalPages, setPatientTotalPages] = useState(1);
+  const [patientTotal, setPatientTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [deleteErrorDialog, setDeleteErrorDialog] = useState<{
     open: boolean;
@@ -94,7 +99,8 @@ const Users: React.FC = () => {
     is_active: true,
   });
 
-  const roles = [
+  // All roles for display purposes
+  const allRoles = [
     { value: 'admin', label: 'Administrator' },
     { value: 'doctor', label: 'Doctor' },
     { value: 'lab_technician', label: 'Lab Technician' },
@@ -102,6 +108,15 @@ const Users: React.FC = () => {
     { value: 'accountant', label: 'Accountant' },
     { value: 'patient', label: 'Patient' },
   ];
+
+  // Roles that admin can assign when creating/editing users (only staff and doctor)
+  const assignableRoles = [
+    { value: 'staff', label: 'Staff' },
+    { value: 'doctor', label: 'Doctor' },
+  ];
+
+  // Use assignableRoles for the form, allRoles for display
+  const roles = assignableRoles;
 
   const getRoleColor = (role: string) => {
     const colors: { [key: string]: string } = {
@@ -116,21 +131,25 @@ const Users: React.FC = () => {
   };
 
   const getRoleLabel = (role: string) => {
-    const roleObj = roles.find(r => r.value === role);
+    const roleObj = allRoles.find(r => r.value === role);
     return roleObj ? roleObj.label : role;
   };
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      // Fetch non-patient users (exclude patients)
       const response = await axios.get('/api/users', {
         params: {
           page,
           search: searchTerm,
+          exclude_role: 'patient', // Exclude patients from main users list
         },
       });
       const usersData = response.data.data || [];
-      setUsers(usersData);
+      // Filter out patients from the response
+      const nonPatientUsers = usersData.filter((user: User) => user.role !== 'patient');
+      setUsers(nonPatientUsers);
       setTotalPages(response.data.last_page || 1);
       setError(null);
     } catch (err) {
@@ -181,22 +200,53 @@ const Users: React.FC = () => {
     }
   };
 
+  const fetchPatients = async () => {
+    try {
+      setLoadingPatients(true);
+      const response = await axios.get('/api/users', {
+        params: {
+          role: 'patient',
+          page: patientPage,
+          per_page: 15, // 15 patients per page
+          search: searchTerm,
+        },
+      });
+      const patientsData = response.data.data || [];
+      setPatients(patientsData);
+      setPatientTotalPages(response.data.last_page || 1);
+      setPatientTotal(response.data.total || 0);
+    } catch (err) {
+      console.error('Error fetching patients:', err);
+      setPatients([]);
+      setPatientTotalPages(1);
+      setPatientTotal(0);
+    } finally {
+      setLoadingPatients(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, [page, searchTerm]);
 
+  useEffect(() => {
+    fetchPatients();
+  }, [patientPage, searchTerm]);
+
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
     setPage(1);
+    setPatientPage(1); // Reset patient page when search changes
   };
 
   const handleOpenDialog = (user?: User) => {
     if (user) {
       setEditingUser(user);
+      // Keep the original role, especially for patients who should always remain patients
       setFormData({
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role, // Keep original role (important for patients)
         password: '',
         is_active: user.is_active,
       });
@@ -231,7 +281,12 @@ const Users: React.FC = () => {
   const handleSubmit = async () => {
     try {
       if (editingUser) {
-        await axios.put(`/api/users/${editingUser.id}`, formData);
+        // For patients, always preserve their role - don't allow role changes
+        const submitData = { ...formData };
+        if (editingUser.role === 'patient') {
+          submitData.role = 'patient'; // Force patient role
+        }
+        await axios.put(`/api/users/${editingUser.id}`, submitData);
         toast.success('User updated successfully');
       } else {
         await axios.post('/api/users', formData);
@@ -239,6 +294,7 @@ const Users: React.FC = () => {
       }
       handleCloseDialog();
       fetchUsers();
+      fetchPatients(); // Also refresh patients list
     } catch (err) {
       console.error('Error saving user:', err);
       toast.error('Failed to save user');
@@ -255,6 +311,7 @@ const Users: React.FC = () => {
         await axios.delete(`/api/users/${userId}`);
         toast.success('User deleted successfully');
         fetchUsers();
+        fetchPatients(); // Also refresh patients list
       } catch (err: any) {
         console.error('Error deleting user:', err);
         
@@ -292,22 +349,26 @@ const Users: React.FC = () => {
       });
       toast.success(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
       fetchUsers();
+      fetchPatients(); // Also refresh patients list
     } catch (err) {
       console.error('Error updating user status:', err);
       toast.error('Failed to update user status');
     }
   };
 
+  // Filter non-patient users (patients are handled separately)
   const filteredUsers = users.filter(user => {
+    if (user.role === 'patient') return false; // Exclude patients from main list
     const searchLower = searchTerm.toLowerCase();
-    const userName = user.role === 'patient' && user.patient ? user.patient.name : user.name;
     return (
-      userName.toLowerCase().includes(searchLower) ||
       user.name.toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
       user.role.toLowerCase().includes(searchLower)
     );
   });
+
+  // Patients are already filtered by backend pagination, no need to filter again
+  const filteredPatients = patients;
 
   // Group users by role (normalize role to lowercase to handle any case differences)
   const usersByRole = filteredUsers.reduce((acc, user) => {
@@ -440,7 +501,10 @@ const Users: React.FC = () => {
                   return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
                 });
                 
-                return sortedRoles.map((normalizedRole) => {
+                // Filter out 'patient' role from main list (patients are shown separately)
+                const nonPatientRoles = sortedRoles.filter(role => role !== 'patient');
+                
+                return nonPatientRoles.map((normalizedRole) => {
                   const roleUsers = usersByRole[normalizedRole] || [];
                   // Find the original role label from roleOrder
                   const originalRole = roleOrder.find(r => {
@@ -561,8 +625,147 @@ const Users: React.FC = () => {
                 );
                 });
               })()}
+
+              {/* Patients Section with Separate Pagination */}
+              <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Chip
+                    label={roleLabels['patient'] || 'Patients'}
+                    color={getRoleColor('patient') as any}
+                    size="medium"
+                    sx={{ fontWeight: 'bold', fontSize: '1rem', py: 2.5 }}
+                    icon={<Person />}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    ({patientTotal} {patientTotal === 1 ? 'user' : 'users'})
+                  </Typography>
+                </Box>
+                {loadingPatients ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <>
+                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                      <Table>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: 'grey.50' }}>
+                            <TableCell>User</TableCell>
+                            <TableCell>Email</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Created</TableCell>
+                            <TableCell align="center">Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {filteredPatients.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                <Typography variant="body1" color="text.secondary">
+                                  No patients found
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredPatients.map((user) => (
+                              <TableRow key={user.id} hover>
+                                <TableCell>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Avatar sx={{ bgcolor: `${getRoleColor(user.role)}.main` }}>
+                                      <Person />
+                                    </Avatar>
+                                    <Box>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                        {user.display_name || user.name}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        ID: {user.id}
+                                        {user.patient_id && (
+                                          <span> • Patient ID: {user.patient_id}</span>
+                                        )}
+                                        {user.real_name && (
+                                          <span> • Real Name: {user.real_name}</span>
+                                        )}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </TableCell>
+                                <TableCell>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Email sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                    {user.email}
+                                  </Box>
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={user.is_active ? 'Active' : 'Inactive'}
+                                    color={user.is_active ? 'success' : 'default'}
+                                    size="small"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {new Date(user.created_at).toLocaleDateString()}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell align="center">
+                                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                    <Tooltip title="Edit User">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => handleOpenDialog(user)}
+                                        color="primary"
+                                      >
+                                        <Edit />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title={user.is_active ? 'Deactivate' : 'Activate'}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          handleToggleStatus(user.id, user.is_active);
+                                        }}
+                                        color={user.is_active ? 'warning' : 'success'}
+                                      >
+                                        {user.is_active ? <VisibilityOff /> : <Visibility />}
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete User">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          handleDelete(user.id);
+                                        }}
+                                        color="error"
+                                      >
+                                        <Delete />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    {/* Patients Pagination */}
+                    {patientTotalPages > 1 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                        <Pagination
+                          count={patientTotalPages}
+                          page={patientPage}
+                          onChange={(_, newPage) => setPatientPage(newPage)}
+                          color="primary"
+                          size="large"
+                        />
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Box>
               
-              {Object.keys(usersByRole).length === 0 && !loading && (
+              {Object.keys(usersByRole).filter(role => role !== 'patient').length === 0 && !loading && (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <Typography variant="body1" color="text.secondary">
                     No users found
@@ -620,17 +823,39 @@ const Users: React.FC = () => {
               <Grid item xs={12}>
                 <FormControl fullWidth required>
                   <InputLabel>Role</InputLabel>
-                  <Select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    label="Role"
-                  >
-                    {roles.map((role) => (
-                      <MenuItem key={role.value} value={role.value}>
-                        {role.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
+                  {editingUser && editingUser.role === 'patient' ? (
+                    // For patients, show read-only field - patients cannot change their role
+                    <TextField
+                      fullWidth
+                      label="Role"
+                      value={getRoleLabel('patient')}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      helperText="Patient role cannot be changed"
+                    />
+                  ) : (
+                    // For other users, show dropdown with assignable roles
+                    <>
+                      <Select
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        label="Role"
+                      >
+                        {/* Show only staff and doctor options that can be assigned */}
+                        {assignableRoles.map((role) => (
+                          <MenuItem key={role.value} value={role.value}>
+                            {role.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      {editingUser && editingUser.role && !assignableRoles.find(r => r.value === editingUser.role) && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                          Current role: {getRoleLabel(editingUser.role)}. You can only assign Staff or Doctor roles.
+                        </Typography>
+                      )}
+                    </>
+                  )}
                 </FormControl>
               </Grid>
               <Grid item xs={12}>

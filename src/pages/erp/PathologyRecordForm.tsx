@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import TemplateSaveModal from '../../components/TemplateSaveModal';
@@ -26,7 +26,6 @@ import {
   ArrowBack,
   CloudUpload,
   ContentCopy,
-  Fullscreen,
   FullscreenExit,
   Add,
   Delete,
@@ -113,7 +112,7 @@ const PathologyRecordForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { } = useAuth();
+  const { user } = useAuth();
   
   // Get return URL from navigation state, default to /reports
   const returnUrl = (location.state as { returnUrl?: string })?.returnUrl || '/reports';
@@ -553,10 +552,7 @@ const PathologyRecordForm: React.FC = () => {
     }));
   };
 
-  const handleExpandField = (field: string) => {
-    setExpandedField(field);
-    setExpandedValue(formData[field as keyof typeof formData] as string || '');
-  };
+  // Removed unused handleExpandField function
 
   const handleCloseExpandedField = () => {
     if (expandedField) {
@@ -582,6 +578,8 @@ const PathologyRecordForm: React.FC = () => {
     imagePlacement: string;
     disabled?: boolean;
   }) => {
+    // imagePlacement is passed but not used in this component
+    void imagePlacement;
     // Store initial points in ref - never read from props again
     const initialPointsRef = useRef<string[]>(initialPoints);
     
@@ -687,11 +685,11 @@ const PathologyRecordForm: React.FC = () => {
         }));
         // Update all field points
         setClinicalDataPoints(parseFieldData(clinicalData));
-        setNatureOfSpecimenPoints(parseFieldData(pathologyData.nature_of_specimen || ''));
-        setGrossPathologyPoints(parseFieldData(pathologyData.gross_pathology || ''));
-        setMicroscopicExaminationPoints(parseFieldData(pathologyData.microscopic_examination || ''));
-        setConclusionPoints(parseFieldData(pathologyData.conclusion || ''));
-        setRecommendationsPoints(parseFieldData(pathologyData.recommendations || ''));
+        setNatureOfSpecimenPoints(parseFieldData(template.specimen_information || ''));
+        setGrossPathologyPoints(parseFieldData(template.gross_examination || ''));
+        setMicroscopicExaminationPoints(parseFieldData(template.microscopic_description || template.microscopic || ''));
+        setConclusionPoints(parseFieldData(template.diagnosis || ''));
+        setRecommendationsPoints(parseFieldData(template.recommendations || ''));
       }
     }
   };
@@ -751,7 +749,7 @@ const PathologyRecordForm: React.FC = () => {
       toast.error('Lab number is required');
       return false;
     }
-
+    
     // Get current points from the StructuredListField components
     // We need to read them directly from state at save time
     // Format all points into formData before saving
@@ -765,36 +763,36 @@ const PathologyRecordForm: React.FC = () => {
       recommendations: formatFieldData(recommendationsPoints),
     };
 
-    const formDataToSend = new FormData();
-    
-    // Add all form fields
+      const formDataToSend = new FormData();
+      
+      // Add all form fields
     Object.entries(updatedFormData).forEach(([key, value]) => {
-      if (key !== 'image' && value !== null) {
-        formDataToSend.append(key, value.toString());
-      }
-    });
+        if (key !== 'image' && value !== null) {
+          formDataToSend.append(key, value.toString());
+        }
+      });
 
-    // Keep the current status when "Record Now" is pressed (don't auto-complete)
-    // Only admin can mark as completed via "Mark as Complete" button
+      // Keep the current status when "Record Now" is pressed (don't auto-complete)
+      // Only admin can mark as completed via "Mark as Complete" button
     formDataToSend.set('test_status', updatedFormData.test_status || 'pending');
 
-    // Debug: Log the form data being sent
+      // Debug: Log the form data being sent
     console.log('Form data being sent:', updatedFormData);
-    console.log('FormDataToSend entries:');
-    for (let [key, value] of formDataToSend.entries()) {
-      console.log(`${key}: ${value}`);
-    }
+      console.log('FormDataToSend entries:');
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`${key}: ${value}`);
+      }
 
-    // Add image if selected
+      // Add image if selected
     if (updatedFormData.image) {
       formDataToSend.append('image', updatedFormData.image);
-    }
+      }
 
-    await axios.post(`/api/visits/${visitId}/report`, formDataToSend, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+      await axios.post(`/api/visits/${visitId}/report`, formDataToSend, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
     return true;
   };
@@ -807,15 +805,44 @@ const PathologyRecordForm: React.FC = () => {
     try {
       const success = await saveReport();
       if (success) {
-        toast.success('Report saved successfully!');
-        // Navigate to documents page for this visit
-        navigate(`/documents/${visitId}`, {
-          state: { returnUrl: returnUrl }
-        });
+      toast.success('Report saved successfully!');
+      // Navigate to documents page for this visit
+      navigate(`/documents/${visitId}`, {
+        state: { returnUrl: returnUrl }
+      });
       }
     } catch (error) {
       console.error('Failed to save report:', error);
       toast.error('Failed to save report');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleMarkAsChecked = async () => {
+    if (!user?.name) {
+      toast.error('User name not found');
+      return;
+    }
+
+    if (!visitId) {
+      toast.error('Visit ID not found');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await axios.post(`/api/visits/${visitId}/mark-checked`, {
+        doctor_name: user.name
+      });
+
+      toast.success('Report marked as checked successfully');
+      
+      // Refresh visit data to update the checked_by_doctors list
+      await fetchVisitData();
+    } catch (error: any) {
+      console.error('Failed to mark report as checked:', error);
+      toast.error(error.response?.data?.message || 'Failed to mark report as checked');
     } finally {
       setSaving(false);
     }
@@ -1078,11 +1105,11 @@ const PathologyRecordForm: React.FC = () => {
 
         // Update all field points
         setClinicalDataPoints(parseFieldData(clinicalData));
-        setNatureOfSpecimenPoints(parseFieldData(template.specimen_information || ''));
-        setGrossPathologyPoints(parseFieldData(template.gross_examination || ''));
-        setMicroscopicExaminationPoints(parseFieldData(template.microscopic_description || template.microscopic || ''));
-        setConclusionPoints(parseFieldData(template.diagnosis || ''));
-        setRecommendationsPoints(parseFieldData(template.recommendations || ''));
+        setNatureOfSpecimenPoints(parseFieldData(pathologyData.nature_of_specimen || ''));
+        setGrossPathologyPoints(parseFieldData(pathologyData.gross_pathology || ''));
+        setMicroscopicExaminationPoints(parseFieldData(pathologyData.microscopic_examination || ''));
+        setConclusionPoints(parseFieldData(pathologyData.conclusion || ''));
+        setRecommendationsPoints(parseFieldData(pathologyData.recommendations || ''));
 
     toast.success('Pathology details copied successfully!');
     setCopyModalOpen(false);
@@ -1257,12 +1284,62 @@ const PathologyRecordForm: React.FC = () => {
                   >
                     <MenuItem value="pending">Pending</MenuItem>
                     <MenuItem value="in_progress">In Progress</MenuItem>
-                    <MenuItem value="completed">Completed</MenuItem>
-                    <MenuItem value="cancelled">Cancelled</MenuItem>
+                    {/* Doctors can see Approved status */}
+                    {(user?.role === 'doctor' || user?.role === 'admin') && (
+                      <MenuItem value="approved">Approved</MenuItem>
+                    )}
+                    {/* Only admins can see Completed and Cancelled */}
+                    {user?.role === 'admin' && (
+                      <>
+                        <MenuItem value="completed">Completed</MenuItem>
+                        <MenuItem value="cancelled">Cancelled</MenuItem>
+                      </>
+                    )}
                   </Select>
                 </FormControl>
               </Grid>
             </Grid>
+
+            {/* Fourth Row: Checked By (for doctors only) */}
+            {user?.role === 'doctor' && (
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} sm={8}>
+                  <TextField
+                    fullWidth
+                    label="Checked By"
+                    name="checked_by"
+                    value={
+                      visit?.checked_by_doctors && visit.checked_by_doctors.length > 0
+                        ? visit.checked_by_doctors.join(', ')
+                        : 'No doctors have checked this report yet'
+                    }
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    placeholder="Checked By"
+                    helperText="Doctors who have checked this report"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={handleMarkAsChecked}
+                    disabled={saving || (visit?.checked_by_doctors && user?.name && visit.checked_by_doctors.includes(user.name))}
+                    sx={{ 
+                      height: '56px',
+                      mt: { xs: 0, sm: 0 }
+                    }}
+                  >
+                    {visit?.checked_by_doctors && user?.name && visit.checked_by_doctors.includes(user.name)
+                      ? 'Already Checked'
+                      : 'Mark as Checked'}
+                  </Button>
+                </Grid>
+              </Grid>
+            )}
           </Box>
 
           {/* Pathology Details */}
@@ -1324,8 +1401,8 @@ const PathologyRecordForm: React.FC = () => {
                   fieldName="clinical_data"
                   placeholder="Point"
                   imagePlacement={formData.image_placement}
-                  disabled={formData.image_placement === 'clinical_data'}
-                />
+                    disabled={formData.image_placement === 'clinical_data'}
+                  />
               )}
             </Box>
 
@@ -1359,8 +1436,8 @@ const PathologyRecordForm: React.FC = () => {
                   fieldName="nature_of_specimen"
                   placeholder="Point"
                   imagePlacement={formData.image_placement}
-                  disabled={formData.image_placement === 'nature_of_specimen'}
-                />
+                    disabled={formData.image_placement === 'nature_of_specimen'}
+                  />
               )}
             </Box>
 
@@ -1394,8 +1471,8 @@ const PathologyRecordForm: React.FC = () => {
                   fieldName="gross_pathology"
                   placeholder="Point"
                   imagePlacement={formData.image_placement}
-                  disabled={formData.image_placement === 'gross_pathology'}
-                />
+                    disabled={formData.image_placement === 'gross_pathology'}
+                  />
               )}
             </Box>
 
@@ -1429,8 +1506,8 @@ const PathologyRecordForm: React.FC = () => {
                   fieldName="microscopic_examination"
                   placeholder="Point"
                   imagePlacement={formData.image_placement}
-                  disabled={formData.image_placement === 'microscopic_examination'}
-                />
+                    disabled={formData.image_placement === 'microscopic_examination'}
+                  />
               )}
             </Box>
 
@@ -1464,8 +1541,8 @@ const PathologyRecordForm: React.FC = () => {
                   fieldName="conclusion"
                   placeholder="Point"
                   imagePlacement={formData.image_placement}
-                  disabled={formData.image_placement === 'conclusion'}
-                />
+                    disabled={formData.image_placement === 'conclusion'}
+                  />
               )}
             </Box>
 
@@ -1618,38 +1695,41 @@ const PathologyRecordForm: React.FC = () => {
               />
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                sx={{ 
-                  bgcolor: 'error.main', 
-                  color: 'white',
-                  px: 6,
-                  py: 2,
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold'
-                }}
-                disabled={saving}
-              >
-                {saving ? <CircularProgress size={24} color="inherit" /> : 'Record Now'}
-              </Button>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleRecordAndPrint}
-                sx={{ 
-                  bgcolor: 'primary.main', 
-                  color: 'white',
-                  px: 6,
-                  py: 2,
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold'
-                }}
-                disabled={saving}
-              >
-                {saving ? <CircularProgress size={24} color="inherit" /> : 'Record and Print'}
-              </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              sx={{ 
+                bgcolor: 'error.main', 
+                color: 'white',
+                px: 6,
+                py: 2,
+                fontSize: '1.1rem',
+                fontWeight: 'bold'
+              }}
+              disabled={saving}
+            >
+              {saving ? <CircularProgress size={24} color="inherit" /> : 'Record Now'}
+            </Button>
+              {/* Hide "Record and Print" button for doctors */}
+              {user?.role !== 'doctor' && (
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={handleRecordAndPrint}
+                  sx={{ 
+                    bgcolor: 'primary.main', 
+                    color: 'white',
+                    px: 6,
+                    py: 2,
+                    fontSize: '1.1rem',
+                    fontWeight: 'bold'
+                  }}
+                  disabled={saving}
+                >
+                  {saving ? <CircularProgress size={24} color="inherit" /> : 'Record and Print'}
+                </Button>
+              )}
             </Box>
           </Box>
         </Box>

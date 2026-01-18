@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Box,
@@ -49,7 +49,6 @@ interface Visit {
 const PatientDocuments: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const { } = useAuth();
   const [loading, setLoading] = useState(true);
   const [visit, setVisit] = useState<Visit | null>(null);

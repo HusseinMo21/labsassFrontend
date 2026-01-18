@@ -150,7 +150,35 @@ const MainNav = () => {
   };
 
   const handleDashboardClick = () => {
-    navigate('/dashboard');
+    // Navigate to role-specific dashboard
+    if (user) {
+      const role = user.role;
+      let dashboardRoute = '/dashboard';
+      
+      switch (role) {
+        case 'admin':
+          dashboardRoute = '/admin/dashboard';
+          break;
+        case 'staff':
+          dashboardRoute = '/staff/dashboard';
+          break;
+        case 'doctor':
+          dashboardRoute = '/doctor/dashboard';
+          break;
+        case 'patient':
+          dashboardRoute = '/patient/dashboard';
+          break;
+        case 'accountant':
+          dashboardRoute = '/accountant/dashboard';
+          break;
+        default:
+          dashboardRoute = '/dashboard';
+      }
+      
+      navigate(dashboardRoute);
+    } else {
+      navigate('/dashboard');
+    }
     setAnchorEl(null);
   };
 

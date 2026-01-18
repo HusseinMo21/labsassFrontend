@@ -38,6 +38,8 @@ import PathologyRecordForm from './pages/erp/PathologyRecordForm';
 import PatientDocuments from './pages/erp/PatientDocuments';
 import ShiftManagement from './pages/ShiftManagement';
 import TodayClients from './pages/erp/TodayClients';
+import DiseaseSearchPage from './pages/erp/DiseaseSearch';
+import DashboardRedirect from './components/DashboardRedirect';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -54,6 +56,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Helper function to get dashboard route based on user role
+const getDashboardRoute = (role: string | undefined): string => {
+  switch (role) {
+    case 'admin':
+      return '/admin/dashboard';
+    case 'staff':
+      return '/staff/dashboard';
+    case 'doctor':
+      return '/doctor/dashboard';
+    case 'patient':
+      return '/patient/dashboard';
+    case 'accountant':
+      return '/accountant/dashboard';
+    default:
+      return '/dashboard';
+  }
+};
+
 // Public Route Component (redirect to dashboard if authenticated)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -63,7 +83,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getDashboardRoute(user.role)} replace />;
   }
   
   return <>{children}</>;
@@ -95,14 +115,12 @@ const router = createBrowserRouter([
     ),
   },
   
-  // Protected ERP routes
+  // Protected ERP routes - redirect to role-specific dashboard
   {
     path: '/dashboard',
     element: (
       <ProtectedRoute>
-        <ERPLayout>
-          <Dashboard />
-        </ERPLayout>
+        <DashboardRedirect />
       </ProtectedRoute>
     ),
   },
@@ -113,6 +131,17 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <Dashboard />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Disease Search
+  {
+    path: '/disease-search',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <DiseaseSearchPage />
         </ERPLayout>
       </ProtectedRoute>
     ),

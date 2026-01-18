@@ -38,6 +38,7 @@ import {
   AttachMoney,
   Schedule,
   Today,
+  Search,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -71,7 +72,8 @@ const navigationItems: NavigationItem[] = [
   { path: '/users', label: 'Users', icon: <Person />, roles: ['admin'] },
   { path: '/inventory', label: 'Inventory', icon: <Inventory />, roles: ['admin'] },
   { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['admin'] },
-  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['admin'] },
+  { path: '/enhanced-reports', label: 'Completed Reports', icon: <Assessment />, roles: ['admin'] },
+  { path: '/disease-search', label: 'Disease Search', icon: <Search />, roles: ['admin'] },
   { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'] },
 
   // Staff - Limited access (including Extra Payments Management and Unpaid Invoices)
@@ -97,7 +99,7 @@ const navigationItems: NavigationItem[] = [
   // Doctor - Can view and approve reports
   { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },
   { path: '/doctor/reports', label: 'Reports', icon: <Assessment />, roles: ['doctor'] },
-  { path: '/enhanced-reports', label: 'Enhanced Reports', icon: <Assessment />, roles: ['doctor'] },
+  { path: '/enhanced-reports', label: 'Completed Reports', icon: <Assessment />, roles: ['doctor'] },
 
   // Patient - Can view their own reports after payment
   { path: '/patient/dashboard', label: 'My Dashboard', icon: <Dashboard />, roles: ['patient'] },
