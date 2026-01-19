@@ -28,6 +28,7 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  Pagination,
 } from '@mui/material';
 import {
   PlayArrow,
@@ -114,10 +115,16 @@ const ShiftManagement: React.FC = () => {
   const [shiftsByDate, setShiftsByDate] = useState<Shift[]>([]);
   const [loadingShiftsByDate, setLoadingShiftsByDate] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [pagination, setPagination] = useState({
+    page: 1,
+    perPage: 10,
+    total: 0,
+    lastPage: 1,
+  });
 
   useEffect(() => {
     fetchCurrentShift();
-    fetchShiftHistory();
+    fetchShiftHistory(1, 10);
   }, []);
 
   // Update current time every second for the timer (more accurate)
@@ -173,11 +180,24 @@ const ShiftManagement: React.FC = () => {
     }
   };
 
-  const fetchShiftHistory = async () => {
+  const fetchShiftHistory = async (page: number = pagination.page, perPage: number = pagination.perPage) => {
     try {
-      const response = await axios.get('/api/shifts/history');
+      const response = await axios.get('/api/shifts/history', {
+        params: {
+          page,
+          per_page: perPage,
+        },
+      });
       if (response.data.success) {
         setShiftHistory(response.data.data);
+        if (response.data.pagination) {
+          setPagination({
+            page: response.data.pagination.current_page,
+            perPage: response.data.pagination.per_page,
+            total: response.data.pagination.total,
+            lastPage: response.data.pagination.last_page,
+          });
+        }
       }
     } catch (error: any) {
       console.error('Failed to fetch shift history:', error);
@@ -231,7 +251,7 @@ const ShiftManagement: React.FC = () => {
         toast.success('Shift opened successfully!');
         setOpenShiftDialog(false);
         fetchCurrentShift();
-        fetchShiftHistory();
+        fetchShiftHistory(1, pagination.perPage);
       }
     } catch (error: any) {
       console.error('Failed to open shift:', error);
@@ -253,7 +273,7 @@ const ShiftManagement: React.FC = () => {
         setCloseShiftDialog(false);
         setCloseNotes('');
         fetchCurrentShift();
-        fetchShiftHistory();
+        fetchShiftHistory(1, pagination.perPage);
       }
     } catch (error: any) {
       console.error('Failed to close shift:', error);
@@ -1028,11 +1048,30 @@ const ShiftManagement: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Shift History
             </Typography>
-            {shiftHistory && shiftHistory.length > 0 && (
-              <Typography variant="body2" color="text.secondary">
-                Total: {shiftHistory.length} closed shift(s)
-              </Typography>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {pagination.total > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.perPage) + 1} - {Math.min(pagination.page * pagination.perPage, pagination.total)} of {pagination.total} closed shift(s)
+                </Typography>
+              )}
+              <FormControl size="small" sx={{ minWidth: 100 }}>
+                <InputLabel>Per Page</InputLabel>
+                <Select
+                  value={pagination.perPage}
+                  label="Per Page"
+                  onChange={(e) => {
+                    const newPerPage = Number(e.target.value);
+                    setPagination({ ...pagination, perPage: newPerPage, page: 1 });
+                    fetchShiftHistory(1, newPerPage);
+                  }}
+                >
+                  <MenuItem value={5}>5</MenuItem>
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={25}>25</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
           </Box>
           
           <TableContainer component={Paper}>
@@ -1118,6 +1157,23 @@ const ShiftManagement: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
+          
+          {/* Pagination Controls */}
+          {pagination.total > 0 && pagination.lastPage > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 2 }}>
+              <Pagination
+                count={pagination.lastPage}
+                page={pagination.page}
+                onChange={(event, value) => {
+                  setPagination({ ...pagination, page: value });
+                  fetchShiftHistory(value, pagination.perPage);
+                }}
+                color="primary"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          )}
         </CardContent>
       </Card>
 

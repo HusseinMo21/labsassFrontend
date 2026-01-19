@@ -53,6 +53,8 @@ interface Visit {
   image_uploaded_at?: string;
   image_uploaded_by?: number;
   lab_number?: string;
+  checked_by_doctors?: string[];
+  last_checked_at?: string;
   labRequest?: {
     id: number;
     lab_no: string;
@@ -832,7 +834,7 @@ const PathologyRecordForm: React.FC = () => {
 
     try {
       setSaving(true);
-      const response = await axios.post(`/api/visits/${visitId}/mark-checked`, {
+      await axios.post(`/api/visits/${visitId}/mark-checked`, {
         doctor_name: user.name
       });
 
@@ -1327,7 +1329,7 @@ const PathologyRecordForm: React.FC = () => {
                     color="primary"
                     size="large"
                     onClick={handleMarkAsChecked}
-                    disabled={saving || (visit?.checked_by_doctors && user?.name && visit.checked_by_doctors.includes(user.name))}
+                    disabled={saving || Boolean(visit?.checked_by_doctors && user?.name && visit.checked_by_doctors.includes(user.name))}
                     sx={{ 
                       height: '56px',
                       mt: { xs: 0, sm: 0 }
