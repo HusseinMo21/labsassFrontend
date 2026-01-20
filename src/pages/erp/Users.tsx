@@ -836,25 +836,25 @@ const Users: React.FC = () => {
                     />
                   ) : (
                     // For other users, show dropdown with assignable roles
-                    <>
+                    <Box>
                       <Select
                         value={formData.role}
                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                         label="Role"
                       >
                         {/* Show only staff and doctor options that can be assigned */}
-                        {assignableRoles.map((role) => (
+                        {Array.isArray(assignableRoles) ? assignableRoles.map((role) => (
                           <MenuItem key={role.value} value={role.value}>
                             {role.label}
                           </MenuItem>
-                        ))}
+                        )) : null}
                       </Select>
                       {editingUser && editingUser.role && !assignableRoles.find(r => r.value === editingUser.role) && (
                         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
                           Current role: {getRoleLabel(editingUser.role)}. You can only assign Staff or Doctor roles.
                         </Typography>
                       )}
-                    </>
+                    </Box>
                   )}
                 </FormControl>
               </Grid>

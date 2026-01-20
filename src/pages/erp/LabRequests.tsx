@@ -679,11 +679,11 @@ const LabRequests: React.FC = () => {
                 label="Patient"
               >
                 <MenuItem value="">Select Patient</MenuItem>
-                {patients.map((patient) => (
+                {Array.isArray(patients) && patients.length > 0 ? patients.map((patient) => (
                   <MenuItem key={patient.id} value={patient.id}>
                     {patient.name} - {patient.phone}
                   </MenuItem>
-                ))}
+                )) : null}
               </Select>
             </FormControl>
 

@@ -378,11 +378,11 @@ const ReportForm: React.FC = () => {
                         label="Select Template"
                       >
                         <MenuItem value="">No Template</MenuItem>
-                        {Array.isArray(templates) && templates.map((template) => (
+                        {Array.isArray(templates) ? templates.map((template) => (
                           <MenuItem key={template.id} value={template.id.toString()}>
                             {template.name}
                           </MenuItem>
-                        ))}
+                        )) : null}
                       </Select>
                     </FormControl>
                   </Grid>

@@ -16,10 +16,12 @@ import {
   Card,
   CardContent,
   Grid,
+  TextField,
 } from '@mui/material';
 import {
   Print,
   Today,
+  Refresh,
 } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
@@ -52,24 +54,28 @@ const TodayClients: React.FC = () => {
   const [clients, setClients] = useState<TodayClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    // Initialize with today's date
+    return new Date().toISOString().split('T')[0];
+  });
 
   useEffect(() => {
     fetchTodayClients();
-  }, []);
+  }, [selectedDate]);
 
   const fetchTodayClients = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const deliveryDate = selectedDate; // Use selected date instead of today
       
-      console.log('Fetching today clients for date:', today);
+      console.log('Fetching clients for delivery date:', deliveryDate);
       
       // First try with backend filter
       let response;
       try {
         response = await axios.get('/api/visits', {
           params: {
-            delivery_date: today,
+            delivery_date: deliveryDate,
             per_page: 1000,
           },
         });
@@ -170,9 +176,9 @@ const TodayClients: React.FC = () => {
                 : '';
             }
             
-            console.log(`Visit ${visit.id} - Normalized date:`, normalizedDate, 'vs today:', today, 'match:', normalizedDate === today);
+            console.log(`Visit ${visit.id} - Normalized date:`, normalizedDate, 'vs selected date:', deliveryDate, 'match:', normalizedDate === deliveryDate);
             
-            return normalizedDate === today;
+            return normalizedDate === deliveryDate;
           } catch (e) {
             console.warn('Error parsing delivery date:', deliveryDate, e);
             return false;
@@ -224,6 +230,11 @@ const TodayClients: React.FC = () => {
     return { totalAmount, totalPaid, totalLeft, paidCount, unpaidCount };
   };
 
+  const handleResetToToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setSelectedDate(today);
+  };
+
   const handlePrint = async () => {
     if (clients.length === 0) {
       toast.info('No clients to print');
@@ -233,7 +244,7 @@ const TodayClients: React.FC = () => {
     setPrinting(true);
     try {
       const { totalAmount, totalPaid, totalLeft, paidCount, unpaidCount } = calculateTotals();
-      const today = new Date().toLocaleDateString('ar-EG');
+      const formattedDate = new Date(selectedDate).toLocaleDateString('ar-EG');
 
       const tableRows = clients.map((client) => {
         const finalAmount = Number(client.final_amount || client.total_amount || 0) || 0;
@@ -350,9 +361,9 @@ const TodayClients: React.FC = () => {
         </head>
         <body>
           <div class="header">
-            <h1>Today Clients Report</h1>
+            <h1>Clients Delivery Report</h1>
             <div style="margin: 10px 0; font-size: 14px; color: #333;">
-              <strong>Delivery Date:</strong> ${today}
+              <strong>Delivery Date:</strong> ${formattedDate}
             </div>
             <div style="margin: 10px 0; font-size: 14px; color: #333;">
               <strong>Total Clients:</strong> ${clients.length}
@@ -441,7 +452,7 @@ const TodayClients: React.FC = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Today sx={{ fontSize: 32, color: 'primary.main' }} />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Today Clients
+            Clients Delivery
           </Typography>
           <Chip 
             label={`${clients.length} Clients`} 
@@ -449,15 +460,42 @@ const TodayClients: React.FC = () => {
             size="small"
           />
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Print />}
-          onClick={handlePrint}
-          disabled={printing || clients.length === 0}
-          sx={{ px: 3 }}
-        >
-          {printing ? <CircularProgress size={24} color="inherit" /> : 'Print'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={handleResetToToday}
+            size="small"
+          >
+            Today
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Print />}
+            onClick={handlePrint}
+            disabled={printing || clients.length === 0}
+            sx={{ px: 3 }}
+          >
+            {printing ? <CircularProgress size={24} color="inherit" /> : 'Print'}
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Date Picker */}
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <TextField
+          label="Select Delivery Date"
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          InputLabelProps={{
+            shrink: true,
+          }}
+          sx={{ minWidth: 200 }}
+        />
+        <Typography variant="body2" color="text.secondary">
+          Showing clients scheduled for delivery on: <strong>{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
+        </Typography>
       </Box>
 
       {/* Summary Cards */}
@@ -526,7 +564,7 @@ const TodayClients: React.FC = () => {
 
       {clients.length === 0 ? (
         <Alert severity="info">
-          No clients scheduled for delivery today.
+          No clients scheduled for delivery on {new Date(selectedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.
         </Alert>
       ) : (
         <TableContainer component={Paper}>

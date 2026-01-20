@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import TemplateSaveModal from '../../components/TemplateSaveModal';
+import { SimilarCasesPanel } from '../../components/reportSearch/SimilarCasesPanel';
+import { ReportComparison } from '../../components/reportSearch/ReportComparison';
 import {
   Box,
   Typography,
@@ -27,8 +29,7 @@ import {
   CloudUpload,
   ContentCopy,
   FullscreenExit,
-  Add,
-  Delete,
+  Fullscreen,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -136,31 +137,33 @@ const PathologyRecordForm: React.FC = () => {
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [expandedValue, setExpandedValue] = useState('');
 
-  // Structured list points for all fields
-  const [clinicalDataPoints, setClinicalDataPoints] = useState<string[]>(['']);
-  const [natureOfSpecimenPoints, setNatureOfSpecimenPoints] = useState<string[]>(['']);
-  const [grossPathologyPoints, setGrossPathologyPoints] = useState<string[]>(['']);
-  const [microscopicExaminationPoints, setMicroscopicExaminationPoints] = useState<string[]>(['']);
-  const [conclusionPoints, setConclusionPoints] = useState<string[]>(['']);
-  const [recommendationsPoints, setRecommendationsPoints] = useState<string[]>(['']);
+  // Comparison modal state
+  const [comparisonModalOpen, setComparisonModalOpen] = useState(false);
+  const [comparisonVisitId, setComparisonVisitId] = useState<number | null>(null);
 
-  // Helper function to parse any field string into array of points
-  const parseFieldData = (data: string | undefined): string[] => {
+  // Single text fields for all pathology details
+  const [clinicalData, setClinicalData] = useState<string>('');
+  const [natureOfSpecimen, setNatureOfSpecimen] = useState<string>('');
+  const [grossPathology, setGrossPathology] = useState<string>('');
+  const [microscopicExamination, setMicroscopicExamination] = useState<string>('');
+  const [conclusion, setConclusion] = useState<string>('');
+  const [recommendations, setRecommendations] = useState<string>('');
+
+  // Helper function to clean field data (remove numbered points format)
+  const cleanFieldData = (data: string | undefined): string => {
     if (!data || data.trim() === '' || data === '.' || data === '---') {
-      return [''];
+      return '';
     }
     
-    // Try to parse as structured format (numbered points like "1-point1\n2-point2")
-    // Or simple newline-separated points
+    // Remove numbered points format (e.g., "1-point1\n2-point2" -> "point1\npoint2")
     const lines = data.split('\n').filter(line => line.trim() !== '');
     
     if (lines.length === 0) {
-      return [''];
+      return '';
     }
     
-    // Check if lines start with numbers (like "1-", "2-", etc.)
-    const parsedPoints = lines.map(line => {
-      // Remove leading number and dash/period if present (e.g., "1-point" -> "point")
+    // Remove leading number and dash/period if present
+    const cleanedLines = lines.map(line => {
       const match = line.match(/^\d+[-.)]\s*(.+)$/);
       if (match) {
         return match[1].trim();
@@ -173,16 +176,7 @@ const PathologyRecordForm: React.FC = () => {
       return line.trim();
     });
     
-    return parsedPoints.length > 0 ? parsedPoints : [''];
-  };
-
-  // Helper function to format any field points as string
-  const formatFieldData = (points: string[]): string => {
-    const validPoints = points.filter(p => p.trim() !== '');
-    if (validPoints.length === 0) {
-      return '';
-    }
-    return validPoints.map((point, index) => `${index + 1}-${point.trim()}`).join('\n');
+    return cleanedLines.join('\n');
   };
 
   const [formData, setFormData] = useState({
@@ -520,13 +514,13 @@ const PathologyRecordForm: React.FC = () => {
       
       setFormData(newFormData);
       
-      // Initialize all field points from the loaded data
-      setClinicalDataPoints(parseFieldData(newFormData.clinical_data));
-      setNatureOfSpecimenPoints(parseFieldData(newFormData.nature_of_specimen));
-      setGrossPathologyPoints(parseFieldData(newFormData.gross_pathology));
-      setMicroscopicExaminationPoints(parseFieldData(newFormData.microscopic_examination));
-      setConclusionPoints(parseFieldData(newFormData.conclusion));
-      setRecommendationsPoints(parseFieldData(newFormData.recommendations));
+      // Initialize all fields from the loaded data
+      setClinicalData(cleanFieldData(newFormData.clinical_data));
+      setNatureOfSpecimen(cleanFieldData(newFormData.nature_of_specimen));
+      setGrossPathology(cleanFieldData(newFormData.gross_pathology));
+      setMicroscopicExamination(cleanFieldData(newFormData.microscopic_examination));
+      setConclusion(cleanFieldData(newFormData.conclusion));
+      setRecommendations(cleanFieldData(newFormData.recommendations));
       
     } catch (error) {
       console.error('Failed to fetch visit data:', error);
@@ -556,114 +550,59 @@ const PathologyRecordForm: React.FC = () => {
 
   // Removed unused handleExpandField function
 
+  const handleExpandField = (fieldName: string) => {
+    let currentValue = '';
+    switch (fieldName) {
+      case 'clinical_data':
+        currentValue = clinicalData;
+        break;
+      case 'nature_of_specimen':
+        currentValue = natureOfSpecimen;
+        break;
+      case 'gross_pathology':
+        currentValue = grossPathology;
+        break;
+      case 'microscopic_examination':
+        currentValue = microscopicExamination;
+        break;
+      case 'conclusion':
+        currentValue = conclusion;
+        break;
+      case 'recommendations':
+        currentValue = recommendations;
+        break;
+    }
+    setExpandedValue(currentValue);
+    setExpandedField(fieldName);
+  };
+
   const handleCloseExpandedField = () => {
     if (expandedField) {
-      handleInputChange(expandedField, expandedValue);
+      switch (expandedField) {
+        case 'clinical_data':
+          setClinicalData(expandedValue);
+          break;
+        case 'nature_of_specimen':
+          setNatureOfSpecimen(expandedValue);
+          break;
+        case 'gross_pathology':
+          setGrossPathology(expandedValue);
+          break;
+        case 'microscopic_examination':
+          setMicroscopicExamination(expandedValue);
+          break;
+        case 'conclusion':
+          setConclusion(expandedValue);
+          break;
+        case 'recommendations':
+          setRecommendations(expandedValue);
+          break;
+      }
     }
     setExpandedField(null);
     setExpandedValue('');
   };
 
-  // Reusable component for structured list fields - COMPLETELY INDEPENDENT
-  const StructuredListField = ({
-    points: initialPoints,
-    setPoints,
-    fieldName,
-    placeholder,
-    imagePlacement,
-    disabled = false,
-  }: {
-    points: string[];
-    setPoints: (points: string[]) => void;
-    fieldName: string;
-    placeholder: string;
-    imagePlacement: string;
-    disabled?: boolean;
-  }) => {
-    // imagePlacement is passed but not used in this component
-    void imagePlacement;
-    // Store initial points in ref - never read from props again
-    const initialPointsRef = useRef<string[]>(initialPoints);
-    
-    // Local state - completely independent, initialized once from ref
-    const [localPoints, setLocalPoints] = useState<string[]>(() => initialPointsRef.current);
-
-    // Simple input handler - ONLY updates local state, nothing else
-    const handlePointChange = (index: number, value: string) => {
-      setLocalPoints(prev => {
-        const newPoints = [...prev];
-        newPoints[index] = value;
-        return newPoints;
-      });
-    };
-
-    // Handle delete
-    const handleDelete = (index: number) => {
-      setLocalPoints(prev => prev.filter((_, i) => i !== index));
-    };
-
-    return (
-      <Box>
-        {localPoints.map((point, index) => (
-          <Box key={`${fieldName}-${index}-${localPoints.length}`} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'flex-start' }}>
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                minWidth: '30px', 
-                pt: 1.5, 
-                fontWeight: 'bold',
-                color: 'text.secondary'
-              }}
-            >
-              {index + 1}-
-            </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              minRows={3}
-              maxRows={10}
-              value={point || ''}
-              onChange={(e) => handlePointChange(index, e.target.value)}
-              onBlur={() => {
-                // Update parent state on blur so save can read it, but child won't re-render
-                setPoints(localPoints);
-              }}
-              placeholder={`${placeholder} ${index + 1}`}
-              disabled={disabled}
-              sx={{ 
-                '& .MuiInputBase-root': {
-                  alignItems: 'flex-start',
-                }
-              }}
-            />
-            {localPoints.length > 1 && (
-              <IconButton
-                size="small"
-                onClick={() => handleDelete(index)}
-                sx={{ mt: 0.5 }}
-                color="error"
-              >
-                <Delete fontSize="small" />
-              </IconButton>
-            )}
-          </Box>
-        ))}
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<Add />}
-          onClick={() => {
-            setLocalPoints(prev => [...prev, '']);
-          }}
-          disabled={disabled}
-          sx={{ mt: 1 }}
-        >
-          Add Point
-        </Button>
-      </Box>
-    );
-  };
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
@@ -685,13 +624,13 @@ const PathologyRecordForm: React.FC = () => {
           // Document Type
           type_of_analysis: template.type_of_analysis || prev.type_of_analysis,
         }));
-        // Update all field points
-        setClinicalDataPoints(parseFieldData(clinicalData));
-        setNatureOfSpecimenPoints(parseFieldData(template.specimen_information || ''));
-        setGrossPathologyPoints(parseFieldData(template.gross_examination || ''));
-        setMicroscopicExaminationPoints(parseFieldData(template.microscopic_description || template.microscopic || ''));
-        setConclusionPoints(parseFieldData(template.diagnosis || ''));
-        setRecommendationsPoints(parseFieldData(template.recommendations || ''));
+        // Update all fields
+        setClinicalData(cleanFieldData(clinicalData));
+        setNatureOfSpecimen(cleanFieldData(template.specimen_information || ''));
+        setGrossPathology(cleanFieldData(template.gross_examination || ''));
+        setMicroscopicExamination(cleanFieldData(template.microscopic_description || template.microscopic || ''));
+        setConclusion(cleanFieldData(template.diagnosis || ''));
+        setRecommendations(cleanFieldData(template.recommendations || ''));
       }
     }
   };
@@ -752,17 +691,15 @@ const PathologyRecordForm: React.FC = () => {
       return false;
     }
     
-    // Get current points from the StructuredListField components
-    // We need to read them directly from state at save time
-    // Format all points into formData before saving
+    // Get current field values from state
     const updatedFormData = {
       ...formData,
-      clinical_data: formatFieldData(clinicalDataPoints),
-      nature_of_specimen: formatFieldData(natureOfSpecimenPoints),
-      gross_pathology: formatFieldData(grossPathologyPoints),
-      microscopic_examination: formatFieldData(microscopicExaminationPoints),
-      conclusion: formatFieldData(conclusionPoints),
-      recommendations: formatFieldData(recommendationsPoints),
+      clinical_data: clinicalData.trim(),
+      nature_of_specimen: natureOfSpecimen.trim(),
+      gross_pathology: grossPathology.trim(),
+      microscopic_examination: microscopicExamination.trim(),
+      conclusion: conclusion.trim(),
+      recommendations: recommendations.trim(),
     };
 
       const formDataToSend = new FormData();
@@ -1105,13 +1042,13 @@ const PathologyRecordForm: React.FC = () => {
       ...newFormData,
     }));
 
-        // Update all field points
-        setClinicalDataPoints(parseFieldData(clinicalData));
-        setNatureOfSpecimenPoints(parseFieldData(pathologyData.nature_of_specimen || ''));
-        setGrossPathologyPoints(parseFieldData(pathologyData.gross_pathology || ''));
-        setMicroscopicExaminationPoints(parseFieldData(pathologyData.microscopic_examination || ''));
-        setConclusionPoints(parseFieldData(pathologyData.conclusion || ''));
-        setRecommendationsPoints(parseFieldData(pathologyData.recommendations || ''));
+        // Update all fields
+        setClinicalData(cleanFieldData(clinicalData));
+        setNatureOfSpecimen(cleanFieldData(pathologyData.nature_of_specimen || ''));
+        setGrossPathology(cleanFieldData(pathologyData.gross_pathology || ''));
+        setMicroscopicExamination(cleanFieldData(pathologyData.microscopic_examination || ''));
+        setConclusion(cleanFieldData(pathologyData.conclusion || ''));
+        setRecommendations(cleanFieldData(pathologyData.recommendations || ''));
 
     toast.success('Pathology details copied successfully!');
     setCopyModalOpen(false);
@@ -1287,16 +1224,14 @@ const PathologyRecordForm: React.FC = () => {
                     <MenuItem value="pending">Pending</MenuItem>
                     <MenuItem value="in_progress">In Progress</MenuItem>
                     {/* Doctors can see Approved status */}
-                    {(user?.role === 'doctor' || user?.role === 'admin') && (
-                      <MenuItem value="approved">Approved</MenuItem>
-                    )}
+                    {((user?.role === 'doctor' || user?.role === 'admin') && (
+                      <MenuItem key="approved" value="approved">Approved</MenuItem>
+                    ))}
                     {/* Only admins can see Completed and Cancelled */}
-                    {user?.role === 'admin' && (
-                      <>
-                        <MenuItem value="completed">Completed</MenuItem>
-                        <MenuItem value="cancelled">Cancelled</MenuItem>
-                      </>
-                    )}
+                    {user?.role === 'admin' && [
+                      <MenuItem key="completed" value="completed">Completed</MenuItem>,
+                      <MenuItem key="cancelled" value="cancelled">Cancelled</MenuItem>
+                    ]}
                   </Select>
                 </FormControl>
               </Grid>
@@ -1375,9 +1310,21 @@ const PathologyRecordForm: React.FC = () => {
           <Box sx={{ mb: 4 }}>
             {/* Clinical data */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Clinical data
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  Clinical data
+                </Typography>
+                {formData.image_placement !== 'clinical_data' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('clinical_data')}
+                    color="primary"
+                    title="Expand field"
+                  >
+                    <Fullscreen />
+                  </IconButton>
+                )}
+              </Box>
               {formData.image_placement === 'clinical_data' && formData.image ? (
                 <Box sx={{ 
                   border: '2px solid', 
@@ -1397,22 +1344,42 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <StructuredListField
-                  points={clinicalDataPoints}
-                  setPoints={setClinicalDataPoints}
-                  fieldName="clinical_data"
-                  placeholder="Point"
-                  imagePlacement={formData.image_placement}
-                    disabled={formData.image_placement === 'clinical_data'}
-                  />
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  minRows={6}
+                  maxRows={15}
+                  value={clinicalData}
+                  onChange={(e) => setClinicalData(e.target.value)}
+                  placeholder="Enter clinical data..."
+                  disabled={formData.image_placement === 'clinical_data'}
+                  sx={{ 
+                    '& .MuiInputBase-root': {
+                      alignItems: 'flex-start',
+                    }
+                  }}
+                />
               )}
             </Box>
 
             {/* Nature of specimen */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Nature of specimen
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  Nature of specimen
+                </Typography>
+                {formData.image_placement !== 'nature_of_specimen' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('nature_of_specimen')}
+                    color="primary"
+                    title="Expand field"
+                  >
+                    <Fullscreen />
+                  </IconButton>
+                )}
+              </Box>
               {formData.image_placement === 'nature_of_specimen' && formData.image ? (
                 <Box sx={{ 
                   border: '2px solid', 
@@ -1432,22 +1399,42 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <StructuredListField
-                  points={natureOfSpecimenPoints}
-                  setPoints={setNatureOfSpecimenPoints}
-                  fieldName="nature_of_specimen"
-                  placeholder="Point"
-                  imagePlacement={formData.image_placement}
-                    disabled={formData.image_placement === 'nature_of_specimen'}
-                  />
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  minRows={6}
+                  maxRows={15}
+                  value={natureOfSpecimen}
+                  onChange={(e) => setNatureOfSpecimen(e.target.value)}
+                  placeholder="Enter nature of specimen..."
+                  disabled={formData.image_placement === 'nature_of_specimen'}
+                  sx={{ 
+                    '& .MuiInputBase-root': {
+                      alignItems: 'flex-start',
+                    }
+                  }}
+                />
               )}
             </Box>
 
             {/* Gross Pathology */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Gross Pathology
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  Gross Pathology
+                </Typography>
+                {formData.image_placement !== 'gross_pathology' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('gross_pathology')}
+                    color="primary"
+                    title="Expand field"
+                  >
+                    <Fullscreen />
+                  </IconButton>
+                )}
+              </Box>
               {formData.image_placement === 'gross_pathology' && formData.image ? (
                 <Box sx={{ 
                   border: '2px solid', 
@@ -1467,22 +1454,42 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <StructuredListField
-                  points={grossPathologyPoints}
-                  setPoints={setGrossPathologyPoints}
-                  fieldName="gross_pathology"
-                  placeholder="Point"
-                  imagePlacement={formData.image_placement}
-                    disabled={formData.image_placement === 'gross_pathology'}
-                  />
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  minRows={6}
+                  maxRows={15}
+                  value={grossPathology}
+                  onChange={(e) => setGrossPathology(e.target.value)}
+                  placeholder="Enter gross pathology..."
+                  disabled={formData.image_placement === 'gross_pathology'}
+                  sx={{ 
+                    '& .MuiInputBase-root': {
+                      alignItems: 'flex-start',
+                    }
+                  }}
+                />
               )}
             </Box>
 
             {/* Microscopic examination */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Microscopic examination
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  Microscopic examination
+                </Typography>
+                {formData.image_placement !== 'microscopic_examination' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('microscopic_examination')}
+                    color="primary"
+                    title="Expand field"
+                  >
+                    <Fullscreen />
+                  </IconButton>
+                )}
+              </Box>
               {formData.image_placement === 'microscopic_examination' && formData.image ? (
                 <Box sx={{ 
                   border: '2px solid', 
@@ -1502,22 +1509,42 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <StructuredListField
-                  points={microscopicExaminationPoints}
-                  setPoints={setMicroscopicExaminationPoints}
-                  fieldName="microscopic_examination"
-                  placeholder="Point"
-                  imagePlacement={formData.image_placement}
-                    disabled={formData.image_placement === 'microscopic_examination'}
-                  />
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  minRows={6}
+                  maxRows={15}
+                  value={microscopicExamination}
+                  onChange={(e) => setMicroscopicExamination(e.target.value)}
+                  placeholder="Enter microscopic examination..."
+                  disabled={formData.image_placement === 'microscopic_examination'}
+                  sx={{ 
+                    '& .MuiInputBase-root': {
+                      alignItems: 'flex-start',
+                    }
+                  }}
+                />
               )}
             </Box>
 
             {/* Conclusion */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Conclusion
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  Conclusion
+                </Typography>
+                {formData.image_placement !== 'conclusion' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleExpandField('conclusion')}
+                    color="primary"
+                    title="Expand field"
+                  >
+                    <Fullscreen />
+                  </IconButton>
+                )}
+              </Box>
               {formData.image_placement === 'conclusion' && formData.image ? (
                 <Box sx={{ 
                   border: '2px solid', 
@@ -1537,29 +1564,54 @@ const PathologyRecordForm: React.FC = () => {
                   />
                 </Box>
               ) : (
-                <StructuredListField
-                  points={conclusionPoints}
-                  setPoints={setConclusionPoints}
-                  fieldName="conclusion"
-                  placeholder="Point"
-                  imagePlacement={formData.image_placement}
-                    disabled={formData.image_placement === 'conclusion'}
-                  />
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  minRows={6}
+                  maxRows={15}
+                  value={conclusion}
+                  onChange={(e) => setConclusion(e.target.value)}
+                  placeholder="Enter conclusion..."
+                  disabled={formData.image_placement === 'conclusion'}
+                  sx={{ 
+                    '& .MuiInputBase-root': {
+                      alignItems: 'flex-start',
+                    }
+                  }}
+                />
               )}
             </Box>
 
             {/* Recommendations */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
-                Recommendations
-              </Typography>
-              <StructuredListField
-                points={recommendationsPoints}
-                setPoints={setRecommendationsPoints}
-                fieldName="recommendations"
-                placeholder="Point"
-                imagePlacement={formData.image_placement}
-                disabled={false}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                  Recommendations
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => handleExpandField('recommendations')}
+                  color="primary"
+                  title="Expand field"
+                >
+                  <Fullscreen />
+                </IconButton>
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                rows={6}
+                minRows={6}
+                maxRows={15}
+                value={recommendations}
+                onChange={(e) => setRecommendations(e.target.value)}
+                placeholder="Enter recommendations..."
+                sx={{ 
+                  '& .MuiInputBase-root': {
+                    alignItems: 'flex-start',
+                  }
+                }}
               />
             </Box>
           </Box>
@@ -1666,11 +1718,11 @@ const PathologyRecordForm: React.FC = () => {
                     <MenuItem value="">
                       <em>Select a template...</em>
                     </MenuItem>
-                    {templates.map((template) => (
+                    {Array.isArray(templates) && templates.length > 0 ? templates.map((template) => (
                       <MenuItem key={template.id} value={template.id.toString()}>
                         {template.name || `Template ${template.id}`}
                       </MenuItem>
-                    ))}
+                    )) : null}
                   </Select>
                 </FormControl>
               </Grid>
@@ -1736,6 +1788,25 @@ const PathologyRecordForm: React.FC = () => {
           </Box>
         </Box>
       </Paper>
+
+      {/* Similar Cases Panel */}
+      {visitId && visit && (
+        <SimilarCasesPanel
+          currentVisitId={Number(visitId)}
+          reportData={{
+            clinical_data: formData.clinical_data,
+            microscopic_examination: formData.microscopic_examination,
+            conclusion: formData.conclusion,
+            recommendations: formData.recommendations,
+            nature_of_specimen: formData.nature_of_specimen,
+            gross_pathology: formData.gross_pathology,
+          }}
+          onCompare={(compareVisitId) => {
+            setComparisonVisitId(compareVisitId);
+            setComparisonModalOpen(true);
+          }}
+        />
+      )}
       
       {/* Template Save Modal */}
       <TemplateSaveModal
@@ -1843,57 +1914,87 @@ const PathologyRecordForm: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Report Comparison Modal */}
+      {comparisonVisitId && visitId && (
+        <ReportComparison
+          open={comparisonModalOpen}
+          onClose={() => {
+            setComparisonModalOpen(false);
+            setComparisonVisitId(null);
+          }}
+          visitId1={Number(visitId)}
+          visitId2={comparisonVisitId}
+        />
+      )}
+
       {/* Expanded Field Dialog */}
       <Dialog
         open={expandedField !== null}
         onClose={handleCloseExpandedField}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
-            maxHeight: '70vh',
+            maxHeight: '90vh',
+            height: '90vh',
           }
         }}
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">
-              {expandedField === 'clinical_data' && 'Clinical data'}
-              {expandedField === 'nature_of_specimen' && 'Nature of specimen'}
+              {expandedField === 'clinical_data' && 'Clinical Data'}
+              {expandedField === 'nature_of_specimen' && 'Nature of Specimen'}
               {expandedField === 'gross_pathology' && 'Gross Pathology'}
-              {expandedField === 'microscopic_examination' && 'Microscopic examination'}
+              {expandedField === 'microscopic_examination' && 'Microscopic Examination'}
               {expandedField === 'conclusion' && 'Conclusion'}
               {expandedField === 'recommendations' && 'Recommendations'}
             </Typography>
-            <IconButton onClick={handleCloseExpandedField} size="small">
+            <IconButton onClick={handleCloseExpandedField} size="small" title="Minimize">
               <FullscreenExit />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <TextField
             fullWidth
             multiline
-            rows={12}
             value={expandedValue}
             onChange={(e) => setExpandedValue(e.target.value)}
             placeholder={
-              expandedField === 'clinical_data' ? 'Clinical data: *' :
-              expandedField === 'nature_of_specimen' ? 'Nature of specimen: *' :
-              expandedField === 'gross_pathology' ? 'Gross Pathology' :
-              expandedField === 'microscopic_examination' ? 'Microscopic examination' :
-              expandedField === 'conclusion' ? 'Conclusion' :
-              'Recommendations'
+              expandedField === 'clinical_data' ? 'Enter clinical data...' :
+              expandedField === 'nature_of_specimen' ? 'Enter nature of specimen...' :
+              expandedField === 'gross_pathology' ? 'Enter gross pathology...' :
+              expandedField === 'microscopic_examination' ? 'Enter microscopic examination...' :
+              expandedField === 'conclusion' ? 'Enter conclusion...' :
+              'Enter recommendations...'
             }
             autoFocus
+            sx={{ 
+              flex: 1,
+              '& .MuiInputBase-root': {
+                height: '100%',
+                alignItems: 'flex-start',
+              },
+              '& .MuiInputBase-input': {
+                height: '100% !important',
+                overflow: 'auto !important',
+              }
+            }}
+            inputProps={{
+              style: {
+                height: '100%',
+                overflow: 'auto',
+              }
+            }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseExpandedField} variant="outlined">
-            Cancel
+          <Button onClick={handleCloseExpandedField} variant="outlined" startIcon={<FullscreenExit />}>
+            Minimize
           </Button>
           <Button onClick={handleCloseExpandedField} variant="contained" color="primary">
-            Save
+            Save & Close
           </Button>
         </DialogActions>
       </Dialog>
