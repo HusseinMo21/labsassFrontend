@@ -481,34 +481,36 @@ const router = createBrowserRouter([
   {
     path: '*',
     element: (
-      <div style={{ 
+      <div dir="rtl" style={{ 
         display: 'flex', 
         flexDirection: 'column', 
         alignItems: 'center', 
         justifyContent: 'center', 
         height: '100vh',
         textAlign: 'center',
-        padding: '20px'
+        padding: '20px',
+        fontFamily: 'Cairo, sans-serif'
       }}>
-        <h1 style={{ fontSize: '4rem', margin: '0', color: '#666' }}>404</h1>
-        <h2 style={{ margin: '10px 0', color: '#333' }}>Page Not Found</h2>
+        <h1 style={{ fontSize: '4rem', margin: '0', color: '#0d9488' }}>404</h1>
+        <h2 style={{ margin: '10px 0', color: '#333' }}>الصفحة غير موجودة</h2>
         <p style={{ margin: '10px 0', color: '#666' }}>
-          The page you're looking for doesn't exist.
+          الصفحة التي تبحث عنها غير موجودة.
         </p>
         <button 
           onClick={() => window.location.href = basename + '/'}
           style={{
-            padding: '10px 20px',
-            backgroundColor: '#1976d2',
+            padding: '12px 24px',
+            backgroundColor: '#0d9488',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '16px',
-            marginTop: '20px'
+            marginTop: '20px',
+            fontWeight: 600
           }}
         >
-          Go Home
+          العودة للرئيسية
         </button>
       </div>
     ),

@@ -86,12 +86,12 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box dir="rtl" sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Navbar />
       <Box
         sx={{
           minHeight: 'calc(100vh - 120px)',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -102,7 +102,7 @@ const Login: React.FC = () => {
           <Card
             sx={{
               borderRadius: 3,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
               overflow: 'hidden',
             }}
           >
@@ -110,21 +110,21 @@ const Login: React.FC = () => {
             <Box sx={{ textAlign: 'center', mb: 4 }}>
               <Avatar
                 sx={{
-                  width: 120,
-                  height: 120,
+                  width: 80,
+                  height: 80,
                   mx: 'auto',
                   mb: 2,
                   bgcolor: 'primary.main',
-                  fontSize: '2rem',
+                  fontSize: '1.5rem',
                 }}
               >
-                LAB
+                ساس
               </Avatar>
-              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-                DR.Yasser Mohamed LAB
+              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 800, color: 'primary.main' }}>
+                ساس لاب
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Sign in to your account
+                تسجيل الدخول إلى حسابك
               </Typography>
             </Box>
 
@@ -134,8 +134,8 @@ const Login: React.FC = () => {
               centered
               sx={{ mb: 3 }}
             >
-              <Tab label="Staff Login" value="staff" />
-              <Tab label="Patient Login" value="patient" />
+              <Tab label="موظفين المعمل" value="staff" />
+              <Tab label="مريض" value="patient" />
             </Tabs>
 
             {error && (
@@ -147,12 +147,12 @@ const Login: React.FC = () => {
             <Box component="form" onSubmit={handleSubmit}>
               <TextField
                 fullWidth
-                label={loginType === 'staff' ? 'Email Address' : 'Username'}
+                label={loginType === 'staff' ? 'البريد الإلكتروني' : 'اسم المستخدم'}
                 name="login"
                 type={loginType === 'staff' ? 'email' : 'text'}
                 value={formData.login}
                 onChange={handleChange}
-                placeholder={loginType === 'staff' ? 'Enter your email' : 'Enter your username'}
+                placeholder={loginType === 'staff' ? 'أدخل بريدك الإلكتروني' : 'أدخل اسم المستخدم'}
                 required
                 disabled={loading}
                 sx={{ mb: 3 }}
@@ -160,12 +160,12 @@ const Login: React.FC = () => {
 
               <TextField
                 fullWidth
-                label="Password"
+                label="كلمة المرور"
                 name="password"
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Enter your password"
+                placeholder="أدخل كلمة المرور"
                 autoComplete="current-password"
                 required
                 disabled={loading}
@@ -183,30 +183,26 @@ const Login: React.FC = () => {
                   fontSize: '1.1rem',
                   fontWeight: 600,
                   borderRadius: 2,
+                  bgcolor: 'primary.main',
+                  '&:hover': { bgcolor: 'primary.dark' },
                 }}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
               </Button>
             </Box>
 
             <Box sx={{ mt: 4, textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                <strong>Demo Credentials:</strong>
+                <strong>بيانات تجريبية:</strong>
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                <strong>Admin:</strong> admin@dryasserlab.com / DrYasserLab123456790@
+                <strong>مدير:</strong> admin@lab.com / password
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                <strong>Staff:</strong> zeinab@dryasserlab.com / Zeinab12345678
+                <strong>موظف:</strong> staff@lab.com / password
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                <strong>Staff:</strong> menna@dryasserlab.com / Menna12345678
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Doctor:</strong> doctor1@dryasserlab.com / Doctor123456
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Doctor:</strong> doctor2@dryasserlab.com / Doctor123456
+                <strong>دكتور:</strong> doctor@lab.com / password
               </Typography>
             </Box>
 
@@ -216,7 +212,7 @@ const Login: React.FC = () => {
                 onClick={() => navigate('/')}
                 sx={{ color: 'primary.main' }}
               >
-                ← Back to Home
+                ← العودة للرئيسية
               </Button>
             </Box>
           </CardContent>

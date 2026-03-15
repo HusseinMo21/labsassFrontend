@@ -109,7 +109,7 @@ const navigationItems: NavigationItem[] = [
 const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { user, logout } = useAuth();
+  const { user, lab, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -284,8 +284,9 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 Welcome, {user?.name}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" display="block">
                 {getRoleDisplayName(user?.role || '')}
+                {lab && ` • ${lab.name}`}
               </Typography>
             </Box>
             

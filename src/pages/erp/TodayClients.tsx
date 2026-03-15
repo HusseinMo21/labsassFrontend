@@ -35,7 +35,11 @@ interface TodayClient {
     age?: string;
     gender?: string;
     phone?: string;
+    doctor_id?: string;
+    organization_id?: string;
+    organization?: string;
   };
+  referred_doctor?: string;
   labRequest?: {
     id: number;
     full_lab_no: string;
@@ -252,13 +256,26 @@ const TodayClients: React.FC = () => {
         const left = Number(client.remaining_balance || (finalAmount - paid)) || 0;
         const labNo = client.labRequest?.full_lab_no || client.visit_number || 'N/A';
         
+        // Get doctor name from patient.doctor_id, visit.referred_doctor, or metadata
+        const doctorName = client.patient?.doctor_id 
+          || client.referred_doctor 
+          || (client.metadata && typeof client.metadata === 'object' && client.metadata.patient_data?.doctor)
+          || (client.metadata && typeof client.metadata === 'object' && client.metadata.patient_data?.sender)
+          || 'N/A';
+        
+        // Get organization from patient.organization_id, patient.organization, or metadata
+        const organizationName = client.patient?.organization_id 
+          || client.patient?.organization
+          || (client.metadata && typeof client.metadata === 'object' && client.metadata.patient_data?.organization)
+          || 'N/A';
+        
         return `
           <tr>
             <td>${client.patient.name || 'N/A'}</td>
             <td>${labNo}</td>
-            <td>${client.patient.gender ? (client.patient.gender === 'male' ? 'Male' : 'Female') : 'N/A'}</td>
+            <td>${doctorName}</td>
             <td>${client.patient.age || 'N/A'}</td>
-            <td>${client.patient.phone || 'N/A'}</td>
+            <td>${organizationName}</td>
             <td>${finalAmount.toFixed(2)}</td>
             <td>${paid.toFixed(2)}</td>
             <td>${left.toFixed(2)}</td>
@@ -398,9 +415,9 @@ const TodayClients: React.FC = () => {
               <tr>
                 <th>Name</th>
                 <th>Lab Number</th>
-                <th>Gender</th>
+                <th>Doctor</th>
                 <th>Age</th>
-                <th>Phone</th>
+                <th>Organization</th>
                 <th>Total Amount</th>
                 <th>Paid</th>
                 <th>Left</th>
@@ -573,9 +590,9 @@ const TodayClients: React.FC = () => {
               <TableRow sx={{ bgcolor: 'primary.main' }}>
                 <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Name</TableCell>
                 <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Lab Number</TableCell>
-                <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Gender</TableCell>
+                <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Doctor</TableCell>
                 <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Age</TableCell>
-                <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Phone</TableCell>
+                <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Organization</TableCell>
                 <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Total Amount</TableCell>
                 <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Paid</TableCell>
                 <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Left</TableCell>
@@ -590,17 +607,26 @@ const TodayClients: React.FC = () => {
                 const labNo = client.labRequest?.full_lab_no || client.visit_number || 'N/A';
                 const isPaid = left <= 0;
 
+                // Get doctor name from patient.doctor_id, visit.referred_doctor, or metadata
+                const doctorName = client.patient?.doctor_id 
+                  || client.referred_doctor 
+                  || (client.metadata && typeof client.metadata === 'object' && client.metadata.patient_data?.doctor)
+                  || (client.metadata && typeof client.metadata === 'object' && client.metadata.patient_data?.sender)
+                  || 'N/A';
+                
+                // Get organization from patient.organization_id, patient.organization, or metadata
+                const organizationName = client.patient?.organization_id 
+                  || client.patient?.organization
+                  || (client.metadata && typeof client.metadata === 'object' && client.metadata.patient_data?.organization)
+                  || 'N/A';
+
                 return (
                   <TableRow key={client.id} hover>
                     <TableCell sx={{ color: 'text.primary' }}>{client.patient.name || 'N/A'}</TableCell>
                     <TableCell sx={{ color: 'text.primary' }}>{labNo}</TableCell>
-                    <TableCell sx={{ color: 'text.primary' }}>
-                      {client.patient.gender 
-                        ? (client.patient.gender === 'male' ? 'Male' : 'Female')
-                        : 'N/A'}
-                    </TableCell>
+                    <TableCell sx={{ color: 'text.primary' }}>{doctorName}</TableCell>
                     <TableCell sx={{ color: 'text.primary' }}>{client.patient.age || 'N/A'}</TableCell>
-                    <TableCell sx={{ color: 'text.primary' }}>{client.patient.phone || 'N/A'}</TableCell>
+                    <TableCell sx={{ color: 'text.primary' }}>{organizationName}</TableCell>
                     <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>{finalAmount.toFixed(2)}</TableCell>
                     <TableCell sx={{ color: '#4caf50', fontWeight: 'bold' }}>
                       {paid.toFixed(2)}

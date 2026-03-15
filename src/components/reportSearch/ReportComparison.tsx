@@ -13,7 +13,6 @@ import {
   CircularProgress,
   Tooltip,
   ToggleButton,
-  ToggleButtonGroup,
 } from '@mui/material';
 import { Close, SwapHoriz, OpenInNew, Link, LinkOff } from '@mui/icons-material';
 import axios from 'axios';
@@ -304,7 +303,7 @@ export const ReportComparison: React.FC<ReportComparisonProps> = ({
     }
   };
 
-  const renderField = (label: string, value: string) => (
+  const renderField = (label: string, value: string | undefined) => (
     <Box sx={{ mb: 2 }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: 'primary.main' }}>
         {label}:

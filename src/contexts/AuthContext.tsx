@@ -3,15 +3,24 @@ import axios from 'axios';
 import { config } from '../config/environment';
 import { toast } from 'react-toastify';
 
+interface Lab {
+  id: number;
+  name: string;
+  slug: string;
+  subdomain: string;
+}
+
 interface User {
   id: number;
   name: string;
   email: string;
   role: 'admin' | 'staff' | 'doctor' | 'patient' | 'accountant';
+  lab_id?: number | null;
 }
 
 interface AuthContextType {
   user: User | null;
+  lab: Lab | null;
   loading: boolean;
   login: (login: string, password: string) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => Promise<void>;
@@ -34,6 +43,7 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [lab, setLab] = useState<Lab | null>(null);
   const [loading, setLoading] = useState(true);
   const [, setAccessToken] = useState<string | null>(null);
 
@@ -63,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             const response = await axios.get('/api/auth/user');
             setUser(response.data.user);
+            setLab(response.data.lab ?? null);
           } catch (tokenError) {
             // Token is invalid, remove it
             console.warn('Token invalid, removing from storage');
@@ -70,13 +81,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             delete axios.defaults.headers.common['Authorization'];
             setAccessToken(null);
             setUser(null);
+            setLab(null);
           }
         } else {
           setUser(null);
+          setLab(null);
         }
       } catch (error) {
         console.warn('Auth check failed:', error);
         setUser(null);
+        setLab(null);
         setAccessToken(null);
         localStorage.removeItem('access_token');
         delete axios.defaults.headers.common['Authorization'];
@@ -95,8 +109,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      const { user: userData, access_token } = response.data;
+      const { user: userData, lab: labData, access_token } = response.data;
       setUser(userData);
+      setLab(labData ?? null);
       setAccessToken(access_token);
       
       // Store token in localStorage for persistence
@@ -121,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      setLab(null);
       setAccessToken(null);
       
       // Clear token from localStorage
@@ -147,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: AuthContextType = {
     user,
+    lab,
     loading,
     login,
     logout,

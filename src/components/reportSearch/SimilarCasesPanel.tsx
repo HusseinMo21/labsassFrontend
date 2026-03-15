@@ -77,7 +77,7 @@ export function getPreSelectedFields(reportData: ReportData): string[] {
 }
 
 export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
-  currentVisitId,
+  currentVisitId: _currentVisitId,
   reportData,
   onCompare,
 }) => {
@@ -133,7 +133,8 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
   };
 
   const handleSearch = () => {
-    search(1, currentVisitId, 5); // Default 5 results per page
+    // Don't exclude current visit - show all results including current one
+    search(1, undefined, 5); // Default 5 results per page
   };
 
   const handleClear = () => {
@@ -158,7 +159,8 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
   };
 
   const handlePageChange = (page: number) => {
-    search(page, currentVisitId, 5);
+    // Don't exclude current visit - show all results including current one
+    search(page, undefined, 5);
   };
 
   const hintText = "Suggested from this report. You can edit before searching.";

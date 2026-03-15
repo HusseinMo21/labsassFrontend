@@ -3,15 +3,15 @@ import { createTheme } from '@mui/material/styles';
 const theme = createTheme({
   palette: {
     primary: {
-      light: '#4a90e2',
-      main: '#2e7d32', // Medical green for trust and health
-      dark: '#1b5e20',
+      light: '#34d399',
+      main: '#0d9488', // Teal - modern, trustworthy, healthcare SaaS
+      dark: '#0f766e',
       contrastText: '#fff',
     },
     secondary: {
-      light: '#ffb74d',
-      main: '#ff9800', // Orange for alerts and highlights
-      dark: '#f57c00',
+      light: '#67e8f9',
+      main: '#06b6d4', // Cyan accent
+      dark: '#0891b2',
       contrastText: '#fff',
     },
     success: {
@@ -49,6 +49,8 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: [
+      '"Cairo"',
+      '"Tajawal"',
       'Inter',
       'Roboto',
       '-apple-system',

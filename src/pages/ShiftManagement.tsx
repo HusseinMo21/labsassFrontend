@@ -1164,7 +1164,7 @@ const ShiftManagement: React.FC = () => {
               <Pagination
                 count={pagination.lastPage}
                 page={pagination.page}
-                onChange={(event, value) => {
+                onChange={(_event, value) => {
                   setPagination({ ...pagination, page: value });
                   fetchShiftHistory(value, pagination.perPage);
                 }}
