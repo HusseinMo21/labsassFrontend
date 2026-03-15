@@ -14,10 +14,10 @@ import {
   Paper,
   Chip,
   CircularProgress,
-  LinearProgress,
-  Avatar,
   IconButton,
   Tooltip,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import {
   People,
@@ -30,10 +30,11 @@ import {
   Refresh,
   Visibility,
   Print,
-  Assessment,
+  ArrowForward,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 interface DashboardStats {
   totalPatients: number;
@@ -55,12 +56,12 @@ interface RecentVisit {
   total_amount: number;
   final_amount: number;
   visit_tests: any[];
-  patient: {
-    name: string;
-  };
+  patient: { name: string };
 }
 
 const Dashboard: React.FC = () => {
+  const theme = useTheme();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
     totalVisits: 0,
@@ -100,321 +101,262 @@ const Dashboard: React.FC = () => {
   };
 
   const getStatusChip = (status: string) => {
-    const statusConfig: { [key: string]: { color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'; label: string } } = {
-      pending: { color: 'warning', label: 'Pending' },
-      completed: { color: 'success', label: 'Completed' },
-      cancelled: { color: 'error', label: 'Cancelled' },
-      'in-progress': { color: 'info', label: 'In Progress' },
-      'under-review': { color: 'primary', label: 'Under Review' },
+    const config: Record<string, { color: 'success' | 'warning' | 'info' | 'error' | 'default'; label: string }> = {
+      pending: { color: 'warning', label: 'قيد الانتظار' },
+      completed: { color: 'success', label: 'مكتمل' },
+      'in-progress': { color: 'info', label: 'قيد التنفيذ' },
+      'under-review': { color: 'info', label: 'قيد المراجعة' },
     };
-
-    const config = statusConfig[status] || { color: 'default', label: status };
-    return <Chip label={config.label} color={config.color} size="small" />;
+    const c = config[status] || { color: 'default' as const, label: status };
+    return <Chip label={c.label} color={c.color} size="small" sx={{ fontWeight: 500 }} />;
   };
 
-  const StatCard: React.FC<{
-    title: string;
-    value: number | string;
-    icon: React.ReactElement;
-    color: string;
-    trend?: number;
-    subtitle?: string;
-  }> = ({ title, value, icon, color, trend, subtitle }) => (
-    <Card 
-      sx={{ 
-        height: '100%', 
-        position: 'relative', 
-        overflow: 'hidden',
-        background: `linear-gradient(135deg, ${color}15 0%, ${color}05 100%)`,
-        border: `1px solid ${color}20`,
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: `0 8px 25px ${color}30`,
-        }
-      }}
-    >
-      <CardContent sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box
-            sx={{
-              bgcolor: color,
-              borderRadius: 2,
-              p: 1.5,
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {icon}
-          </Box>
-          {trend !== undefined && (
-            <Chip
-              label={`${trend > 0 ? '+' : ''}${trend}%`}
-              color={trend > 0 ? 'success' : trend < 0 ? 'error' : 'default'}
-              size="small"
-              variant="outlined"
-            />
-          )}
-        </Box>
-        <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-          {value}
-        </Typography>
-        <Typography color="text.secondary" variant="body2" sx={{ fontWeight: 500 }}>
-          {title}
-        </Typography>
-        {subtitle && (
-          <Typography color="text.secondary" variant="caption" sx={{ mt: 1, display: 'block' }}>
-            {subtitle}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(amount);
+
+  const completionRate = stats.totalTests > 0 ? Math.round((stats.completedTests / stats.totalTests) * 100) : 0;
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <CircularProgress size={48} />
       </Box>
     );
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'EGP',
-    }).format(amount);
-  };
+  const statCards = [
+    { title: 'إجمالي المرضى', value: stats.totalPatients, icon: People, color: '#0d9488', path: '/patients' },
+    { title: 'الزيارات', value: stats.totalVisits, icon: Schedule, color: '#0891b2', path: '/lab-requests' },
+    { title: 'الإيرادات', value: formatCurrency(stats.totalRevenue), icon: Receipt, color: '#7c3aed', path: '/receipts' },
+    { title: 'التحاليل', value: stats.totalTests, icon: Science, color: '#dc2626', path: '/reports' },
+  ];
 
-  const completionRate = stats.totalTests > 0 ? Math.round((stats.completedTests / stats.totalTests) * 100) : 0;
+  const testStats = [
+    { title: 'قيد الانتظار', value: stats.pendingTests, icon: Warning, color: '#f59e0b' },
+    { title: 'قيد المراجعة', value: stats.underReviewTests, icon: TrendingUp, color: '#3b82f6' },
+    { title: 'مكتمل', value: stats.completedTests, icon: CheckCircle, color: '#22c55e' },
+  ];
 
   return (
-    <Box>
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
-            Dashboard
+          <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+            لوحة التحكم
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Welcome back! Here's what's happening in your lab today.
+            نظرة عامة على أداء المعمل
           </Typography>
         </Box>
-        <IconButton 
+        <IconButton
           onClick={fetchDashboardData}
-          sx={{ 
-            bgcolor: 'primary.main', 
-            color: 'white',
-            '&:hover': { bgcolor: 'primary.dark' }
+          sx={{
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            color: 'primary.main',
+            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
           }}
         >
           <Refresh />
         </IconButton>
       </Box>
 
-      {/* Main Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4, justifyContent: 'center' }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Patients"
-            value={stats.totalPatients}
-            icon={<People />}
-            color="#1976d2"
-            trend={12}
-            subtitle="Active patients"
-          />
+      {/* Main Stats */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {statCards.map(({ title, value, icon: Icon, color, path }) => (
+          <Grid item xs={12} sm={6} md={3} key={title}>
+            <Card
+              onClick={() => path && navigate(path)}
+              sx={{
+                height: '100%',
+                cursor: path ? 'pointer' : 'default',
+                border: '1px solid',
+                borderColor: 'divider',
+                transition: 'all 0.2s',
+                '&:hover': path ? {
+                  borderColor: color,
+                  boxShadow: `0 8px 24px ${alpha(color, 0.15)}`,
+                  transform: 'translateY(-2px)',
+                } : {},
+              }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      {value}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                      {title}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 2,
+                      bgcolor: alpha(color, 0.12),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color,
+                    }}
+                  >
+                    <Icon sx={{ fontSize: 28 }} />
+                  </Box>
+                </Box>
+                {path && (
+                  <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 0.5, color: 'primary.main' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>عرض</Typography>
+                    <ArrowForward sx={{ fontSize: 16 }} />
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Test Status + Progress */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={8}>
+          <Card sx={{ border: '1px solid', borderColor: 'divider', height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                حالة التحاليل
+              </Typography>
+              <Grid container spacing={2}>
+                {testStats.map(({ title, value, icon: Icon, color }) => (
+                  <Grid item xs={4} key={title}>
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: alpha(color, 0.08),
+                        border: '1px solid',
+                        borderColor: alpha(color, 0.2),
+                        textAlign: 'center',
+                      }}
+                    >
+                      <Icon sx={{ color, fontSize: 28, mb: 1 }} />
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>{value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{title}</Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+              <Box sx={{ mt: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">نسبة الإنجاز</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{completionRate}%</Typography>
+                </Box>
+                <Box
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
+                    bgcolor: 'grey.200',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      height: '100%',
+                      width: `${completionRate}%`,
+                      bgcolor: 'success.main',
+                      borderRadius: 4,
+                      transition: 'width 0.5s ease',
+                    }}
+                  />
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Visits"
-            value={stats.totalVisits}
-            icon={<Schedule />}
-            color="#388e3c"
-            trend={8}
-            subtitle="This month"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Revenue"
-            value={formatCurrency(stats.totalRevenue)}
-            icon={<Receipt />}
-            color="#f57c00"
-            trend={15}
-            subtitle="Monthly earnings"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Tests"
-            value={stats.totalTests}
-            icon={<Science />}
-            color="#7b1fa2"
-            trend={5}
-            subtitle="All time"
-          />
+        <Grid item xs={12} md={4}>
+          <Card sx={{ border: '1px solid', borderColor: 'divider', height: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                إجراءات سريعة
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {[
+                  { label: 'تسجيل مريض جديد', path: '/patient-registration' },
+                  { label: 'طلبات المعمل', path: '/lab-requests' },
+                  { label: 'التقارير', path: '/enhanced-reports' },
+                  { label: 'الإيصالات', path: '/receipts' },
+                ].map(({ label, path }) => (
+                  <Box
+                    key={path}
+                    onClick={() => navigate(path)}
+                    sx={{
+                      py: 1.5,
+                      px: 2,
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{label}</Typography>
+                    <ArrowForward sx={{ fontSize: 18, color: 'text.secondary' }} />
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
-      {/* Test Status Cards */}
-      <Grid container spacing={3} sx={{ mb: 4, justifyContent: 'center' }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Pending Tests"
-            value={stats.pendingTests}
-            icon={<Warning />}
-            color="#ff9800"
-            subtitle="Awaiting processing"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Under Review"
-            value={stats.underReviewTests}
-            icon={<TrendingUp />}
-            color="#2196f3"
-            subtitle="In progress"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Completed Tests"
-            value={stats.completedTests}
-            icon={<CheckCircle />}
-            color="#4caf50"
-            subtitle="Ready for delivery"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Completion Rate"
-            value={`${completionRate}%`}
-            icon={<Assessment />}
-            color="#9c27b0"
-            subtitle="Success rate"
-          />
-        </Grid>
-      </Grid>
-
-      {/* Progress Overview */}
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-            Test Processing Overview
-          </Typography>
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2">Completed Tests</Typography>
-              <Typography variant="body2">{completionRate}%</Typography>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={completionRate} 
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-            <Chip icon={<CheckCircle />} label={`${stats.completedTests} Completed`} color="success" variant="outlined" />
-            <Chip icon={<Warning />} label={`${stats.pendingTests} Pending`} color="warning" variant="outlined" />
-            <Chip icon={<TrendingUp />} label={`${stats.underReviewTests} In Review`} color="info" variant="outlined" />
-          </Box>
-        </CardContent>
-      </Card>
-
-      {/* Recent Visits Table */}
-      <Card>
-        <CardContent>
+      {/* Recent Visits */}
+      <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+        <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              Recent Visits
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              آخر الزيارات
             </Typography>
-            <Chip 
-              label={`${recentVisits.length} visits`} 
-              color="primary" 
-              variant="outlined" 
-              size="small"
-            />
+            <Chip label={`${recentVisits.length}`} size="small" variant="outlined" />
           </Box>
-          <TableContainer component={Paper} variant="outlined">
-            <Table>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+            <Table size="small">
               <TableHead>
-                <TableRow>
-                  <TableCell>Visit #</TableCell>
-                  <TableCell>Patient</TableCell>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Tests</TableCell>
-                  <TableCell>Amount</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="center">Actions</TableCell>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>رقم الزيارة</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>المريض</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>التاريخ</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>التحاليل</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>المبلغ</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>الحالة</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600 }}>إجراءات</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {recentVisits.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Avatar sx={{ bgcolor: 'grey.100', mx: 'auto', mb: 2 }}>
-                          <Schedule color="disabled" />
-                        </Avatar>
-                        <Typography variant="body1" color="text.secondary">
-                          No recent visits found
-                        </Typography>
-                      </Box>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <Schedule sx={{ fontSize: 48, color: 'grey.300', mb: 1 }} />
+                      <Typography color="text.secondary">لا توجد زيارات حديثة</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
                   recentVisits.map((visit) => (
                     <TableRow key={visit.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {visit.visit_number || `#${visit.id}`}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                            {visit.patient?.name?.charAt(0) || visit.patient_name?.charAt(0) || 'P'}
-                          </Avatar>
-                          <Typography variant="body2">
-                            {visit.patient?.name || visit.patient_name}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {new Date(visit.visit_date).toLocaleDateString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={`${visit.visit_tests?.length || 0} tests`} 
-                          size="small" 
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {formatCurrency(visit.final_amount || visit.total_amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusChip(visit.test_status || visit.status)}
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 500 }}>{visit.visit_number || `#${visit.id}`}</TableCell>
+                      <TableCell>{visit.patient?.name || visit.patient_name}</TableCell>
+                      <TableCell>{new Date(visit.visit_date).toLocaleDateString('ar-EG')}</TableCell>
+                      <TableCell>{visit.visit_tests?.length || 0}</TableCell>
+                      <TableCell sx={{ fontWeight: 500 }}>{formatCurrency(visit.final_amount || visit.total_amount)}</TableCell>
+                      <TableCell>{getStatusChip(visit.test_status || visit.status)}</TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="View Details">
-                            <IconButton size="small" color="primary">
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Print Report">
-                            <IconButton size="small" color="secondary">
-                              <Print fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
+                        <Tooltip title="عرض">
+                          <IconButton size="small" onClick={() => navigate(`/reports/${visit.id}`)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="طباعة">
+                          <IconButton size="small"><Print fontSize="small" /></IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))
@@ -429,4 +371,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-

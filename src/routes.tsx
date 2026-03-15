@@ -40,6 +40,10 @@ import ShiftManagement from './pages/ShiftManagement';
 import TodayClients from './pages/erp/TodayClients';
 import DiseaseSearchPage from './pages/erp/DiseaseSearch';
 import DashboardRedirect from './components/DashboardRedirect';
+import PlatformDashboard from './pages/erp/PlatformDashboard';
+import LabsPage from './pages/erp/LabsPage';
+import PlansPage from './pages/erp/PlansPage';
+import SubscriptionsPage from './pages/erp/SubscriptionsPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -56,21 +60,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Helper function to get dashboard route based on user role
-const getDashboardRoute = (role: string | undefined): string => {
-  switch (role) {
-    case 'admin':
-      return '/admin/dashboard';
-    case 'staff':
-      return '/staff/dashboard';
-    case 'doctor':
-      return '/doctor/dashboard';
-    case 'patient':
-      return '/patient/dashboard';
-    case 'accountant':
-      return '/accountant/dashboard';
-    default:
-      return '/dashboard';
+// Helper function to get dashboard route based on user role and lab_id
+const getDashboardRoute = (user: { role?: string; lab_id?: number | null } | null): string => {
+  if (!user) return '/dashboard';
+  if (user.role === 'admin' && user.lab_id == null) return '/platform/dashboard';
+  switch (user.role) {
+    case 'admin': return '/admin/dashboard';
+    case 'staff': return '/staff/dashboard';
+    case 'doctor': return '/doctor/dashboard';
+    case 'patient': return '/patient/dashboard';
+    case 'accountant': return '/accountant/dashboard';
+    default: return '/dashboard';
   }
 };
 
@@ -83,7 +83,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (user) {
-    return <Navigate to={getDashboardRoute(user.role)} replace />;
+    return <Navigate to={getDashboardRoute(user)} replace />;
   }
   
   return <>{children}</>;
@@ -124,7 +124,48 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-  // Admin Dashboard
+  // Platform Admin (system-level, not lab-specific)
+  {
+    path: '/platform/dashboard',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <PlatformDashboard />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/platform/labs',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <LabsPage />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/platform/plans',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <PlansPage />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/platform/subscriptions',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <SubscriptionsPage />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  // Admin Dashboard (lab admin)
   {
     path: '/admin/dashboard',
     element: (

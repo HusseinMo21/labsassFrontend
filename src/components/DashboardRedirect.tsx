@@ -2,9 +2,14 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from './LoadingSpinner';
 
-// Helper function to get dashboard route based on user role
-const getDashboardRoute = (role: string | undefined): string => {
-  switch (role) {
+// Helper function to get dashboard route based on user role and lab_id
+const getDashboardRoute = (user: { role?: string; lab_id?: number | null } | null): string => {
+  if (!user) return '/dashboard';
+  // Platform admin (lab_id null) controls the system, not lab operations
+  if (user.role === 'admin' && user.lab_id == null) {
+    return '/platform/dashboard';
+  }
+  switch (user.role) {
     case 'admin':
       return '/admin/dashboard';
     case 'staff':
@@ -31,7 +36,7 @@ const DashboardRedirect: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return <Navigate to={getDashboardRoute(user.role)} replace />;
+  return <Navigate to={getDashboardRoute(user)} replace />;
 };
 
 export default DashboardRedirect;

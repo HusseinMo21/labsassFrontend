@@ -72,13 +72,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Try to get user info with the token
           try {
             const response = await axios.get('/api/auth/user');
-            setUser(response.data.user);
-            setLab(response.data.lab ?? null);
+            const userData = response.data.user;
+            const labData = response.data.lab ?? null;
+            setUser(userData);
+            setLab(labData);
+            if (userData?.lab_id) {
+              axios.defaults.headers.common['X-Lab-ID'] = String(userData.lab_id);
+            } else {
+              delete axios.defaults.headers.common['X-Lab-ID'];
+            }
           } catch (tokenError) {
             // Token is invalid, remove it
             console.warn('Token invalid, removing from storage');
             localStorage.removeItem('access_token');
             delete axios.defaults.headers.common['Authorization'];
+            delete axios.defaults.headers.common['X-Lab-ID'];
             setAccessToken(null);
             setUser(null);
             setLab(null);
@@ -86,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setUser(null);
           setLab(null);
+          delete axios.defaults.headers.common['X-Lab-ID'];
         }
       } catch (error) {
         console.warn('Auth check failed:', error);
@@ -120,6 +129,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Set axios default authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
+      // Set X-Lab-ID for localhost: allows users from any lab to use their lab context
+      if (userData?.lab_id) {
+        axios.defaults.headers.common['X-Lab-ID'] = String(userData.lab_id);
+      } else {
+        delete axios.defaults.headers.common['X-Lab-ID'];
+      }
+      
       toast.success('Login successful!');
       return { success: true, user: userData };
     } catch (error: any) {
@@ -142,8 +158,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear token from localStorage
       localStorage.removeItem('access_token');
       
-      // Remove authorization header
+      // Remove authorization header and lab context
       delete axios.defaults.headers.common['Authorization'];
+      delete axios.defaults.headers.common['X-Lab-ID'];
       
       toast.info('Logged out successfully');
     }

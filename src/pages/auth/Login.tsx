@@ -43,31 +43,16 @@ const Login: React.FC = () => {
 
     try {
       const result = await login(formData.login, formData.password);
-      if (result.success && result.user) {
-        // Redirect based on user role
-        const role = result.user.role;
+        if (result.success && result.user) {
+        const u = result.user;
         let dashboardRoute = '/dashboard';
-        
-        switch (role) {
-          case 'admin':
-            dashboardRoute = '/admin/dashboard';
-            break;
-          case 'staff':
-            dashboardRoute = '/staff/dashboard';
-            break;
-          case 'doctor':
-            dashboardRoute = '/doctor/dashboard';
-            break;
-          case 'patient':
-            dashboardRoute = '/patient/dashboard';
-            break;
-          case 'accountant':
-            dashboardRoute = '/accountant/dashboard';
-            break;
-          default:
-            dashboardRoute = '/dashboard';
-        }
-        
+        if (u.role === 'admin' && u.lab_id == null) {
+          dashboardRoute = '/platform/dashboard';
+        } else if (u.role === 'admin') dashboardRoute = '/admin/dashboard';
+        else if (u.role === 'staff') dashboardRoute = '/staff/dashboard';
+        else if (u.role === 'doctor') dashboardRoute = '/doctor/dashboard';
+        else if (u.role === 'patient') dashboardRoute = '/patient/dashboard';
+        else if (u.role === 'accountant') dashboardRoute = '/accountant/dashboard';
         navigate(dashboardRoute);
       } else {
         setError(result.error || 'Login failed');
@@ -192,18 +177,33 @@ const Login: React.FC = () => {
             </Box>
 
             <Box sx={{ mt: 4, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>بيانات تجريبية:</strong>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, mb: 2, display: 'block' }}>
+                بيانات تجريبية (localhost = المعمل الافتراضي)
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                <strong>مدير:</strong> admin@lab.com / password
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>موظف:</strong> staff@lab.com / password
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>دكتور:</strong> doctor@lab.com / password
-              </Typography>
+              <Box sx={{ textAlign: 'right', maxHeight: 280, overflow: 'auto', bgcolor: 'action.hover', p: 2, borderRadius: 2, fontSize: '0.8rem' }}>
+                <Typography variant="caption" component="div" color="text.secondary" sx={{ mb: 1.5, fontWeight: 600 }}>منصة (كل المعامل)</Typography>
+                <Typography variant="caption" component="div">platform@saaslab.com / password</Typography>
+                <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 2, mb: 1.5, fontWeight: 600 }}>المعمل الافتراضي (Default Lab)</Typography>
+                <Typography variant="caption" component="div">admin@default.com / Password123!</Typography>
+                <Typography variant="caption" component="div">staff@default.com / Password123!</Typography>
+                <Typography variant="caption" component="div">doctor@default.com / Password123!</Typography>
+                <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 2, mb: 1.5, fontWeight: 600 }}>Dr. Yasser Lab</Typography>
+                <Typography variant="caption" component="div">admin@dryasserlab.com / Password123! أو DrYasserLab123456790@</Typography>
+                <Typography variant="caption" component="div">staff@dryasserlab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">doctor@dryasserlab.com / Password123!</Typography>
+                <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 2, mb: 1.5, fontWeight: 600 }}>Cairo Central Lab</Typography>
+                <Typography variant="caption" component="div">admin@cairolab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">staff@cairolab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">doctor@cairolab.com / Password123!</Typography>
+                <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 2, mb: 1.5, fontWeight: 600 }}>Alexandria Medical Lab</Typography>
+                <Typography variant="caption" component="div">admin@alexlab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">staff@alexlab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">doctor@alexlab.com / Password123!</Typography>
+                <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 2, mb: 1.5, fontWeight: 600 }}>Giza Pathology Lab</Typography>
+                <Typography variant="caption" component="div">admin@gizalab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">staff@gizalab.com / Password123!</Typography>
+                <Typography variant="caption" component="div">doctor@gizalab.com / Password123!</Typography>
+              </Box>
             </Box>
 
             <Box sx={{ mt: 3, textAlign: 'center' }}>
