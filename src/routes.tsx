@@ -44,6 +44,7 @@ import PlatformDashboard from './pages/erp/PlatformDashboard';
 import LabsPage from './pages/erp/LabsPage';
 import PlansPage from './pages/erp/PlansPage';
 import SubscriptionsPage from './pages/erp/SubscriptionsPage';
+import PlatformMasterCatalogPage from './pages/erp/PlatformMasterCatalogPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -161,6 +162,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <SubscriptionsPage />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/platform/master-catalog',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <PlatformMasterCatalogPage />
         </ERPLayout>
       </ProtectedRoute>
     ),

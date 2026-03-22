@@ -15,6 +15,7 @@ import {
   TableHead,
   TableRow,
   Paper,
+  Button,
 } from '@mui/material';
 import {
   Business,
@@ -108,9 +109,32 @@ const PlatformDashboard: React.FC = () => {
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
         لوحة تحكم المنصة
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         إدارة النظام والمعامل — تحليلات شاملة لمالك النظام
       </Typography>
+
+      <Card
+        sx={{
+          mb: 4,
+          border: '2px solid',
+          borderColor: 'primary.main',
+          background: (t) => alpha(t.palette.primary.main, 0.06),
+        }}
+      >
+        <CardContent sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+              التحاليل والتصنيفات المرجعية (Master catalog)
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              أضف هنا تصنيفات المنصة (دم، بول، …) والتحاليل المرجعية التي يرثها كل معمل ثم يفعّلها ويحدد أسعار البيع من لوحة المعمل.
+            </Typography>
+          </Box>
+          <Button variant="contained" size="large" startIcon={<Science />} onClick={() => navigate('/platform/master-catalog')}>
+            فتح إدارة التحاليل المرجعية
+          </Button>
+        </CardContent>
+      </Card>
 
       <Grid container spacing={2} sx={{ mb: 4 }}>
         {cards.map(({ title, value, icon: Icon, color, path }) => (

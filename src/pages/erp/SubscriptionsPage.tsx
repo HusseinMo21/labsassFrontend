@@ -26,7 +26,7 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
-import { Add, Cancel, Search, AttachMoney, Business } from '@mui/icons-material';
+import { Add, Cancel, AttachMoney, Business } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';

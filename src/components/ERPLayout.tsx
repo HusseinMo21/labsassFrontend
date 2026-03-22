@@ -5,6 +5,7 @@ import {
   List,
   Typography,
   ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   IconButton,
@@ -14,6 +15,8 @@ import {
   Avatar,
   Chip,
   Tooltip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -43,18 +46,18 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import type { Locale } from '../i18n/translations';
 import ShiftOpeningDialog from './ShiftOpeningDialog';
 import axios from 'axios';
+import { alpha } from '@mui/material/styles';
 
-const drawerWidth = 280;
-const collapsedDrawerWidth = 80;
-
-const textOnGlass = '#1a1a2e';
-const textOnGlassMuted = 'rgba(26, 26, 46, 0.75)';
+const drawerWidth = 300;
+const collapsedDrawerWidth = 72;
 
 interface NavigationItem {
   path: string;
-  label: string;
+  labelKey: string;
   icon: React.ReactElement;
   roles: string[];
   platformAdminOnly?: boolean; // if true, only for platform admin (lab_id null)
@@ -63,56 +66,59 @@ interface NavigationItem {
 
 const navigationItems: NavigationItem[] = [
   // Platform Admin only - system control
-  { path: '/platform/dashboard', label: 'لوحة المنصة', icon: <Dashboard />, roles: ['admin'], platformAdminOnly: true },
-  { path: '/platform/labs', label: 'المعامل', icon: <Business />, roles: ['admin'], platformAdminOnly: true },
-  { path: '/platform/plans', label: 'خطط الاشتراك', icon: <CreditCard />, roles: ['admin'], platformAdminOnly: true },
-  { path: '/platform/subscriptions', label: 'الاشتراكات', icon: <AttachMoney />, roles: ['admin'], platformAdminOnly: true },
+  { path: '/platform/dashboard', labelKey: 'nav.platform_dashboard', icon: <Dashboard />, roles: ['admin'], platformAdminOnly: true },
+  { path: '/platform/labs', labelKey: 'nav.platform_labs', icon: <Business />, roles: ['admin'], platformAdminOnly: true },
+  { path: '/platform/plans', labelKey: 'nav.platform_plans', icon: <CreditCard />, roles: ['admin'], platformAdminOnly: true },
+  { path: '/platform/subscriptions', labelKey: 'nav.platform_subscriptions', icon: <AttachMoney />, roles: ['admin'], platformAdminOnly: true },
+  { path: '/platform/master-catalog', labelKey: 'nav.master_catalog', icon: <Science />, roles: ['admin'], platformAdminOnly: true },
 
   // Lab Admin only - lab operations (admin with lab_id)
-  { path: '/admin/dashboard', label: 'Admin Dashboard', icon: <Dashboard />, roles: ['admin'], labAdminOnly: true },
-  { path: '/patients', label: 'Patients', icon: <People />, roles: ['admin'], labAdminOnly: true },
-  { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['admin'], labAdminOnly: true },
-  { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['admin'], labAdminOnly: true },
-  { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['admin'], labAdminOnly: true },
-  { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['admin'], labAdminOnly: true },
-  { path: '/accounts', label: 'Accounts', icon: <Business />, roles: ['admin'], labAdminOnly: true },
-  { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['admin'], labAdminOnly: true },
-  { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['admin'], labAdminOnly: true },
-  { path: '/users', label: 'Users', icon: <Person />, roles: ['admin'], labAdminOnly: true },
-  { path: '/inventory', label: 'Inventory', icon: <Inventory />, roles: ['admin'], labAdminOnly: true },
-  { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['admin'], labAdminOnly: true },
-  { path: '/enhanced-reports', label: 'Completed Reports', icon: <Assessment />, roles: ['admin'], labAdminOnly: true },
-  { path: '/disease-search', label: 'Disease Search', icon: <Search />, roles: ['admin'], labAdminOnly: true },
-  { path: '/lab-insights', label: 'Lab Insights', icon: <BarChart />, roles: ['admin'], labAdminOnly: true },
+  { path: '/admin/dashboard', labelKey: 'nav.admin_dashboard', icon: <Dashboard />, roles: ['admin'], labAdminOnly: true },
+  { path: '/admin/dashboard?tab=catalog', labelKey: 'nav.catalog_tests', icon: <Science />, roles: ['admin'], labAdminOnly: true },
+  { path: '/patients', labelKey: 'nav.patients', icon: <People />, roles: ['admin'], labAdminOnly: true },
+  { path: '/patient-registration', labelKey: 'nav.patient_registration', icon: <PersonAdd />, roles: ['admin'], labAdminOnly: true },
+  { path: '/doctors', labelKey: 'nav.doctors', icon: <LocalHospital />, roles: ['admin'], labAdminOnly: true },
+  { path: '/organizations', labelKey: 'nav.organizations', icon: <Business />, roles: ['admin'], labAdminOnly: true },
+  { path: '/lab-requests', labelKey: 'nav.lab_requests', icon: <Assignment />, roles: ['admin'], labAdminOnly: true },
+  { path: '/accounts', labelKey: 'nav.accounts', icon: <Business />, roles: ['admin'], labAdminOnly: true },
+  { path: '/receipts', labelKey: 'nav.receipts', icon: <Receipt />, roles: ['admin'], labAdminOnly: true },
+  { path: '/expenses', labelKey: 'nav.expenses', icon: <AttachMoney />, roles: ['admin'], labAdminOnly: true },
+  { path: '/users', labelKey: 'nav.users', icon: <Person />, roles: ['admin'], labAdminOnly: true },
+  { path: '/inventory', labelKey: 'nav.inventory', icon: <Inventory />, roles: ['admin'], labAdminOnly: true },
+  { path: '/reports', labelKey: 'nav.reports', icon: <Assessment />, roles: ['admin'], labAdminOnly: true },
+  { path: '/enhanced-reports', labelKey: 'nav.completed_reports', icon: <Assessment />, roles: ['admin'], labAdminOnly: true },
+  { path: '/disease-search', labelKey: 'nav.disease_search', icon: <Search />, roles: ['admin'], labAdminOnly: true },
+  { path: '/lab-insights', labelKey: 'nav.lab_insights', icon: <BarChart />, roles: ['admin'], labAdminOnly: true },
 
-  { path: '/staff/dashboard', label: 'Staff Dashboard', icon: <Dashboard />, roles: ['staff'] },
-  { path: '/shift-management', label: 'Shift Management', icon: <Schedule />, roles: ['staff'] },
-  { path: '/today-clients', label: 'Today Clients', icon: <Today />, roles: ['staff'] },
-  { path: '/patients', label: 'Patients Search', icon: <People />, roles: ['staff'] },
-  { path: '/patient-registration', label: 'Patient Registration', icon: <PersonAdd />, roles: ['staff'] },
-  { path: '/doctors', label: 'Doctors', icon: <LocalHospital />, roles: ['staff'] },
-  { path: '/organizations', label: 'Organizations', icon: <Business />, roles: ['staff'] },
-  { path: '/lab-requests', label: 'Lab Requests', icon: <Assignment />, roles: ['staff'] },
-  { path: '/unpaid-invoices', label: 'Unpaid Invoices', icon: <CreditCard />, roles: ['staff'] },
-  { path: '/notifications', label: 'Notifications', icon: <Notifications />, roles: ['staff'] },
-  { path: '/accounts', label: 'Accounts', icon: <Business />, roles: ['staff'] },
-  { path: '/receipts', label: 'Receipts', icon: <Receipt />, roles: ['staff'] },
-  { path: '/expenses', label: 'Expenses', icon: <AttachMoney />, roles: ['staff'] },
-  { path: '/reports', label: 'Reports', icon: <Assessment />, roles: ['staff'] },
-  { path: '/barcode-demo', label: 'Barcode Scanner Hub', icon: <QrCodeScanner />, roles: ['staff'] },
-  { path: '/enhanced-reports', label: 'Completed Reports', icon: <Assessment />, roles: ['staff'] },
+  { path: '/staff/dashboard', labelKey: 'nav.staff_dashboard', icon: <Dashboard />, roles: ['staff'] },
+  { path: '/shift-management', labelKey: 'nav.shift_management', icon: <Schedule />, roles: ['staff'] },
+  { path: '/today-clients', labelKey: 'nav.today_clients', icon: <Today />, roles: ['staff'] },
+  { path: '/patients', labelKey: 'nav.patients_search', icon: <People />, roles: ['staff'] },
+  { path: '/patient-registration', labelKey: 'nav.patient_registration', icon: <PersonAdd />, roles: ['staff'] },
+  { path: '/doctors', labelKey: 'nav.doctors', icon: <LocalHospital />, roles: ['staff'] },
+  { path: '/organizations', labelKey: 'nav.organizations', icon: <Business />, roles: ['staff'] },
+  { path: '/lab-requests', labelKey: 'nav.lab_requests', icon: <Assignment />, roles: ['staff'] },
+  { path: '/unpaid-invoices', labelKey: 'nav.unpaid_invoices', icon: <CreditCard />, roles: ['staff'] },
+  { path: '/notifications', labelKey: 'nav.notifications', icon: <Notifications />, roles: ['staff'] },
+  { path: '/accounts', labelKey: 'nav.accounts', icon: <Business />, roles: ['staff'] },
+  { path: '/receipts', labelKey: 'nav.receipts', icon: <Receipt />, roles: ['staff'] },
+  { path: '/expenses', labelKey: 'nav.expenses', icon: <AttachMoney />, roles: ['staff'] },
+  { path: '/reports', labelKey: 'nav.reports', icon: <Assessment />, roles: ['staff'] },
+  { path: '/barcode-demo', labelKey: 'nav.barcode_hub', icon: <QrCodeScanner />, roles: ['staff'] },
+  { path: '/enhanced-reports', labelKey: 'nav.completed_reports', icon: <Assessment />, roles: ['staff'] },
 
-  { path: '/doctor/dashboard', label: 'Doctor Dashboard', icon: <Dashboard />, roles: ['doctor'] },
-  { path: '/doctor/reports', label: 'Reports', icon: <Assessment />, roles: ['doctor'] },
-  { path: '/enhanced-reports', label: 'Completed Reports', icon: <Assessment />, roles: ['doctor'] },
+  { path: '/doctor/dashboard', labelKey: 'nav.doctor_dashboard', icon: <Dashboard />, roles: ['doctor'] },
+  { path: '/doctor/reports', labelKey: 'nav.doctor_reports', icon: <Assessment />, roles: ['doctor'] },
+  { path: '/enhanced-reports', labelKey: 'nav.completed_reports', icon: <Assessment />, roles: ['doctor'] },
 
-  { path: '/patient/dashboard', label: 'My Dashboard', icon: <Dashboard />, roles: ['patient'] },
-  { path: '/patient/reports', label: 'My Reports', icon: <Assessment />, roles: ['patient'] },
+  { path: '/patient/dashboard', labelKey: 'nav.patient_dashboard', icon: <Dashboard />, roles: ['patient'] },
+  { path: '/patient/reports', labelKey: 'nav.patient_reports', icon: <Assessment />, roles: ['patient'] },
 ];
 
 const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { locale, setLocale, t } = useLanguage();
   const { user, lab, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,6 +126,9 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showShiftDialog, setShowShiftDialog] = useState(false);
   const [hasCheckedShift, setHasCheckedShift] = useState(false);
+
+  /** EN: sidebar on the left. AR: sidebar on the right. */
+  const drawerAnchor = locale === 'ar' ? 'right' : 'left';
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -178,208 +187,227 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        position: 'relative',
-        background: 'rgba(13, 148, 136, 0.25)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        borderRight: '1px solid rgba(255, 255, 255, 0.18)',
-        boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        bgcolor: alpha(theme.palette.primary.main, 0.06),
+        borderInlineEnd: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+        backgroundImage: `linear-gradient(180deg, ${alpha('#fff', 0.92)} 0%, ${alpha(theme.palette.primary.light, 0.08)} 100%)`,
       }}
     >
-      {/* Header - glassy */}
+      {/* Header — compact */}
       <Box
         sx={{
-          p: sidebarOpen ? 3 : 2,
-          background: 'rgba(255, 255, 255, 0.35)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          color: textOnGlass,
+          flexShrink: 0,
+          px: sidebarOpen ? 2 : 1,
+          py: sidebarOpen ? 2 : 1.5,
           textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          zIndex: 1,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.25)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+          bgcolor: alpha('#fff', 0.55),
         }}
       >
         {sidebarOpen ? (
-          <>
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Avatar
-                sx={{
-                  width: 70,
-                  height: 70,
-                  mx: 'auto',
-                  mb: 2,
-                  bgcolor: 'rgba(13, 148, 136, 0.15)',
-                  border: '2px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-                  color: '#0d9488',
-                }}
-              >
-                <Science sx={{ fontSize: 35 }} />
-              </Avatar>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '1.1rem', color: textOnGlass }}>
-                SaaS Lab
-              </Typography>
-              <Typography variant="body2" sx={{ color: textOnGlassMuted, mb: 1, fontSize: '0.85rem' }}>
-                {isPlatformAdmin ? 'منصة النظام' : (lab?.name || 'Laboratory')}
-              </Typography>
-              <Chip
-                icon={<AdminPanelSettings sx={{ color: 'inherit !important', fontSize: '16px !important' }} />}
-                label={user?.name || 'User'}
-                size="small"
-                sx={{
-                  mt: 1,
-                  bgcolor: 'rgba(255, 255, 255, 0.7)',
-                  color: textOnGlass,
-                  fontWeight: 'bold',
-                  fontSize: '0.75rem',
-                  height: '24px',
-                  border: '1px solid rgba(255, 255, 255, 0.8)',
-                  '& .MuiChip-icon': { color: 'inherit' },
-                }}
-              />
-            </Box>
-          </>
-        ) : (
-          <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Box>
             <Avatar
               sx={{
-                width: 50,
-                height: 50,
+                width: 48,
+                height: 48,
                 mx: 'auto',
-                bgcolor: 'rgba(13, 148, 136, 0.15)',
-                border: '2px solid rgba(255, 255, 255, 0.8)',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                color: '#0d9488',
+                mb: 1,
+                bgcolor: alpha(theme.palette.primary.main, 0.12),
+                color: 'primary.main',
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
               }}
             >
-              <Science sx={{ fontSize: 25 }} />
+              <Science sx={{ fontSize: 26 }} />
             </Avatar>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                color: 'text.primary',
+                lineHeight: 1.2,
+                mb: 0.25,
+              }}
+            >
+              {t('layout.brand')}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                display: 'block',
+                px: 0.5,
+                lineHeight: 1.35,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={isPlatformAdmin ? t('layout.system_platform') : lab?.name || t('layout.laboratory')}
+            >
+              {isPlatformAdmin ? t('layout.system_platform') : lab?.name || t('layout.laboratory')}
+            </Typography>
+            <Chip
+              icon={<AdminPanelSettings sx={{ fontSize: '16px !important' }} />}
+              label={user?.name || 'User'}
+              size="small"
+              sx={{
+                mt: 1,
+                maxWidth: '100%',
+                height: 26,
+                fontWeight: 600,
+                fontSize: '0.7rem',
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: 'primary.dark',
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                '& .MuiChip-label': {
+                  px: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                },
+              }}
+            />
           </Box>
+        ) : (
+          <Avatar
+            sx={{
+              width: 40,
+              height: 40,
+              mx: 'auto',
+              bgcolor: alpha(theme.palette.primary.main, 0.12),
+              color: 'primary.main',
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+            }}
+          >
+            <Science sx={{ fontSize: 22 }} />
+          </Avatar>
         )}
       </Box>
 
-      {/* Navigation Menu */}
-      <Box sx={{ flexGrow: 1, py: 2, px: sidebarOpen ? 2 : 1, position: 'relative', zIndex: 1, overflow: 'auto' }}>
-        <List sx={{ p: 0 }}>
+      {/* Navigation — scrolls; minHeight:0 so flex child can shrink */}
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          py: 1,
+          px: sidebarOpen ? 1 : 0.5,
+        }}
+      >
+        <List dense disablePadding>
           {filteredNavItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const tabParam = new URLSearchParams(location.search).get('tab');
+            let isActive = location.pathname === item.path;
+            if (item.path === '/admin/dashboard?tab=catalog') {
+              isActive = location.pathname === '/admin/dashboard' && tabParam === 'catalog';
+            } else if (item.path === '/admin/dashboard') {
+              isActive = location.pathname === '/admin/dashboard' && tabParam !== 'catalog';
+            }
             return (
-              <ListItem
-                key={item.path}
-                onClick={() => handleNavigation(item.path)}
-                sx={{
-                  mb: 1.5,
-                  borderRadius: 3,
-                  px: sidebarOpen ? 2 : 1.5,
-                  py: 1.5,
-                  minHeight: 56,
-                  justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                  background: isActive ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.08)',
-                  color: isActive ? textOnGlass : textOnGlassMuted,
-                  boxShadow: isActive ? '0 4px 16px rgba(0, 0, 0, 0.06)' : 'none',
-                  border: isActive ? '1px solid rgba(255, 255, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.12)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    background: isActive ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.2)',
-                    color: textOnGlass,
-                    transform: 'translateX(4px)',
-                    boxShadow: isActive ? '0 6px 20px rgba(0, 0, 0, 0.1)' : '0 2px 12px rgba(0, 0, 0, 0.06)',
-                    borderColor: 'rgba(255, 255, 255, 0.5)',
-                  },
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  '&::before': isActive ? {
-                    content: '""',
-                    position: 'absolute',
-                    left: 0,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: 4,
-                    height: '60%',
-                    background: textOnGlass,
-                    borderRadius: '0 4px 4px 0',
-                  } : {},
-                }}
-              >
-                <ListItemIcon
+              <ListItem key={`${item.path}__${item.labelKey}`} disablePadding sx={{ mb: 0.35 }}>
+                <ListItemButton
+                  selected={isActive}
+                  onClick={() => handleNavigation(item.path)}
+                  title={sidebarOpen ? undefined : t(item.labelKey)}
                   sx={{
-                    color: 'inherit',
-                    minWidth: sidebarOpen ? 45 : 'auto',
-                    justifyContent: 'center',
-                    mr: sidebarOpen ? 2 : 0,
+                    py: 0.65,
+                    px: sidebarOpen ? 1 : 0.75,
+                    minHeight: sidebarOpen ? 44 : 40,
+                    borderRadius: 1.5,
+                    justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                    alignItems: 'center',
+                    color: 'text.secondary',
+                    '&.Mui-selected': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.14),
+                      color: 'primary.dark',
+                      borderInlineStart: '3px solid',
+                      borderInlineStartColor: 'primary.main',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.2),
+                      },
+                    },
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.action.hover, 0.5),
+                    },
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                {sidebarOpen && (
-                  <ListItemText
-                    primary={item.label}
+                  <ListItemIcon
                     sx={{
-                      '& .MuiListItemText-primary': {
-                        fontWeight: isActive ? 'bold' : 600,
-                        fontSize: '0.95rem',
-                        letterSpacing: '0.3px',
-                      },
+                      color: 'inherit',
+                      minWidth: sidebarOpen ? 36 : 0,
+                      justifyContent: 'center',
+                      '& svg': { fontSize: 22 },
                     }}
-                  />
-                )}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  {sidebarOpen && (
+                    <ListItemText
+                      primary={t(item.labelKey)}
+                      primaryTypographyProps={{
+                        variant: 'body2',
+                        sx: {
+                          fontWeight: isActive ? 600 : 500,
+                          fontSize: '0.8125rem',
+                          lineHeight: 1.35,
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word',
+                        },
+                      }}
+                    />
+                  )}
+                </ListItemButton>
               </ListItem>
             );
           })}
         </List>
       </Box>
 
-      {/* Logout Section */}
-      <Box sx={{ p: sidebarOpen ? 2 : 1, borderTop: '1px solid rgba(255, 255, 255, 0.4)', position: 'relative', zIndex: 1 }}>
-        <ListItem
-          onClick={handleLogout}
-          sx={{
-            borderRadius: 3,
-            px: sidebarOpen ? 2 : 1.5,
-            py: 1.5,
-            minHeight: 56,
-            justifyContent: sidebarOpen ? 'flex-start' : 'center',
-            color: textOnGlassMuted,
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            cursor: 'pointer',
-            '&:hover': {
-              background: 'rgba(239, 68, 68, 0.12)',
-              color: '#b91c1c',
-              transform: 'translateX(4px)',
-              borderColor: 'rgba(239, 68, 68, 0.3)',
-            },
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          <ListItemIcon
+      {/* Logout */}
+      <Box
+        sx={{
+          flexShrink: 0,
+          p: sidebarOpen ? 1 : 0.75,
+          borderTop: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+          bgcolor: alpha('#fff', 0.4),
+        }}
+      >
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={handleLogout}
+            title={sidebarOpen ? undefined : t('layout.logout')}
             sx={{
-              color: 'inherit',
-              minWidth: sidebarOpen ? 45 : 'auto',
-              justifyContent: 'center',
-              mr: sidebarOpen ? 2 : 0,
+              py: 0.75,
+              px: sidebarOpen ? 1 : 0.75,
+              minHeight: 44,
+              borderRadius: 1.5,
+              justifyContent: sidebarOpen ? 'flex-start' : 'center',
+              color: 'error.main',
+              '&:hover': {
+                bgcolor: alpha(theme.palette.error.main, 0.08),
+              },
             }}
           >
-            <Logout />
-          </ListItemIcon>
-          {sidebarOpen && (
-            <ListItemText
-              primary="تسجيل الخروج"
+            <ListItemIcon
               sx={{
-                '& .MuiListItemText-primary': {
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
-                },
+                color: 'inherit',
+                minWidth: sidebarOpen ? 36 : 0,
+                justifyContent: 'center',
+                '& svg': { fontSize: 22 },
               }}
-            />
-          )}
+            >
+              <Logout />
+            </ListItemIcon>
+            {sidebarOpen && (
+              <ListItemText
+                primary={t('layout.logout')}
+                primaryTypographyProps={{
+                  variant: 'body2',
+                  sx: { fontWeight: 600, fontSize: '0.8125rem' },
+                }}
+              />
+            )}
+          </ListItemButton>
         </ListItem>
       </Box>
     </Box>
@@ -410,6 +438,7 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Mobile Drawer */}
       <Drawer
         variant="temporary"
+        anchor={drawerAnchor}
         open={mobileOpen}
         onClose={handleDrawerToggle}
         ModalProps={{ keepMounted: true }}
@@ -419,7 +448,10 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             boxSizing: 'border-box',
             width: drawerWidth,
             border: 'none',
-            boxShadow: '8px 0 32px rgba(0,0,0,0.3)',
+            boxShadow:
+              drawerAnchor === 'left'
+                ? '8px 0 32px rgba(0,0,0,0.3)'
+                : '-8px 0 32px rgba(0,0,0,0.3)',
             zIndex: 9998,
           },
         }}
@@ -430,13 +462,17 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Desktop Drawer */}
       <Drawer
         variant="permanent"
+        anchor={drawerAnchor}
         sx={{
           display: { xs: 'none', md: 'block' },
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
             width: sidebarOpen ? drawerWidth : collapsedDrawerWidth,
             border: 'none',
-            boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
+            boxShadow:
+              drawerAnchor === 'left'
+                ? '4px 0 24px rgba(0,0,0,0.15)'
+                : '-4px 0 24px rgba(0,0,0,0.15)',
             zIndex: 9998,
             top: 0,
             height: '100vh',
@@ -459,7 +495,7 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             md: `calc(100% - ${sidebarOpen ? drawerWidth : collapsedDrawerWidth}px)`,
             xs: '100%',
           },
-          marginLeft: {
+          marginInlineStart: {
             md: `${sidebarOpen ? drawerWidth : collapsedDrawerWidth}px`,
             xs: 0,
           },
@@ -470,8 +506,19 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }}
       >
         {/* Sidebar Toggle Button */}
-        <Box sx={{ mb: 0.5, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 1, px: 1, pt: 1 }}>
-          <Tooltip title={sidebarOpen ? 'طي الشريط الجانبي' : 'توسيع الشريط الجانبي'}>
+        <Box
+          sx={{
+            mb: 0.5,
+            display: 'flex',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            gap: 1,
+            px: 1,
+            pt: 1,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Tooltip title={sidebarOpen ? t('layout.collapse_sidebar') : t('layout.expand_sidebar')}>
             <IconButton
               onClick={handleSidebarToggle}
               sx={{
@@ -489,9 +536,45 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
-              {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
+              {sidebarOpen
+                ? theme.direction === 'rtl'
+                  ? <ChevronRight />
+                  : <ChevronLeft />
+                : theme.direction === 'rtl'
+                  ? <ChevronLeft />
+                  : <ChevronRight />}
             </IconButton>
           </Tooltip>
+
+          <ToggleButtonGroup
+            value={locale}
+            exclusive
+            size="small"
+            onChange={(_, v: Locale | null) => {
+              if (v) setLocale(v);
+            }}
+            aria-label="language"
+            sx={{
+              background: 'rgba(255, 255, 255, 0.75)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.6)',
+              '& .MuiToggleButton-root': {
+                px: 1.25,
+                py: 0.5,
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                color: '#1a1a2e',
+                border: 'none',
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(13, 148, 136, 0.2)',
+                  color: '#0d9488',
+                },
+              },
+            }}
+          >
+            <ToggleButton value="en">EN</ToggleButton>
+            <ToggleButton value="ar">AR</ToggleButton>
+          </ToggleButtonGroup>
 
           {/* Mobile Menu Button */}
           {isMobile && (

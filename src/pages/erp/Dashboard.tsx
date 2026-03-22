@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Grid,
@@ -18,6 +18,8 @@ import {
   Tooltip,
   useTheme,
   alpha,
+  Tab,
+  Tabs,
 } from '@mui/material';
 import {
   People,
@@ -31,10 +33,14 @@ import {
   Visibility,
   Print,
   ArrowForward,
+  ArrowBack,
 } from '@mui/icons-material';
-import axios from 'axios';
+import axios from '../../config/axios';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import LabCatalogAdminPanel from '../../components/erp/LabCatalogAdminPanel';
 
 interface DashboardStats {
   totalPatients: number;
@@ -62,6 +68,12 @@ interface RecentVisit {
 const Dashboard: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { t, locale } = useLanguage();
+  const numberLocale = locale === 'ar' ? 'ar-EG' : 'en-US';
+  const [searchParams] = useSearchParams();
+  const [mainTab, setMainTab] = useState(0);
+
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
     totalVisits: 0,
@@ -75,10 +87,12 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (searchParams.get('tab') === 'catalog') {
+      setMainTab(1);
+    }
+  }, [searchParams]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get('/api/dashboard/stats');
@@ -94,59 +108,97 @@ const Dashboard: React.FC = () => {
       setRecentVisits(response.data.recentVisits || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      toast.error(t('dashboard.load_error'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    if (user?.role === 'admin' && user.lab_id != null) {
+      fetchDashboardData();
+    }
+  }, [user?.role, user?.lab_id, fetchDashboardData]);
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user.role !== 'admin') {
+    const roleHome: Record<string, string> = {
+      staff: '/staff/dashboard',
+      doctor: '/doctor/dashboard',
+      patient: '/patient/dashboard',
+      accountant: '/accountant/dashboard',
+    };
+    return <Navigate to={roleHome[user.role] || '/login'} replace />;
+  }
+  if (user.lab_id == null) {
+    return <Navigate to="/platform/dashboard" replace />;
+  }
+
+  const labId = user.lab_id as number;
 
   const getStatusChip = (status: string) => {
-    const config: Record<string, { color: 'success' | 'warning' | 'info' | 'error' | 'default'; label: string }> = {
-      pending: { color: 'warning', label: 'قيد الانتظار' },
-      completed: { color: 'success', label: 'مكتمل' },
-      'in-progress': { color: 'info', label: 'قيد التنفيذ' },
-      'under-review': { color: 'info', label: 'قيد المراجعة' },
+    const config: Record<string, { color: 'success' | 'warning' | 'info' | 'error' | 'default'; labelKey: string }> = {
+      pending: { color: 'warning', labelKey: 'dashboard.status_pending' },
+      completed: { color: 'success', labelKey: 'dashboard.status_completed' },
+      'in-progress': { color: 'info', labelKey: 'dashboard.status_in_progress' },
+      'under-review': { color: 'info', labelKey: 'dashboard.status_under_review' },
     };
-    const c = config[status] || { color: 'default' as const, label: status };
-    return <Chip label={c.label} color={c.color} size="small" sx={{ fontWeight: 500 }} />;
+    const c = config[status] || { color: 'default' as const, labelKey: '' };
+    const label = c.labelKey ? t(c.labelKey) : status;
+    return <Chip label={label} color={c.color} size="small" sx={{ fontWeight: 500 }} />;
   };
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(amount);
+    new Intl.NumberFormat(numberLocale, { style: 'currency', currency: 'EGP' }).format(amount);
 
   const completionRate = stats.totalTests > 0 ? Math.round((stats.completedTests / stats.totalTests) * 100) : 0;
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <CircularProgress size={48} />
-      </Box>
-    );
-  }
-
   const statCards = [
-    { title: 'إجمالي المرضى', value: stats.totalPatients, icon: People, color: '#0d9488', path: '/patients' },
-    { title: 'الزيارات', value: stats.totalVisits, icon: Schedule, color: '#0891b2', path: '/lab-requests' },
-    { title: 'الإيرادات', value: formatCurrency(stats.totalRevenue), icon: Receipt, color: '#7c3aed', path: '/receipts' },
-    { title: 'التحاليل', value: stats.totalTests, icon: Science, color: '#dc2626', path: '/reports' },
+    { titleKey: 'dashboard.total_patients', value: stats.totalPatients, icon: People, color: '#0d9488', path: '/patients' },
+    { titleKey: 'dashboard.visits', value: stats.totalVisits, icon: Schedule, color: '#0891b2', path: '/lab-requests' },
+    { titleKey: 'dashboard.revenue', value: formatCurrency(stats.totalRevenue), icon: Receipt, color: '#7c3aed', path: '/receipts' },
+    { titleKey: 'dashboard.tests_total', value: stats.totalTests, icon: Science, color: '#dc2626', path: '/reports' },
   ];
 
   const testStats = [
-    { title: 'قيد الانتظار', value: stats.pendingTests, icon: Warning, color: '#f59e0b' },
-    { title: 'قيد المراجعة', value: stats.underReviewTests, icon: TrendingUp, color: '#3b82f6' },
-    { title: 'مكتمل', value: stats.completedTests, icon: CheckCircle, color: '#22c55e' },
+    { titleKey: 'dashboard.pending', value: stats.pendingTests, icon: Warning, color: '#f59e0b' },
+    { titleKey: 'dashboard.under_review', value: stats.underReviewTests, icon: TrendingUp, color: '#3b82f6' },
+    { titleKey: 'dashboard.completed', value: stats.completedTests, icon: CheckCircle, color: '#22c55e' },
   ];
+
+  const NextIcon = theme.direction === 'rtl' ? ArrowBack : ArrowForward;
 
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      <Tabs
+        value={mainTab}
+        onChange={(_, v) => setMainTab(v)}
+        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label={t('dashboard.overview_tab')} />
+        <Tab label={t('dashboard.catalog_tab')} />
+      </Tabs>
+
+      {mainTab === 1 && <LabCatalogAdminPanel labId={labId} />}
+
+      {mainTab === 0 && loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}>
+          <CircularProgress size={48} />
+        </Box>
+      )}
+
+      {mainTab === 0 && !loading && (
+        <>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
-            لوحة التحكم
+            {t('dashboard.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            نظرة عامة على أداء المعمل
+            {t('dashboard.subtitle')}
           </Typography>
         </Box>
         <IconButton
@@ -163,8 +215,8 @@ const Dashboard: React.FC = () => {
 
       {/* Main Stats */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statCards.map(({ title, value, icon: Icon, color, path }) => (
-          <Grid item xs={12} sm={6} md={3} key={title}>
+        {statCards.map(({ titleKey, value, icon: Icon, color, path }) => (
+          <Grid item xs={12} sm={6} md={3} key={titleKey}>
             <Card
               onClick={() => path && navigate(path)}
               sx={{
@@ -187,7 +239,7 @@ const Dashboard: React.FC = () => {
                       {value}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                      {title}
+                      {t(titleKey)}
                     </Typography>
                   </Box>
                   <Box
@@ -207,8 +259,8 @@ const Dashboard: React.FC = () => {
                 </Box>
                 {path && (
                   <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 0.5, color: 'primary.main' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600 }}>عرض</Typography>
-                    <ArrowForward sx={{ fontSize: 16 }} />
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>{t('dashboard.view')}</Typography>
+                    <NextIcon sx={{ fontSize: 16 }} />
                   </Box>
                 )}
               </CardContent>
@@ -223,11 +275,11 @@ const Dashboard: React.FC = () => {
           <Card sx={{ border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                حالة التحاليل
+                {t('dashboard.tests_status')}
               </Typography>
               <Grid container spacing={2}>
-                {testStats.map(({ title, value, icon: Icon, color }) => (
-                  <Grid item xs={4} key={title}>
+                {testStats.map(({ titleKey, value, icon: Icon, color }) => (
+                  <Grid item xs={4} key={titleKey}>
                     <Box
                       sx={{
                         p: 2,
@@ -240,14 +292,14 @@ const Dashboard: React.FC = () => {
                     >
                       <Icon sx={{ color, fontSize: 28, mb: 1 }} />
                       <Typography variant="h5" sx={{ fontWeight: 700 }}>{value}</Typography>
-                      <Typography variant="caption" color="text.secondary">{title}</Typography>
+                      <Typography variant="caption" color="text.secondary">{t(titleKey)}</Typography>
                     </Box>
                   </Grid>
                 ))}
               </Grid>
               <Box sx={{ mt: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">نسبة الإنجاز</Typography>
+                  <Typography variant="body2">{t('dashboard.completion_rate')}</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{completionRate}%</Typography>
                 </Box>
                 <Box
@@ -276,15 +328,15 @@ const Dashboard: React.FC = () => {
           <Card sx={{ border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                إجراءات سريعة
+                {t('dashboard.quick_actions')}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {[
-                  { label: 'تسجيل مريض جديد', path: '/patient-registration' },
-                  { label: 'طلبات المعمل', path: '/lab-requests' },
-                  { label: 'التقارير', path: '/enhanced-reports' },
-                  { label: 'الإيصالات', path: '/receipts' },
-                ].map(({ label, path }) => (
+                  { labelKey: 'dashboard.qa_register', path: '/patient-registration' },
+                  { labelKey: 'dashboard.qa_lab_requests', path: '/lab-requests' },
+                  { labelKey: 'dashboard.qa_reports', path: '/enhanced-reports' },
+                  { labelKey: 'dashboard.qa_receipts', path: '/receipts' },
+                ].map(({ labelKey, path }) => (
                   <Box
                     key={path}
                     onClick={() => navigate(path)}
@@ -299,8 +351,8 @@ const Dashboard: React.FC = () => {
                       '&:hover': { bgcolor: 'action.hover' },
                     }}
                   >
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{label}</Typography>
-                    <ArrowForward sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{t(labelKey)}</Typography>
+                    <NextIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                   </Box>
                 ))}
               </Box>
@@ -314,7 +366,7 @@ const Dashboard: React.FC = () => {
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              آخر الزيارات
+              {t('dashboard.recent_visits')}
             </Typography>
             <Chip label={`${recentVisits.length}`} size="small" variant="outlined" />
           </Box>
@@ -322,13 +374,13 @@ const Dashboard: React.FC = () => {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell sx={{ fontWeight: 600 }}>رقم الزيارة</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>المريض</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>التاريخ</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>التحاليل</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>المبلغ</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>الحالة</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 600 }}>إجراءات</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('dashboard.col_visit')}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('dashboard.col_patient')}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('dashboard.col_date')}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('dashboard.col_tests')}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('dashboard.col_amount')}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{t('dashboard.col_status')}</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600 }}>{t('dashboard.col_actions')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -336,7 +388,7 @@ const Dashboard: React.FC = () => {
                   <TableRow>
                     <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                       <Schedule sx={{ fontSize: 48, color: 'grey.300', mb: 1 }} />
-                      <Typography color="text.secondary">لا توجد زيارات حديثة</Typography>
+                      <Typography color="text.secondary">{t('dashboard.no_recent')}</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -344,17 +396,17 @@ const Dashboard: React.FC = () => {
                     <TableRow key={visit.id} hover>
                       <TableCell sx={{ fontWeight: 500 }}>{visit.visit_number || `#${visit.id}`}</TableCell>
                       <TableCell>{visit.patient?.name || visit.patient_name}</TableCell>
-                      <TableCell>{new Date(visit.visit_date).toLocaleDateString('ar-EG')}</TableCell>
+                      <TableCell>{new Date(visit.visit_date).toLocaleDateString(numberLocale)}</TableCell>
                       <TableCell>{visit.visit_tests?.length || 0}</TableCell>
                       <TableCell sx={{ fontWeight: 500 }}>{formatCurrency(visit.final_amount || visit.total_amount)}</TableCell>
                       <TableCell>{getStatusChip(visit.test_status || visit.status)}</TableCell>
                       <TableCell align="center">
-                        <Tooltip title="عرض">
+                        <Tooltip title={t('dashboard.tooltip_view')}>
                           <IconButton size="small" onClick={() => navigate(`/reports/${visit.id}`)}>
                             <Visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="طباعة">
+                        <Tooltip title={t('dashboard.tooltip_print')}>
                           <IconButton size="small"><Print fontSize="small" /></IconButton>
                         </Tooltip>
                       </TableCell>
@@ -366,6 +418,8 @@ const Dashboard: React.FC = () => {
           </TableContainer>
         </CardContent>
       </Card>
+        </>
+      )}
     </Box>
   );
 };

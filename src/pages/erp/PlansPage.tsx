@@ -23,7 +23,7 @@ import {
   FormControlLabel,
   Switch,
 } from '@mui/material';
-import { Add, Edit, Delete, Search } from '@mui/icons-material';
+import { Add, Edit, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';

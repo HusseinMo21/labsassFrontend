@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -6,27 +6,42 @@ import {
   Button,
   Grid,
   Card,
-  CardContent,
   Select,
   MenuItem,
   FormControl,
+  InputLabel,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   CircularProgress,
+  Stack,
+  Paper,
+  InputAdornment,
+  Divider,
+  Chip,
+  useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
-  Add as AddIcon,
   Save as SaveIcon,
   Print,
   Science,
   Preview,
   Edit,
+  Search as SearchIcon,
+  PersonAdd,
+  Payments,
+  LocalHospital,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from '../../config/axios';
 import { config } from '../../config/environment';
+import { useAuth } from '../../contexts/AuthContext';
+import CatalogTestPicker, {
+  type CatalogTestRow,
+  type CatalogPackageRow,
+} from '../../components/erp/CatalogTestPicker';
 
 interface PatientFormData {
   name: string;
@@ -52,6 +67,13 @@ interface PatientFormData {
 }
 
 const PatientRegistration: React.FC = () => {
+  const theme = useTheme();
+  const { lab, user } = useAuth();
+  const labIdForCatalog = lab?.id ?? user?.lab_id ?? null;
+
+  const [selectedCatalogTests, setSelectedCatalogTests] = useState<CatalogTestRow[]>([]);
+  const [selectedCatalogPackages, setSelectedCatalogPackages] = useState<CatalogPackageRow[]>([]);
+
   const [formData, setFormData] = useState<PatientFormData>({
     name: '',
     age: '',
@@ -120,12 +142,25 @@ const PatientRegistration: React.FC = () => {
     }));
   };
 
+  // اقتراح الإجمالي من اختيارات الكتالوج (يمكن تعديله يدوياً بعد ذلك)
+  useEffect(() => {
+    if (selectedCatalogTests.length === 0 && selectedCatalogPackages.length === 0) return;
+    const sumTests = selectedCatalogTests.reduce((s, t) => s + Number(t.price || 0), 0);
+    const sumPkgs = selectedCatalogPackages.reduce((s, p) => s + Number(p.package_price || 0), 0);
+    const total = sumTests + sumPkgs;
+    setFormData((prev) => ({ ...prev, total_amount: total.toFixed(2) }));
+  }, [selectedCatalogTests, selectedCatalogPackages]);
+
   // Helper function to calculate total paid amount
   const getTotalPaidAmount = () => {
     const cash = parseFloat(formData.amount_paid_cash) || 0;
     const card = parseFloat(formData.amount_paid_card) || 0;
     return cash + card;
   };
+
+  const totalDue = parseFloat(formData.total_amount) || 0;
+  const totalPaidDisplay = getTotalPaidAmount();
+  const remainingDue = Math.max(0, totalDue - totalPaidDisplay);
 
   // Helper function to validate payment amounts
   const validatePaymentAmounts = () => {
@@ -749,6 +784,18 @@ const PatientRegistration: React.FC = () => {
         patientData.additional_payment_method = formData.additional_payment_method;
       }
 
+      if (selectedCatalogTests.length > 0 || selectedCatalogPackages.length > 0) {
+        patientData.catalog_tests = selectedCatalogTests.map((t) => ({
+          lab_test_id: t.lab_test_id,
+          offering_id: t.offering_id,
+          price: t.price,
+        }));
+        patientData.catalog_packages = selectedCatalogPackages.map((p) => ({
+          package_id: p.id,
+          price: p.package_price,
+        }));
+      }
+
       console.log('Submitting patient data:', patientData);
       console.log('Financial data being sent:', {
         total_amount: patientData.total_amount,
@@ -802,6 +849,8 @@ const PatientRegistration: React.FC = () => {
         amount_paid_card: '',
         additional_payment_method: 'Fawry',
       });
+        setSelectedCatalogTests([]);
+        setSelectedCatalogPackages([]);
 
     } catch (error: any) {
       console.error('Failed to register patient:', error);
@@ -813,535 +862,452 @@ const PatientRegistration: React.FC = () => {
   };
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      backgroundColor: '#f5f5f5',
-      py: 4,
-      px: 2
-    }}>
-      <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
-        {/* Main Form Card */}
-        <Card sx={{ 
-          borderRadius: 2,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-          backgroundColor: 'white'
-        }}>
-          <CardContent sx={{ p: 4 }}>
-            {/* Lab Number Check Section */}
-            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-              <TextField
-                fullWidth
-                placeholder="Lab Number"
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 1,
-                  }
-                }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleSearch}
-                disabled={searching}
-                sx={{
-                  backgroundColor: '#1976d2',
-                  borderRadius: 1,
-                  px: 3,
-                  py: 1.5,
-                  minWidth: 120,
-                  '&:hover': {
-                    backgroundColor: '#1565c0',
-                  },
-                  '&:disabled': {
-                    backgroundColor: '#ccc',
-                  }
-                }}
-              >
-                {searching ? 'جاري البحث...' : 'التحقق من الوجود'}
-              </Button>
-            </Box>
-
-            {/* Title Section */}
-            <Box sx={{ mb: 4, textAlign: 'center' }}>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 'bold',
-                color: '#333',
-                mb: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 1
-              }}>
-                Patient Entry Record
-                <AddIcon sx={{ color: '#1976d2', fontSize: 32 }} />
-              </Typography>
-              <Box sx={{ 
-                height: 2,
-                backgroundColor: '#1976d2',
-                width: '100%',
-                borderRadius: 1
-              }} />
-        </Box>
-
-
-            {/* Form Fields */}
-            <form onSubmit={handleSubmit}>
-              <Grid container spacing={3}>
-                {/* Row 1: Name, Age, Phone */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    الاسم
-                  </Typography>
-              <TextField
-                fullWidth
-                    placeholder="الاسم"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                required
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    السن
-                  </Typography>
-              <TextField
-                fullWidth
-                    placeholder="مثال: 25 أو 25M أو 5D أو 25M,5D"
-                    value={formData.age}
-                    onChange={(e) => handleInputChange('age', e.target.value)}
-                    required
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    رقم الموبايل
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    placeholder="رقم الموبايل (اختياري)"
-                value={formData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-            
-                {/* Row 2: Organization, Gender, Lab Number */}
-            <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    الجهة
-                  </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <FormControl fullWidth>
-                  <Select
-                    value={
-                      organizationInputMode === 'manual' 
-                        ? 'manual' 
-                        : organizationOptions.includes(formData.organization)
-                          ? formData.organization
-                          : ''
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === 'manual') {
-                        setOrganizationInputMode('manual');
-                        // Keep existing value if switching to manual mode
-                        if (!formData.organization || organizationOptions.includes(formData.organization)) {
-                          handleInputChange('organization', '');
-                        }
-                      } else {
-                        setOrganizationInputMode('select');
-                        handleInputChange('organization', value);
-                      }
-                    }}
-                    sx={{
-                      borderRadius: 1,
-                    }}
-                  >
-                    {organizationOptions.map((org) => (
-                      <MenuItem key={org} value={org}>{org}</MenuItem>
-                    ))}
-                    <MenuItem value="manual">أخرى (إدخال يدوي)</MenuItem>
-                  </Select>
-                </FormControl>
-                {organizationInputMode === 'manual' && (
-                  <TextField
-                    fullWidth
-                    placeholder="أدخل الجهة يدوياً"
-                    value={formData.organization}
-                    onChange={(e) => handleInputChange('organization', e.target.value)}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                      }
-                    }}
-                  />
-                )}
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    النوع
-              </Typography>
-              <FormControl fullWidth>
-                <Select
-                  value={formData.gender}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="ذكر">ذكر</MenuItem>
-                      <MenuItem value="أنثى">أنثى</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    Lab no
-                  </Typography>
-              <TextField
-                fullWidth
-                    placeholder="Lab no"
-                value={formData.lab_number}
-                onChange={(e) => handleInputChange('lab_number', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-
-                {/* Row 3: Referring Doctor, Delivery Date, Delivery Day */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    الدكتور المرسل
-              </Typography>
-              <TextField
-                fullWidth
-                    placeholder="الدكتور المرسل"
-                    value={formData.referring_doctor}
-                    onChange={(e) => handleInputChange('referring_doctor', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    تاريخ الحضور
-                  </Typography>
-              <TextField
-                fullWidth
-                    type="date"
-                    value={formData.attendance_date}
-                    onChange={(e) => handleDateChange('attendance_date', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    يوم الحضور
-              </Typography>
-              <FormControl fullWidth>
-                <Select
-                      value={formData.attendance_day}
-                      onChange={(e) => handleInputChange('attendance_day', e.target.value)}
-                  sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="السبت">السبت</MenuItem>
-                      <MenuItem value="الأحد">الأحد</MenuItem>
-                      <MenuItem value="الاثنين">الاثنين</MenuItem>
-                      <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
-                      <MenuItem value="الأربعاء">الأربعاء</MenuItem>
-                      <MenuItem value="الخميس">الخميس</MenuItem>
-                      <MenuItem value="الجمعة">الجمعة</MenuItem>
-                    </Select>
-                  </FormControl>
-            </Grid>
-            
-                {/* Row 4: Delivery Date, Delivery Day, Number of Samples, Sample Size */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    ميعاد التسليم
-                  </Typography>
-              <TextField
-                fullWidth
-                    type="date"
-                    value={formData.delivery_date}
-                    onChange={(e) => handleDateChange('delivery_date', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    يوم التسليم
-                  </Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      value={formData.delivery_day}
-                      onChange={(e) => handleInputChange('delivery_day', e.target.value)}
-                sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="السبت">السبت</MenuItem>
-                      <MenuItem value="الأحد">الأحد</MenuItem>
-                      <MenuItem value="الاثنين">الاثنين</MenuItem>
-                      <MenuItem value="الثلاثاء">الثلاثاء</MenuItem>
-                      <MenuItem value="الأربعاء">الأربعاء</MenuItem>
-                      <MenuItem value="الخميس">الخميس</MenuItem>
-                      <MenuItem value="الجمعة">الجمعة</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    عدد العينات
-              </Typography>
-              <TextField
-                fullWidth
-                type="number"
-                value={formData.number_of_samples}
-                onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
-                inputProps={{ min: 1, max: 10 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    حجم العينة
-              </Typography>
-              <FormControl fullWidth>
-                <Select
-                  value={formData.sample_size}
-                  onChange={(e) => handleInputChange('sample_size', e.target.value)}
-                  sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="صغيرة جدا">صغيرة جدا</MenuItem>
-                      <MenuItem value="صغيرة">صغيرة</MenuItem>
-                      <MenuItem value="متوسطة">متوسطة</MenuItem>
-                      <MenuItem value="كبيرة">كبيرة</MenuItem>
-                      <MenuItem value="كبيرة جدا">كبيرة جدا</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-                {/* Row 5: Sample Type, Previous Tests, Case Type */}
-            <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    نوع العينة
-              </Typography>
-              <FormControl fullWidth>
-                <Select
-                      value={formData.sample_type}
-                      onChange={(e) => handleInputChange('sample_type', e.target.value)}
-                  sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="Pathology">Pathology</MenuItem>
-                      <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
-                      <MenuItem value="سائل">سائل</MenuItem>
-                      <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
-                      <MenuItem value="frozen">frozen</MenuItem>
-                      <MenuItem value="اخرى">اخرى</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    هل سبق لك تحاليل باثولوجي
-              </Typography>
-              <FormControl fullWidth>
-                <Select
-                      value={formData.previous_tests}
-                      onChange={(e) => handleInputChange('previous_tests', e.target.value)}
-                  sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="نعم">نعم</MenuItem>
-                      <MenuItem value="لا">لا</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-                {/* Row 6: Medical History */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    هل يوجد تاريخ مرضي ؟
-              </Typography>
-              <TextField
-                fullWidth
-                    value={formData.medical_history}
-                    onChange={(e) => handleInputChange('medical_history', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-            
-                {/* Row 7: Financial Information */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    أجمالي المبلغ
-                  </Typography>
-              <TextField
-                fullWidth
-                    placeholder="اجمالي المبلغ"
-                    value={formData.total_amount}
-                    onChange={(e) => handleInputChange('total_amount', e.target.value)}
-                    type="number"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    المبلغ المدفوع نقداً
-              </Typography>
-                  <TextField
-                    fullWidth
-                    placeholder="المبلغ المدفوع نقداً"
-                    value={formData.amount_paid_cash}
-                    onChange={(e) => handleInputChange('amount_paid_cash', e.target.value)}
-                    type="number"
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                      }
-                    }}
-                  />
-            </Grid>
-                <Grid item xs={12} md={4}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    المبلغ المدفوع ب {formData.additional_payment_method}
-                  </Typography>
-              <TextField
-                fullWidth
-                    placeholder={`المبلغ المدفوع ب ${formData.additional_payment_method}`}
-                    value={formData.amount_paid_card}
-                    onChange={(e) => handleInputChange('amount_paid_card', e.target.value)}
-                type="number"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                  }
-                }}
-              />
-            </Grid>
-            
-                {/* Row 8: Payment Method and Summary */}
-            <Grid item xs={12} md={6}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    طريقة الدفع الإضافية
-                  </Typography>
-                  <FormControl fullWidth>
-                    <Select
-                      value={formData.additional_payment_method}
-                      onChange={(e) => handleInputChange('additional_payment_method', e.target.value)}
-                      sx={{
-                        borderRadius: 1,
-                      }}
-                    >
-                      <MenuItem value="Fawry">Fawry</MenuItem>
-                      <MenuItem value="InstaPay">InstaPay</MenuItem>
-                      <MenuItem value="VodafoneCash">VodafoneCash</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#333' }}>
-                    إجمالي المدفوع
-                  </Typography>
-              <TextField
-                fullWidth
-                    value={`${getTotalPaidAmount().toFixed(2)} جنيه`}
-                    disabled
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                        borderRadius: 1,
-                        backgroundColor: '#f5f5f5',
-                  }
-                }}
-              />
-            </Grid>
-          </Grid>
-
-              {/* Submit Button */}
-              <Box sx={{ mt: 4, textAlign: 'center' }}>
-            <Button
-                  type="submit"
-              variant="contained"
-              disabled={submitting}
-                  startIcon={<SaveIcon />}
-              sx={{ 
-                    backgroundColor: '#d32f2f',
-                    color: 'white',
-                    borderRadius: 1,
-                    px: 6,
-                    py: 2,
-                    fontSize: '1.1rem',
-                    fontWeight: 'bold',
-                    minWidth: 200,
-                '&:hover': {
-                      backgroundColor: '#b71c1c',
-                },
-                '&:disabled': {
-                      backgroundColor: '#ccc',
-                }
-              }}
+    <Box
+      sx={{
+        minHeight: '100%',
+        pb: 4,
+        pt: { xs: 1, sm: 2 },
+        px: { xs: 1, sm: 2 },
+        bgcolor: alpha(theme.palette.primary.main, 0.04),
+      }}
+    >
+      <Box sx={{ maxWidth: 1280, mx: 'auto' }}>
+        <Stack spacing={2}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              background: `linear-gradient(135deg, ${alpha('#fff', 0.98)} 0%, ${alpha(theme.palette.primary.light, 0.14)} 100%)`,
+            }}
+          >
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              alignItems={{ md: 'center' }}
+              justifyContent="space-between"
             >
-                  {submitting ? 'جاري الحفظ...' : 'الحفظ و التسجيل'}
-            </Button>
-          </Box>
-            </form>
-          </CardContent>
-        </Card>
-        </Box>
-        
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.primary.main, 0.14),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'primary.main',
+                  }}
+                >
+                  <PersonAdd />
+                </Box>
+                <Box>
+                  <Typography variant="h5" fontWeight={800}>
+                    تسجيل مريض جديد
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    الاسم والسن إلزاميان • اختيار التحاليل يحدّث الإجمالي تلقائياً
+                  </Typography>
+                </Box>
+              </Stack>
+              <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', md: 420 }, flexShrink: 0 }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="بحث برقم المعمل..."
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearch();
+                    }
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <Button variant="contained" onClick={handleSearch} disabled={searching} sx={{ minWidth: 96, flexShrink: 0 }}>
+                  {searching ? <CircularProgress size={22} color="inherit" /> : 'بحث'}
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
+
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={2} alignItems="flex-start">
+              <Grid item xs={12} lg={8}>
+                <Stack spacing={2}>
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                      <Typography variant="subtitle1" fontWeight={700} color="primary">
+                        1 — بيانات المريض
+                      </Typography>
+                      <Chip size="small" label="أساسي" color="primary" variant="outlined" />
+                    </Stack>
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          required
+                          size="small"
+                          label="الاسم"
+                          autoFocus
+                          value={formData.name}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          required
+                          size="small"
+                          label="السن"
+                          placeholder="25 أو 25M,5D"
+                          value={formData.age}
+                          onChange={(e) => handleInputChange('age', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="الموبايل"
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange('phone', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="pr-gender">النوع</InputLabel>
+                          <Select
+                            labelId="pr-gender"
+                            label="النوع"
+                            value={formData.gender}
+                            onChange={(e) => handleInputChange('gender', e.target.value as string)}
+                          >
+                            <MenuItem value="ذكر">ذكر</MenuItem>
+                            <MenuItem value="أنثى">أنثى</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={8}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="pr-org">الجهة</InputLabel>
+                          <Select
+                            labelId="pr-org"
+                            label="الجهة"
+                            value={
+                              organizationInputMode === 'manual'
+                                ? 'manual'
+                                : organizationOptions.includes(formData.organization)
+                                  ? formData.organization
+                                  : ''
+                            }
+                            onChange={(e) => {
+                              const value = e.target.value as string;
+                              if (value === 'manual') {
+                                setOrganizationInputMode('manual');
+                                if (!formData.organization || organizationOptions.includes(formData.organization)) {
+                                  handleInputChange('organization', '');
+                                }
+                              } else {
+                                setOrganizationInputMode('select');
+                                handleInputChange('organization', value);
+                              }
+                            }}
+                          >
+                            {organizationOptions.map((org) => (
+                              <MenuItem key={org} value={org}>
+                                {org}
+                              </MenuItem>
+                            ))}
+                            <MenuItem value="manual">أخرى (يدوي)</MenuItem>
+                          </Select>
+                        </FormControl>
+                        {organizationInputMode === 'manual' && (
+                          <TextField
+                            fullWidth
+                            size="small"
+                            sx={{ mt: 1 }}
+                            placeholder="اسم الجهة"
+                            value={formData.organization}
+                            onChange={(e) => handleInputChange('organization', e.target.value)}
+                          />
+                        )}
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="رقم المعمل"
+                          value={formData.lab_number}
+                          onChange={(e) => handleInputChange('lab_number', e.target.value)}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                      <LocalHospital color="primary" fontSize="small" />
+                      <Typography variant="subtitle1" fontWeight={700} color="primary">
+                        2 — الزيارة والعينة
+                      </Typography>
+                    </Stack>
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="الطبيب المرسل"
+                          value={formData.referring_doctor}
+                          onChange={(e) => handleInputChange('referring_doctor', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="date"
+                          label="تاريخ الحضور"
+                          value={formData.attendance_date}
+                          onChange={(e) => handleDateChange('attendance_date', e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                          helperText={formData.attendance_date ? `اليوم: ${formData.attendance_day}` : ' '}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="date"
+                          label="موعد التسليم"
+                          value={formData.delivery_date}
+                          onChange={(e) => handleDateChange('delivery_date', e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                          helperText={formData.delivery_date ? `اليوم: ${formData.delivery_day}` : ' '}
+                        />
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          label="عدد العينات"
+                          inputProps={{ min: 1, max: 10 }}
+                          value={formData.number_of_samples}
+                          onChange={(e) => handleInputChange('number_of_samples', e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="pr-ss">حجم العينة</InputLabel>
+                          <Select
+                            labelId="pr-ss"
+                            label="حجم العينة"
+                            value={formData.sample_size}
+                            onChange={(e) => handleInputChange('sample_size', e.target.value as string)}
+                          >
+                            <MenuItem value="صغيرة جدا">صغيرة جداً</MenuItem>
+                            <MenuItem value="صغيرة">صغيرة</MenuItem>
+                            <MenuItem value="متوسطة">متوسطة</MenuItem>
+                            <MenuItem value="كبيرة">كبيرة</MenuItem>
+                            <MenuItem value="كبيرة جدا">كبيرة جداً</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="pr-st">نوع العينة</InputLabel>
+                          <Select
+                            labelId="pr-st"
+                            label="نوع العينة"
+                            value={formData.sample_type}
+                            onChange={(e) => handleInputChange('sample_type', e.target.value as string)}
+                          >
+                            <MenuItem value="Pathology">Pathology</MenuItem>
+                            <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
+                            <MenuItem value="سائل">سائل</MenuItem>
+                            <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
+                            <MenuItem value="frozen">frozen</MenuItem>
+                            <MenuItem value="اخرى">أخرى</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="pr-pt">تحاليل سابقة؟</InputLabel>
+                          <Select
+                            labelId="pr-pt"
+                            label="تحاليل سابقة؟"
+                            value={formData.previous_tests}
+                            onChange={(e) => handleInputChange('previous_tests', e.target.value as string)}
+                          >
+                            <MenuItem value="نعم">نعم</MenuItem>
+                            <MenuItem value="لا">لا</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="التاريخ المرضي (اختياري)"
+                          multiline
+                          minRows={2}
+                          value={formData.medical_history}
+                          onChange={(e) => handleInputChange('medical_history', e.target.value)}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: alpha(theme.palette.grey[50], 0.85) }}>
+                    <Typography variant="subtitle1" fontWeight={700} color="primary" gutterBottom>
+                      3 — التحاليل والباقات
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                      من كتالوج المعمل — يُحدَّث الإجمالي في لوحة الدفع
+                    </Typography>
+                    <CatalogTestPicker
+                      labId={labIdForCatalog}
+                      selectedTests={selectedCatalogTests}
+                      selectedPackages={selectedCatalogPackages}
+                      onTestsChange={setSelectedCatalogTests}
+                      onPackagesChange={setSelectedCatalogPackages}
+                    />
+                  </Paper>
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} lg={4}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    position: { lg: 'sticky' },
+                    top: { lg: 16 },
+                    borderColor: alpha(theme.palette.primary.main, 0.28),
+                    boxShadow: { lg: `0 8px 28px ${alpha('#000', 0.06)}` },
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                    <Payments color="primary" />
+                    <Typography variant="subtitle1" fontWeight={700} color="primary">
+                      الدفع والتسجيل
+                    </Typography>
+                  </Stack>
+
+                  <Stack spacing={1.5}>
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        border: '1px dashed',
+                        borderColor: alpha(theme.palette.primary.main, 0.35),
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        ملخص سريع
+                      </Typography>
+                      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 0.5 }}>
+                        <Typography variant="body2">الإجمالي</Typography>
+                        <Typography variant="h6" fontWeight={800} color="primary.dark">
+                          {totalDue.toFixed(2)} ج.م
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="caption" color="text.secondary">المدفوع</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {totalPaidDisplay.toFixed(2)} ج.م
+                        </Typography>
+                      </Stack>
+                      <Divider sx={{ my: 1 }} />
+                      <Chip
+                        size="small"
+                        label={remainingDue <= 0 && totalDue > 0 ? 'مكتمل الدفع' : `متبقي ${remainingDue.toFixed(2)} ج.م`}
+                        color={remainingDue > 0 ? 'warning' : totalDue > 0 ? 'success' : 'default'}
+                        sx={{ fontWeight: 700 }}
+                      />
+                    </Box>
+
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="إجمالي المبلغ"
+                      value={formData.total_amount}
+                      onChange={(e) => handleInputChange('total_amount', e.target.value)}
+                    />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="مدفوع نقداً"
+                      value={formData.amount_paid_cash}
+                      onChange={(e) => handleInputChange('amount_paid_cash', e.target.value)}
+                    />
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="pr-pm">طريقة دفع إضافية</InputLabel>
+                      <Select
+                        labelId="pr-pm"
+                        label="طريقة دفع إضافية"
+                        value={formData.additional_payment_method}
+                        onChange={(e) => handleInputChange('additional_payment_method', e.target.value as string)}
+                      >
+                        <MenuItem value="Fawry">Fawry</MenuItem>
+                        <MenuItem value="InstaPay">InstaPay</MenuItem>
+                        <MenuItem value="VodafoneCash">VodafoneCash</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label={`مبلغ ${formData.additional_payment_method}`}
+                      value={formData.amount_paid_card}
+                      onChange={(e) => handleInputChange('amount_paid_card', e.target.value)}
+                    />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="إجمالي المدفوع (تلقائي)"
+                      value={`${totalPaidDisplay.toFixed(2)} ج.م`}
+                      disabled
+                      sx={{ '& .MuiInputBase-input': { fontWeight: 700 } }}
+                    />
+                  </Stack>
+
+                  <Button
+                    type="submit"
+                    fullWidth
+                    size="large"
+                    variant="contained"
+                    color="primary"
+                    disabled={submitting}
+                    startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                    sx={{ mt: 2, py: 1.35, fontWeight: 800, fontSize: '1rem' }}
+                  >
+                    {submitting ? 'جاري الحفظ...' : 'حفظ وتسجيل المريض'}
+                  </Button>
+                </Paper>
+              </Grid>
+            </Grid>
+          </form>
+        </Stack>
+      </Box>
+
         {/* Credentials Modal */}
         <Dialog open={showCredentialsModal} onClose={() => setShowCredentialsModal(false)} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', color: '#d32f2f' }}>

@@ -8,7 +8,6 @@ import {
   Drawer,
   useTheme,
   useMediaQuery,
-  Link as MuiLink,
   Divider,
   Avatar,
   Menu,
@@ -21,7 +20,6 @@ import {
   Logout,
   Dashboard,
   Person,
-  Science,
 } from '@mui/icons-material';
 import { gsap } from 'gsap';
 import { useNavigate } from 'react-router-dom';
