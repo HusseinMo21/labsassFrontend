@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -21,6 +21,12 @@ import {
   Divider,
   Chip,
   useTheme,
+  Tabs,
+  Tab,
+  IconButton,
+  Tooltip,
+  Alert,
+  FormHelperText,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -31,17 +37,16 @@ import {
   Edit,
   Search as SearchIcon,
   PersonAdd,
+  PersonSearch,
   Payments,
   LocalHospital,
+  DeleteOutline as DeleteOutlineIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import axios from '../../config/axios';
 import { config } from '../../config/environment';
 import { useAuth } from '../../contexts/AuthContext';
-import CatalogTestPicker, {
-  type CatalogTestRow,
-  type CatalogPackageRow,
-} from '../../components/erp/CatalogTestPicker';
+import CatalogTestPicker, { type CatalogTestRow, type CatalogPackageRow } from '../../components/erp/CatalogTestPicker';
 
 interface PatientFormData {
   name: string;
@@ -58,13 +63,54 @@ interface PatientFormData {
   number_of_samples: string;
   attendance_date: string;
   previous_tests: string;
-  sample_type: string;
   medical_history: string;
   total_amount: string;
   amount_paid_cash: string;
   amount_paid_card: string;
   additional_payment_method: string;
 }
+
+type RegistrationMode = 'new' | 'returning';
+
+/** حجم العينة — قيم مناسبة للمعامل الطبية العامة (دم/بول/سوائل). */
+const SAMPLE_SIZE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'قياسي', label: 'قياسي (روتيني)' },
+  { value: '2ml', label: '2 مل' },
+  { value: '3ml', label: '3 مل' },
+  { value: '5ml', label: '5 مل' },
+  { value: '7ml', label: '7 مل' },
+  { value: '10ml', label: '10 مل' },
+  { value: 'انبوب_كامل', label: 'أنبوب كامل' },
+  { value: 'بول_عشوائي', label: 'بول — عشوائي' },
+  { value: 'بول_صباحي', label: 'بول — أول صباح' },
+  { value: 'براز', label: 'براز' },
+  { value: 'مسحة', label: 'مسحة' },
+  { value: 'اخرى', label: 'أخرى' },
+];
+
+const DEFAULT_SAMPLE_SIZE = 'قياسي';
+
+const EMPTY_PATIENT_FORM: PatientFormData = {
+  name: '',
+  age: '',
+  phone: '',
+  lab_number: '',
+  gender: 'ذكر',
+  organization: '',
+  attendance_day: 'السبت',
+  delivery_day: 'السبت',
+  delivery_date: '',
+  referring_doctor: '',
+  sample_size: DEFAULT_SAMPLE_SIZE,
+  number_of_samples: '',
+  attendance_date: '',
+  previous_tests: 'نعم',
+  medical_history: '',
+  total_amount: '',
+  amount_paid_cash: '',
+  amount_paid_card: '',
+  additional_payment_method: 'Fawry',
+};
 
 const PatientRegistration: React.FC = () => {
   const theme = useTheme();
@@ -74,28 +120,11 @@ const PatientRegistration: React.FC = () => {
   const [selectedCatalogTests, setSelectedCatalogTests] = useState<CatalogTestRow[]>([]);
   const [selectedCatalogPackages, setSelectedCatalogPackages] = useState<CatalogPackageRow[]>([]);
 
-  const [formData, setFormData] = useState<PatientFormData>({
-    name: '',
-    age: '',
-    phone: '',
-    lab_number: '',
-    gender: 'ذكر',
-    organization: '',
-    attendance_day: 'السبت',
-    delivery_day: 'السبت',
-    delivery_date: '',
-    referring_doctor: '',
-    sample_size: 'صغيرة جدا',
-    number_of_samples: '',
-    attendance_date: '',
-    previous_tests: 'نعم',
-    sample_type: 'Pathology',
-    medical_history: '',
-    total_amount: '',
-    amount_paid_cash: '',
-    amount_paid_card: '',
-    additional_payment_method: 'Fawry',
-  });
+  const [registrationMode, setRegistrationMode] = useState<RegistrationMode>('new');
+  const [existingPatientId, setExistingPatientId] = useState<number | null>(null);
+  const [credentialsModalMode, setCredentialsModalMode] = useState<RegistrationMode>('new');
+
+  const [formData, setFormData] = useState<PatientFormData>({ ...EMPTY_PATIENT_FORM });
 
   const [searchValue, setSearchValue] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -117,7 +146,61 @@ const PatientRegistration: React.FC = () => {
     patientId?: number;
   } | null>(null);
   const [organizationInputMode, setOrganizationInputMode] = useState<'select' | 'manual'>('select');
-  
+  /** Next auto lab number (read-only UI); does not reserve the sequence until save. */
+  const [previewLabNumber, setPreviewLabNumber] = useState<string | null>(null);
+  const [previewLabLoading, setPreviewLabLoading] = useState(false);
+  const [previewLabRefreshNonce, setPreviewLabRefreshNonce] = useState(0);
+
+  const sampleSizeMenuValues = useMemo(() => {
+    const base = SAMPLE_SIZE_OPTIONS.map((o) => o.value);
+    const v = formData.sample_size?.trim();
+    if (v && !base.includes(v)) {
+      return [v, ...base];
+    }
+    return base;
+  }, [formData.sample_size]);
+
+  /** Sum of catalog lines — authoritative total when tests/packages are selected. */
+  const catalogBillTotal = useMemo(() => {
+    const tt = selectedCatalogTests.reduce((s, t) => s + Number(t.price || 0), 0);
+    const pt = selectedCatalogPackages.reduce((s, p) => s + Number(p.package_price || 0), 0);
+    return tt + pt;
+  }, [selectedCatalogTests, selectedCatalogPackages]);
+
+  const hasCatalogSelection =
+    selectedCatalogTests.length > 0 || selectedCatalogPackages.length > 0;
+
+  /** One bill total for ملخص، الحقول، والإرسال — يمنع اختلاف 468 مقابل 656. */
+  const effectiveBillTotal = hasCatalogSelection
+    ? catalogBillTotal
+    : parseFloat(formData.total_amount) || 0;
+
+  useEffect(() => {
+    if (registrationMode !== 'new') {
+      setPreviewLabNumber(null);
+      setPreviewLabLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLabLoading(true);
+    axios
+      .get<{ success?: boolean; lab_number?: string }>('/api/patient-registration/preview-lab-number')
+      .then((res) => {
+        if (cancelled) return;
+        const n = res.data?.lab_number;
+        setPreviewLabNumber(typeof n === 'string' && n.length > 0 ? n : null);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewLabNumber(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLabLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [registrationMode, previewLabRefreshNonce]);
+
   // Predefined organization options
   const organizationOptions = [
     'كفر الدوار',
@@ -135,6 +218,49 @@ const PatientRegistration: React.FC = () => {
     'سموحة الدولي'
   ];
 
+  const resetRegistrationFormAfterSuccess = () => {
+    setOrganizationInputMode('select');
+    setFormData({ ...EMPTY_PATIENT_FORM });
+    setSelectedCatalogTests([]);
+    setSelectedCatalogPackages([]);
+    setPreviewLabRefreshNonce((n) => n + 1);
+  };
+
+  /** Last visit’s receipt/credentials must not stay visible when starting another visit. */
+  const clearStaleReceiptUi = useCallback(() => {
+    setReceiptPreviewUrl((prev) => {
+      if (prev && prev.startsWith('blob:')) {
+        try {
+          window.URL.revokeObjectURL(prev);
+        } catch {
+          /* ignore */
+        }
+      }
+      return null;
+    });
+    setShowPreviewModal(false);
+    setShowCredentialsModal(false);
+    setPatientCredentials(null);
+    setIsEditing(false);
+  }, []);
+
+  const handleRegistrationTabChange = (_: React.SyntheticEvent, value: RegistrationMode) => {
+    setRegistrationMode(value);
+    setExistingPatientId(null);
+    clearStaleReceiptUi();
+    if (value === 'new') {
+      setSearchValue('');
+      setFormData((prev) => ({ ...prev, lab_number: '' }));
+    }
+  };
+
+  const clearReturningPatientSelection = () => {
+    setExistingPatientId(null);
+    setSearchValue('');
+    clearStaleReceiptUi();
+    resetRegistrationFormAfterSuccess();
+  };
+
   const handleInputChange = (field: keyof PatientFormData, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -142,13 +268,29 @@ const PatientRegistration: React.FC = () => {
     }));
   };
 
-  // اقتراح الإجمالي من اختيارات الكتالوج (يمكن تعديله يدوياً بعد ذلك)
+  // الإجمالي من الكتالوج فقط عند وجود اختيارات — لا تمس حقول الزيارة/الدفع عند فراغ الكتالوج
   useEffect(() => {
-    if (selectedCatalogTests.length === 0 && selectedCatalogPackages.length === 0) return;
-    const sumTests = selectedCatalogTests.reduce((s, t) => s + Number(t.price || 0), 0);
-    const sumPkgs = selectedCatalogPackages.reduce((s, p) => s + Number(p.package_price || 0), 0);
-    const total = sumTests + sumPkgs;
-    setFormData((prev) => ({ ...prev, total_amount: total.toFixed(2) }));
+    if (selectedCatalogTests.length === 0 && selectedCatalogPackages.length === 0) {
+      return;
+    }
+    const testsTotal = selectedCatalogTests.reduce((s, t) => s + Number(t.price || 0), 0);
+    const packagesTotal = selectedCatalogPackages.reduce((s, p) => s + Number(p.package_price || 0), 0);
+    const total = testsTotal + packagesTotal;
+    setFormData((prev) => {
+      const prevTotal = parseFloat(prev.total_amount) || 0;
+      const prevPaid =
+        (parseFloat(prev.amount_paid_cash) || 0) + (parseFloat(prev.amount_paid_card) || 0);
+      const wasFullOrUnpaid =
+        prevPaid <= 0.005 ||
+        (prevTotal > 0 && Math.abs(prevPaid - prevTotal) < 0.02);
+      let nextCash = prev.amount_paid_cash;
+      let nextCard = prev.amount_paid_card;
+      if (wasFullOrUnpaid) {
+        nextCash = total.toFixed(2);
+        nextCard = '';
+      }
+      return { ...prev, total_amount: total.toFixed(2), amount_paid_cash: nextCash, amount_paid_card: nextCard };
+    });
   }, [selectedCatalogTests, selectedCatalogPackages]);
 
   // Helper function to calculate total paid amount
@@ -158,19 +300,20 @@ const PatientRegistration: React.FC = () => {
     return cash + card;
   };
 
-  const totalDue = parseFloat(formData.total_amount) || 0;
   const totalPaidDisplay = getTotalPaidAmount();
-  const remainingDue = Math.max(0, totalDue - totalPaidDisplay);
+  const remainingDue = Math.max(0, effectiveBillTotal - totalPaidDisplay);
+  const overpaidBy =
+    effectiveBillTotal > 0.005 && totalPaidDisplay > effectiveBillTotal + 0.02
+      ? totalPaidDisplay - effectiveBillTotal
+      : 0;
 
   // Helper function to validate payment amounts
   const validatePaymentAmounts = () => {
-    const totalAmount = parseFloat(formData.total_amount) || 0;
     const totalPaid = getTotalPaidAmount();
-    
-    if (totalAmount > 0 && totalPaid > totalAmount) {
-      return 'المبلغ المدفوع أكبر من المبلغ الإجمالي';
+    if (totalPaid < 0) {
+      return 'المبلغ المدفوع لا يمكن أن يكون سالباً';
     }
-    
+    // Overpayment vs total is allowed (credit / rounding / legacy visit data vs receipts)
     return null;
   };
 
@@ -360,11 +503,10 @@ const PatientRegistration: React.FC = () => {
                      (visit.expected_delivery_date ? getDayNameFromDate(visit.expected_delivery_date) : 'السبت'),
         delivery_date: formatDateForInput(visit.expected_delivery_date || patient.delivery_date || patientDataFromMetadata.delivery_date),
         referring_doctor: patient.doctor || patientDataFromMetadata.doctor || patientDataFromMetadata.referring_doctor || '',
-        sample_size: patient.sample_size || patientDataFromMetadata.sample_size || 'صغيرة جدا',
+        sample_size: patient.sample_size || patientDataFromMetadata.sample_size || DEFAULT_SAMPLE_SIZE,
         number_of_samples: patient.number_of_samples?.toString() || patientDataFromMetadata.number_of_samples?.toString() || '',
         attendance_date: formatDateForInput(visit.visit_date || patient.attendance_date || patientDataFromMetadata.attendance_date),
         previous_tests: patient.previous_tests || patientDataFromMetadata.previous_tests || 'نعم',
-        sample_type: patient.sample_type || patientDataFromMetadata.sample_type || 'Pathology',
         medical_history: patient.medical_history || patientDataFromMetadata.medical_history || '',
         total_amount: totalAmount.toString(),
         amount_paid_cash: amountPaidCash.toString(),
@@ -409,7 +551,6 @@ const PatientRegistration: React.FC = () => {
         gender: mapGenderForBackend(formData.gender),
         organization: formData.organization,
         doctor: formData.referring_doctor,
-        sample_type: formData.sample_type,
         sample_size: formData.sample_size,
         number_of_samples: parseInt(formData.number_of_samples) || 1,
         day_of_week: formData.attendance_day,
@@ -417,7 +558,7 @@ const PatientRegistration: React.FC = () => {
         previous_tests: formData.previous_tests,
         attendance_date: formData.attendance_date,
         delivery_date: formData.delivery_date,
-        total_amount: parseFloat(formData.total_amount) || 0,
+        total_amount: effectiveBillTotal,
         amount_paid_cash: parseFloat(formData.amount_paid_cash) || 0,
         amount_paid: getTotalPaidAmount(),
         lab_number: formData.lab_number,
@@ -435,7 +576,7 @@ const PatientRegistration: React.FC = () => {
       
       // Also update visit if payment information changed and visitId exists
       if (patientCredentials.visitId) {
-        const totalAmount = parseFloat(formData.total_amount) || 0;
+        const totalAmount = effectiveBillTotal;
         const totalPaid = getTotalPaidAmount();
         const remainingBalance = Math.max(0, totalAmount - totalPaid);
         
@@ -462,7 +603,6 @@ const PatientRegistration: React.FC = () => {
           patientData.organization = formData.organization;
           patientData.doctor = formData.referring_doctor;
           patientData.referring_doctor = formData.referring_doctor;
-          patientData.sample_type = formData.sample_type;
           patientData.sample_size = formData.sample_size;
           patientData.number_of_samples = parseInt(formData.number_of_samples) || 1;
           patientData.attendance_day = formData.attendance_day;
@@ -608,91 +748,22 @@ const PatientRegistration: React.FC = () => {
       
       if (response.data && response.data.data && response.data.data.length > 0) {
         const patient = response.data.data[0];
-        
-        // Get the latest visit if available
-        const latestVisit = patient.visits && patient.visits.length > 0 ? patient.visits[0] : null;
-        
-        // Parse visit metadata if available
-        let visitMetadata: any = {};
-        let patientDataFromMetadata: any = {};
-        let paymentDetails: any = {};
-        
-        if (latestVisit && latestVisit.metadata) {
-          try {
-            visitMetadata = typeof latestVisit.metadata === 'string' 
-              ? JSON.parse(latestVisit.metadata) 
-              : latestVisit.metadata;
-            patientDataFromMetadata = visitMetadata.patient_data || {};
-            paymentDetails = visitMetadata.payment_details || {};
-          } catch (e) {
-            console.error('Failed to parse visit metadata:', e);
-          }
-        }
-        
-        // Helper function to format date for input field
-        const formatDateForInput = (dateString: string) => {
-          if (!dateString) return '';
-          try {
-            const date = new Date(dateString);
-            return date.toISOString().split('T')[0]; // Convert to yyyy-MM-dd format
-          } catch {
-            return '';
-          }
-        };
 
-        // Helper function to map gender values
         const mapGender = (gender: string) => {
           if (gender === 'male') return 'ذكر';
           if (gender === 'female') return 'أنثى';
           return gender || 'ذكر';
         };
 
-        // Get attendance date from visit or patient
-        const attendanceDate = latestVisit?.visit_date 
-          || patientDataFromMetadata.attendance_date 
-          || patient.attendance_date 
-          || '';
-        
-        // Get delivery date from visit or patient
-        const deliveryDate = latestVisit?.expected_delivery_date 
-          || patientDataFromMetadata.delivery_date 
-          || patient.delivery_date 
-          || '';
-        
-        // Get referring doctor from visit metadata, patient data, or patient record
-        const referringDoctor = patientDataFromMetadata.referring_doctor 
-          || patientDataFromMetadata.doctor 
-          || latestVisit?.referring_doctor 
-          || patient.doctor 
-          || '';
-        
-        // Get number of samples from visit metadata or patient record
-        const numberOfSamples = patientDataFromMetadata.number_of_samples 
-          || patient.number_of_samples?.toString() 
-          || '';
-        
-        // Get payment amounts from visit metadata or patient record
-        const amountPaidCash = paymentDetails.amount_paid_cash 
-          || latestVisit?.upfront_payment 
-          || patient.amount_paid_cash?.toString() 
-          || '';
-        
-        const amountPaidCard = paymentDetails.amount_paid_card 
-          || patient.amount_paid_card?.toString() 
-          || '';
-        
-        const additionalPaymentMethod = paymentDetails.additional_payment_method 
-          || patient.additional_payment_method 
-          || 'Fawry';
-        
-        const totalAmount = latestVisit?.total_amount 
-          || patientDataFromMetadata.total_amount 
-          || patient.total_amount?.toString() 
-          || '';
+        // New visit: do not reuse last receipt, payments, or last visit totals — only patient identity.
+        clearStaleReceiptUi();
+        setSelectedCatalogTests([]);
+        setSelectedCatalogPackages([]);
 
-        // Determine organization input mode based on loaded data
-        const loadedOrganization = patient.organization || patientDataFromMetadata.organization || 
-                     (typeof patient.organization_id === 'string' ? patient.organization_id : '') || '';
+        const loadedOrganization =
+          patient.organization ||
+          (typeof patient.organization_id === 'string' ? patient.organization_id : '') ||
+          '';
         if (loadedOrganization && organizationOptions.includes(loadedOrganization)) {
           setOrganizationInputMode('select');
         } else if (loadedOrganization) {
@@ -701,7 +772,6 @@ const PatientRegistration: React.FC = () => {
           setOrganizationInputMode('select');
         }
 
-        // Fill the form with existing patient data (prioritize visit data, then patient data)
         setFormData({
           name: patient.name || '',
           age: patient.age?.toString() || '',
@@ -709,32 +779,79 @@ const PatientRegistration: React.FC = () => {
           lab_number: patient.lab || patient.lab_number || searchValue,
           gender: mapGender(patient.gender),
           organization: loadedOrganization,
-          attendance_day: attendanceDate ? getDayNameFromDate(attendanceDate) : (patient.day_of_week || 'السبت'),
-          delivery_day: deliveryDate ? getDayNameFromDate(deliveryDate) : (patient.day_of_week || 'السبت'),
-          delivery_date: formatDateForInput(deliveryDate),
-          referring_doctor: referringDoctor,
-          sample_size: patientDataFromMetadata.sample_size || patient.sample_size || 'صغيرة جدا',
-          number_of_samples: numberOfSamples,
-          attendance_date: formatDateForInput(attendanceDate),
+          attendance_day: 'السبت',
+          delivery_day: 'السبت',
+          delivery_date: '',
+          referring_doctor: patient.doctor || '',
+          sample_size: patient.sample_size || DEFAULT_SAMPLE_SIZE,
+          number_of_samples: patient.number_of_samples?.toString() || '',
+          attendance_date: '',
           previous_tests: patient.previous_tests || 'نعم',
-          sample_type: patientDataFromMetadata.sample_type || patient.sample_type || 'Pathology',
           medical_history: patient.medical_history || '',
-          total_amount: totalAmount,
-          amount_paid_cash: amountPaidCash.toString(),
-          amount_paid_card: amountPaidCard.toString(),
-          additional_payment_method: additionalPaymentMethod,
+          total_amount: '',
+          amount_paid_cash: '',
+          amount_paid_card: '',
+          additional_payment_method: 'Fawry',
         });
-        
-        toast.success('Patient found! Form filled with existing data.');
+
+        setExistingPatientId(Number(patient.id));
+        toast.success(
+          'تم اختيار المريض. أدخل بيانات الزيارة الحالية والدفع والتحاليل — لا تُحمَّل من آخر إيصال.'
+        );
       } else {
-        toast.info('No patient found with this lab number. You can proceed with new registration.');
+        setExistingPatientId(null);
+        toast.info('لم يُعثر على مريض بهذا البحث. جرّب رقم معمل أو موبايل آخر، أو استخدم تبويب «مريض جديد».');
       }
     } catch (error: any) {
       console.error('Search error:', error);
-      toast.error('Search failed. Please check the lab number and try again.');
+      setExistingPatientId(null);
+      toast.error('فشل البحث. تحقق من الاتصال أو من صحة البيانات.');
     } finally {
       setSearching(false);
     }
+  };
+
+  const buildRegistrationPayload = () => {
+    const patientData: Record<string, unknown> = {
+      name: formData.name,
+      phone: formData.phone,
+      age: formData.age,
+      gender: mapGenderForBackend(formData.gender),
+      organization: formData.organization,
+      doctor: formData.referring_doctor,
+      sample_size: formData.sample_size,
+      number_of_samples: parseInt(formData.number_of_samples, 10) || 1,
+      day_of_week: formData.attendance_day,
+      medical_history: formData.medical_history,
+      previous_tests: formData.previous_tests,
+      attendance_date: formData.attendance_date,
+      delivery_date: formData.delivery_date,
+      total_amount: effectiveBillTotal,
+      amount_paid_cash: parseFloat(formData.amount_paid_cash) || 0,
+      amount_paid: getTotalPaidAmount(),
+      lab_number: formData.lab_number,
+    };
+
+    const additionalPaymentAmount = parseFloat(formData.amount_paid_card) || 0;
+    if (additionalPaymentAmount > 0 && formData.additional_payment_method) {
+      patientData.amount_paid_card = additionalPaymentAmount;
+      patientData.additional_payment_method = formData.additional_payment_method;
+    }
+
+    if (selectedCatalogTests.length > 0) {
+      patientData.catalog_tests = selectedCatalogTests.map((t) => ({
+        offering_id: t.offering_id,
+        test_name: t.name,
+      }));
+    }
+    if (selectedCatalogPackages.length > 0) {
+      patientData.catalog_packages = selectedCatalogPackages.map((p) => ({
+        package_id: p.id,
+        price: p.package_price,
+      }));
+    }
+
+    return patientData;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -742,120 +859,85 @@ const PatientRegistration: React.FC = () => {
     setSubmitting(true);
 
     try {
-      // Validate required fields
-      if (!formData.name || !formData.age) {
-        toast.error('Please fill in all required fields (Name, Age)');
+      if (registrationMode === 'returning' && existingPatientId == null) {
+        toast.error('ابحث عن المريض برقم المعمل أو الموبايل واختر السجل قبل حفظ الزيارة.');
         return;
       }
 
-      // Validate payment amounts
+      if (!formData.name || !formData.age) {
+        toast.error('يرجى إدخال الاسم والسن.');
+        return;
+      }
+
       const paymentError = validatePaymentAmounts();
       if (paymentError) {
         toast.error(paymentError);
         return;
       }
 
-      // Prepare data for submission
-      const patientData: any = {
-        name: formData.name,
-        phone: formData.phone,
-        age: formData.age, // Send age as string to preserve formats like "25M,5D"
-        gender: mapGenderForBackend(formData.gender), // Convert Arabic to English for backend
-        organization: formData.organization,
-        doctor: formData.referring_doctor,
-        sample_type: formData.sample_type,
-        sample_size: formData.sample_size,
-        number_of_samples: parseInt(formData.number_of_samples) || 1,
-        day_of_week: formData.attendance_day,
-        medical_history: formData.medical_history,
-        previous_tests: formData.previous_tests,
-        attendance_date: formData.attendance_date,
-        delivery_date: formData.delivery_date,
-        total_amount: parseFloat(formData.total_amount) || 0,
-        amount_paid_cash: parseFloat(formData.amount_paid_cash) || 0,
-        amount_paid: getTotalPaidAmount(), // Total paid amount for backward compatibility
-        lab_number: formData.lab_number,
-      };
-
-      // Only include additional payment method and amount if they have values
-      const additionalPaymentAmount = parseFloat(formData.amount_paid_card) || 0;
-      if (additionalPaymentAmount > 0 && formData.additional_payment_method) {
-        patientData.amount_paid_card = additionalPaymentAmount;
-        patientData.additional_payment_method = formData.additional_payment_method;
+      const totalForVisit = effectiveBillTotal;
+      if (totalForVisit > 0 && selectedCatalogTests.length + selectedCatalogPackages.length < 1) {
+        toast.error('أضف تحليلاً أو باقة واحدة على الأقل من كتالوج المعمل عندما يكون الإجمالي أكبر من صفر.');
+        return;
       }
 
-      if (selectedCatalogTests.length > 0 || selectedCatalogPackages.length > 0) {
-        patientData.catalog_tests = selectedCatalogTests.map((t) => ({
-          lab_test_id: t.lab_test_id,
-          offering_id: t.offering_id,
-          price: t.price,
-        }));
-        patientData.catalog_packages = selectedCatalogPackages.map((p) => ({
-          package_id: p.id,
-          price: p.package_price,
-        }));
-      }
+      const patientData = buildRegistrationPayload();
 
-      console.log('Submitting patient data:', patientData);
-      console.log('Financial data being sent:', {
-        total_amount: patientData.total_amount,
-        amount_paid_cash: patientData.amount_paid_cash,
-        amount_paid_card: patientData.amount_paid_card,
-        amount_paid: patientData.amount_paid,
-        additional_payment_method: patientData.additional_payment_method,
-      });
+      if (registrationMode === 'returning' && existingPatientId != null) {
+        patientData.patient_id = existingPatientId;
+        const response = await axios.post('/api/patient-registration/submit', patientData);
+        const d = response.data;
+        const cred = d.user_credentials;
+        const inner = d.data ?? {};
+        const visitId = inner.visit_id ?? d.visit_id;
+        const labNum = d.lab_number ?? inner.lab_number;
+        const patientId = inner.patient_id ?? d.patient_id ?? existingPatientId;
 
-      // Submit to backend
-      const response = await axios.post('/api/patients', patientData);
-      
-      console.log('Backend response:', response.data);
-      
-      toast.success('Patient registered successfully!');
-      console.log('Patient registration response:', response.data);
-      
-      // Show credentials modal
-        if (response.data.user_credentials) {
-        setPatientCredentials({
-          username: response.data.user_credentials.username,
-          password: response.data.user_credentials.password,
-          visitId: response.data.visit_id,
-          labNumber: response.data.lab_number,
-          patientId: response.data.patient_id,
-        });
-        setShowCredentialsModal(true);
+        if (cred?.username) {
+          setCredentialsModalMode('returning');
+          setPatientCredentials({
+            username: cred.username,
+            password: cred.password ?? '—',
+            visitId,
+            labNumber: labNum,
+            patientId,
+          });
+          setShowCredentialsModal(true);
         }
-        
-        // Reset form
-        setOrganizationInputMode('select');
-        setFormData({
-          name: '',
-        age: '',
-          phone: '',
-        lab_number: '',
-        gender: 'ذكر',
-          organization: '',
-        attendance_day: 'السبت',
-        delivery_day: 'السبت',
-          delivery_date: '',
-        referring_doctor: '',
-        sample_size: 'صغيرة جدا',
-        number_of_samples: '',
-        attendance_date: '',
-        previous_tests: 'نعم',
-        sample_type: 'Pathology',
-        medical_history: '',
-        total_amount: '',
-        amount_paid_cash: '',
-        amount_paid_card: '',
-        additional_payment_method: 'Fawry',
-      });
-        setSelectedCatalogTests([]);
-        setSelectedCatalogPackages([]);
 
+        toast.success(d.message || 'تم تسجيل الزيارة بنجاح');
+        resetRegistrationFormAfterSuccess();
+        setExistingPatientId(null);
+        setSearchValue('');
+      } else {
+        const response = await axios.post('/api/patients', patientData);
+
+        if (response.data.user_credentials) {
+          setCredentialsModalMode('new');
+          setPatientCredentials({
+            username: response.data.user_credentials.username,
+            password: response.data.user_credentials.password,
+            visitId: response.data.visit_id,
+            labNumber: response.data.lab_number,
+            patientId: response.data.patient_id,
+          });
+          setShowCredentialsModal(true);
+        }
+
+        toast.success(response.data.message || 'تم تسجيل المريض بنجاح');
+        resetRegistrationFormAfterSuccess();
+        setSearchValue('');
+      }
     } catch (error: any) {
-      console.error('Failed to register patient:', error);
-      const message = error.response?.data?.message || 'Failed to register patient';
-      toast.error(message);
+      console.error('Submit error:', error);
+      const msg =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        (typeof error.response?.data?.errors === 'object'
+          ? Object.values(error.response.data.errors).flat().join(' ')
+          : null) ||
+        'فشل الحفظ';
+      toast.error(String(msg));
     } finally {
       setSubmitting(false);
     }
@@ -902,42 +984,77 @@ const PatientRegistration: React.FC = () => {
                     color: 'primary.main',
                   }}
                 >
-                  <PersonAdd />
+                  {registrationMode === 'returning' ? <PersonSearch /> : <PersonAdd />}
                 </Box>
-                <Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="h5" fontWeight={800}>
-                    تسجيل مريض جديد
+                    تسجيل المرضى
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    الاسم والسن إلزاميان • اختيار التحاليل يحدّث الإجمالي تلقائياً
+                    {registrationMode === 'new'
+                      ? 'مريض جديد: يُنشأ سجل وطلب معمل وزيارة عبر «حفظ وتسجيل المريض».'
+                      : 'مريض مسجّل: ابحث أولاً، ثم أدخل بيانات الزيارة والتحاليل — يُحدَّث المريض وتُنشأ زيارة جديدة دون تكرار السجل.'}
                   </Typography>
                 </Box>
               </Stack>
-              <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', md: 420 }, flexShrink: 0 }}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="بحث برقم المعمل..."
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSearch();
-                    }
-                  }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" color="action" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                <Button variant="contained" onClick={handleSearch} disabled={searching} sx={{ minWidth: 96, flexShrink: 0 }}>
-                  {searching ? <CircularProgress size={22} color="inherit" /> : 'بحث'}
-                </Button>
-              </Stack>
+
+              <Tabs
+                value={registrationMode}
+                onChange={handleRegistrationTabChange}
+                variant="fullWidth"
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  '& .MuiTab-root': { textTransform: 'none', fontWeight: 700 },
+                }}
+              >
+                <Tab icon={<PersonAdd fontSize="small" />} iconPosition="start" label="مريض جديد" value="new" />
+                <Tab icon={<PersonSearch fontSize="small" />} iconPosition="start" label="مريض مسجّل (زيارة)" value="returning" />
+              </Tabs>
+
+              {registrationMode === 'returning' && (
+                <Stack spacing={1}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="رقم المعمل أو الموبايل أو جزء من الاسم..."
+                      value={searchValue}
+                      onChange={(e) => setSearchValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearch();
+                        }
+                      }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" color="action" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={handleSearch}
+                      disabled={searching}
+                      sx={{ minWidth: 96, flexShrink: 0 }}
+                    >
+                      {searching ? <CircularProgress size={22} color="inherit" /> : 'بحث'}
+                    </Button>
+                  </Stack>
+                  {existingPatientId != null && (
+                    <Chip
+                      color="success"
+                      variant="outlined"
+                      onDelete={clearReturningPatientSelection}
+                      label={`مختار للزيارة: ${formData.name || '—'} · رقم المعمل ${formData.lab_number || '—'} · #${existingPatientId}`}
+                      sx={{ fontWeight: 600, alignSelf: 'flex-start' }}
+                    />
+                  )}
+                </Stack>
+              )}
             </Stack>
           </Paper>
 
@@ -945,115 +1062,192 @@ const PatientRegistration: React.FC = () => {
             <Grid container spacing={2} alignItems="flex-start">
               <Grid item xs={12} lg={8}>
                 <Stack spacing={2}>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-                      <Typography variant="subtitle1" fontWeight={700} color="primary">
-                        1 — بيانات المريض
-                      </Typography>
-                      <Chip size="small" label="أساسي" color="primary" variant="outlined" />
-                    </Stack>
-                    <Grid container spacing={1.5}>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          required
-                          size="small"
-                          label="الاسم"
-                          autoFocus
-                          value={formData.name}
-                          onChange={(e) => handleInputChange('name', e.target.value)}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          required
-                          size="small"
-                          label="السن"
-                          placeholder="25 أو 25M,5D"
-                          value={formData.age}
-                          onChange={(e) => handleInputChange('age', e.target.value)}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="الموبايل"
-                          value={formData.phone}
-                          onChange={(e) => handleInputChange('phone', e.target.value)}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel id="pr-gender">النوع</InputLabel>
-                          <Select
-                            labelId="pr-gender"
-                            label="النوع"
-                            value={formData.gender}
-                            onChange={(e) => handleInputChange('gender', e.target.value as string)}
-                          >
-                            <MenuItem value="ذكر">ذكر</MenuItem>
-                            <MenuItem value="أنثى">أنثى</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} sm={8}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel id="pr-org">الجهة</InputLabel>
-                          <Select
-                            labelId="pr-org"
-                            label="الجهة"
-                            value={
-                              organizationInputMode === 'manual'
-                                ? 'manual'
-                                : organizationOptions.includes(formData.organization)
-                                  ? formData.organization
-                                  : ''
-                            }
-                            onChange={(e) => {
-                              const value = e.target.value as string;
-                              if (value === 'manual') {
-                                setOrganizationInputMode('manual');
-                                if (!formData.organization || organizationOptions.includes(formData.organization)) {
-                                  handleInputChange('organization', '');
-                                }
-                              } else {
-                                setOrganizationInputMode('select');
-                                handleInputChange('organization', value);
-                              }
-                            }}
-                          >
-                            {organizationOptions.map((org) => (
-                              <MenuItem key={org} value={org}>
-                                {org}
-                              </MenuItem>
-                            ))}
-                            <MenuItem value="manual">أخرى (يدوي)</MenuItem>
-                          </Select>
-                        </FormControl>
-                        {organizationInputMode === 'manual' && (
+                  {registrationMode === 'new' ? (
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="primary">
+                          1 — بيانات المريض
+                        </Typography>
+                        <Chip size="small" label="أساسي" color="primary" variant="outlined" />
+                      </Stack>
+                      <Grid container spacing={1.5}>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            required
+                            size="small"
+                            label="الاسم"
+                            autoFocus
+                            value={formData.name}
+                            onChange={(e) => handleInputChange('name', e.target.value)}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            required
+                            size="small"
+                            label="السن"
+                            placeholder="25 أو 25M,5D"
+                            value={formData.age}
+                            onChange={(e) => handleInputChange('age', e.target.value)}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
                             size="small"
-                            sx={{ mt: 1 }}
-                            placeholder="اسم الجهة"
-                            value={formData.organization}
-                            onChange={(e) => handleInputChange('organization', e.target.value)}
+                            label="الموبايل"
+                            value={formData.phone}
+                            onChange={(e) => handleInputChange('phone', e.target.value)}
                           />
-                        )}
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel id="pr-gender">النوع</InputLabel>
+                            <Select
+                              labelId="pr-gender"
+                              label="النوع"
+                              value={formData.gender}
+                              onChange={(e) => handleInputChange('gender', e.target.value as string)}
+                            >
+                              <MenuItem value="ذكر">ذكر</MenuItem>
+                              <MenuItem value="أنثى">أنثى</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={8}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel id="pr-org">الجهة</InputLabel>
+                            <Select
+                              labelId="pr-org"
+                              label="الجهة"
+                              value={
+                                organizationInputMode === 'manual'
+                                  ? 'manual'
+                                  : organizationOptions.includes(formData.organization)
+                                    ? formData.organization
+                                    : ''
+                              }
+                              onChange={(e) => {
+                                const value = e.target.value as string;
+                                if (value === 'manual') {
+                                  setOrganizationInputMode('manual');
+                                  if (!formData.organization || organizationOptions.includes(formData.organization)) {
+                                    handleInputChange('organization', '');
+                                  }
+                                } else {
+                                  setOrganizationInputMode('select');
+                                  handleInputChange('organization', value);
+                                }
+                              }}
+                            >
+                              {organizationOptions.map((org) => (
+                                <MenuItem key={org} value={org}>
+                                  {org}
+                                </MenuItem>
+                              ))}
+                              <MenuItem value="manual">أخرى (يدوي)</MenuItem>
+                            </Select>
+                          </FormControl>
+                          {organizationInputMode === 'manual' && (
+                            <TextField
+                              fullWidth
+                              size="small"
+                              sx={{ mt: 1 }}
+                              placeholder="اسم الجهة"
+                              value={formData.organization}
+                              onChange={(e) => handleInputChange('organization', e.target.value)}
+                            />
+                          )}
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="رقم المعمل"
+                            value={previewLabLoading ? '…' : previewLabNumber ?? '—'}
+                            InputProps={{ readOnly: true }}
+                            helperText="يُنشأ تلقائياً عند الحفظ (معاينة للرقم التالي)"
+                          />
+                        </Grid>
                       </Grid>
-                      <Grid item xs={12} sm={4}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="رقم المعمل"
-                          value={formData.lab_number}
-                          onChange={(e) => handleInputChange('lab_number', e.target.value)}
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
+                    </Paper>
+                  ) : (
+                    <>
+                      {existingPatientId == null && (
+                        <Alert severity="info" sx={{ borderRadius: 2 }}>
+                          هذا التبويب لمريض مسجّل مسبقاً: لن يظهر نموذج التسجيل الكامل. استخدم{' '}
+                          <strong>البحث في الشريط العلوي</strong> ثم أكمل «الزيارة والعينة» و«التحاليل» و«الدفع» فقط.
+                        </Alert>
+                      )}
+                      {existingPatientId != null && (
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            borderColor: alpha(theme.palette.success.main, 0.45),
+                            bgcolor: alpha(theme.palette.success.main, 0.06),
+                          }}
+                        >
+                          <Typography variant="subtitle1" fontWeight={800} color="success.dark" sx={{ mb: 1.5 }}>
+                            بيانات المريض (من السجل — للاطلاع)
+                          </Typography>
+                          <Grid container spacing={1.25}>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="caption" color="text.secondary">
+                                الاسم
+                              </Typography>
+                              <Typography variant="body2" fontWeight={700}>
+                                {formData.name || '—'}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                              <Typography variant="caption" color="text.secondary">
+                                السن
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {formData.age || '—'}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                              <Typography variant="caption" color="text.secondary">
+                                النوع
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {formData.gender}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="caption" color="text.secondary">
+                                الموبايل
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {formData.phone || '—'}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="caption" color="text.secondary">
+                                رقم المعمل
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {formData.lab_number || '—'}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12}>
+                              <Typography variant="caption" color="text.secondary">
+                                الجهة
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {formData.organization || '—'}
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </Paper>
+                      )}
+                    </>
+                  )}
 
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
@@ -1113,33 +1307,23 @@ const PatientRegistration: React.FC = () => {
                           <Select
                             labelId="pr-ss"
                             label="حجم العينة"
-                            value={formData.sample_size}
+                            value={
+                              sampleSizeMenuValues.includes(formData.sample_size)
+                                ? formData.sample_size
+                                : DEFAULT_SAMPLE_SIZE
+                            }
                             onChange={(e) => handleInputChange('sample_size', e.target.value as string)}
                           >
-                            <MenuItem value="صغيرة جدا">صغيرة جداً</MenuItem>
-                            <MenuItem value="صغيرة">صغيرة</MenuItem>
-                            <MenuItem value="متوسطة">متوسطة</MenuItem>
-                            <MenuItem value="كبيرة">كبيرة</MenuItem>
-                            <MenuItem value="كبيرة جدا">كبيرة جداً</MenuItem>
+                            {sampleSizeMenuValues.map((val) => {
+                              const opt = SAMPLE_SIZE_OPTIONS.find((o) => o.value === val);
+                              return (
+                                <MenuItem key={val} value={val}>
+                                  {opt?.label ?? val}
+                                </MenuItem>
+                              );
+                            })}
                           </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel id="pr-st">نوع العينة</InputLabel>
-                          <Select
-                            labelId="pr-st"
-                            label="نوع العينة"
-                            value={formData.sample_type}
-                            onChange={(e) => handleInputChange('sample_type', e.target.value as string)}
-                          >
-                            <MenuItem value="Pathology">Pathology</MenuItem>
-                            <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
-                            <MenuItem value="سائل">سائل</MenuItem>
-                            <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
-                            <MenuItem value="frozen">frozen</MenuItem>
-                            <MenuItem value="اخرى">أخرى</MenuItem>
-                          </Select>
+                          <FormHelperText>كميات وأنابيب شائعة في المعامل العامة</FormHelperText>
                         </FormControl>
                       </Grid>
                       <Grid item xs={12} sm={6}>
@@ -1171,11 +1355,12 @@ const PatientRegistration: React.FC = () => {
                   </Paper>
 
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: alpha(theme.palette.grey[50], 0.85) }}>
-                    <Typography variant="subtitle1" fontWeight={700} color="primary" gutterBottom>
-                      3 — التحاليل والباقات
+                    <Typography variant="subtitle1" fontWeight={800} color="primary" gutterBottom>
+                      3 — التحاليل من الكتالوج
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                      من كتالوج المعمل — يُحدَّث الإجمالي في لوحة الدفع
+                      بحث فوري، تصنيفات المعمل، اختصارات بالكود، وقائمة على عمودين — اضغط للإضافة أو لإزالة التحديد. المختار
+                      يظهر في «الدفع والتسجيل».
                     </Typography>
                     <CatalogTestPicker
                       labId={labIdForCatalog}
@@ -1183,6 +1368,8 @@ const PatientRegistration: React.FC = () => {
                       selectedPackages={selectedCatalogPackages}
                       onTestsChange={setSelectedCatalogTests}
                       onPackagesChange={setSelectedCatalogPackages}
+                      showPackages={true}
+                      showSelectedChips={false}
                     />
                   </Paper>
                 </Stack>
@@ -1210,6 +1397,115 @@ const PatientRegistration: React.FC = () => {
                   <Stack spacing={1.5}>
                     <Box
                       sx={{
+                        p: 1.25,
+                        borderRadius: 1.5,
+                        border: '1px solid',
+                        borderColor: alpha(theme.palette.divider, 0.9),
+                        bgcolor: alpha(theme.palette.grey[50], 0.9),
+                      }}
+                    >
+                      <Typography variant="caption" fontWeight={800} color="text.primary" display="block" sx={{ mb: 1 }}>
+                        التحاليل والباقات المختارة
+                      </Typography>
+                      {selectedCatalogTests.length === 0 && selectedCatalogPackages.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          لم تُختر تحاليل أو باقات بعد — أضفها من قسم الكتالوج.
+                        </Typography>
+                      ) : (
+                        <Stack
+                          spacing={0.75}
+                          sx={{
+                            maxHeight: 220,
+                            overflow: 'auto',
+                            pr: 0.5,
+                          }}
+                        >
+                          {selectedCatalogTests.map((t) => (
+                            <Stack
+                              key={t.offering_id}
+                              direction="row"
+                              alignItems="flex-start"
+                              spacing={0.5}
+                              sx={{ pr: 0.25 }}
+                            >
+                              <Typography variant="body2" sx={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
+                                {t.name}
+                                <Typography component="span" variant="caption" color="text.secondary" display="block">
+                                  {t.code}
+                                </Typography>
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                fontWeight={700}
+                                color="primary.dark"
+                                sx={{ flexShrink: 0, alignSelf: 'center', minWidth: '4.5rem', textAlign: 'left' }}
+                              >
+                                {Number(t.price || 0).toFixed(2)} ج.م
+                              </Typography>
+                              <Tooltip title="إزالة من الاختيار">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  aria-label={`إزالة ${t.name}`}
+                                  onClick={() =>
+                                    setSelectedCatalogTests((prev) => prev.filter((x) => x.offering_id !== t.offering_id))
+                                  }
+                                  sx={{ flexShrink: 0, mt: -0.25 }}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          ))}
+                          {selectedCatalogPackages.map((p) => (
+                            <Stack
+                              key={`pkg-${p.id}`}
+                              direction="row"
+                              alignItems="flex-start"
+                              spacing={0.5}
+                              sx={{ pr: 0.25 }}
+                            >
+                              <Stack direction="row" alignItems="flex-start" spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
+                                <Chip
+                                  size="small"
+                                  label="باقة"
+                                  color="secondary"
+                                  variant="outlined"
+                                  sx={{ height: 22, fontSize: '0.7rem', flexShrink: 0, mt: 0.125 }}
+                                />
+                                <Typography variant="body2" sx={{ lineHeight: 1.35 }}>
+                                  {p.name}
+                                </Typography>
+                              </Stack>
+                              <Typography
+                                variant="body2"
+                                fontWeight={700}
+                                color="secondary.dark"
+                                sx={{ flexShrink: 0, alignSelf: 'center', minWidth: '4.5rem', textAlign: 'left' }}
+                              >
+                                {Number(p.package_price || 0).toFixed(2)} ج.م
+                              </Typography>
+                              <Tooltip title="إزالة من الاختيار">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  aria-label={`إزالة باقة ${p.name}`}
+                                  onClick={() =>
+                                    setSelectedCatalogPackages((prev) => prev.filter((x) => x.id !== p.id))
+                                  }
+                                  sx={{ flexShrink: 0, mt: -0.25 }}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          ))}
+                        </Stack>
+                      )}
+                    </Box>
+
+                    <Box
+                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
                         bgcolor: alpha(theme.palette.primary.main, 0.08),
@@ -1223,7 +1519,7 @@ const PatientRegistration: React.FC = () => {
                       <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 0.5 }}>
                         <Typography variant="body2">الإجمالي</Typography>
                         <Typography variant="h6" fontWeight={800} color="primary.dark">
-                          {totalDue.toFixed(2)} ج.م
+                          {effectiveBillTotal.toFixed(2)} ج.م
                         </Typography>
                       </Stack>
                       <Stack direction="row" justifyContent="space-between">
@@ -1235,8 +1531,24 @@ const PatientRegistration: React.FC = () => {
                       <Divider sx={{ my: 1 }} />
                       <Chip
                         size="small"
-                        label={remainingDue <= 0 && totalDue > 0 ? 'مكتمل الدفع' : `متبقي ${remainingDue.toFixed(2)} ج.م`}
-                        color={remainingDue > 0 ? 'warning' : totalDue > 0 ? 'success' : 'default'}
+                        label={
+                          effectiveBillTotal <= 0.005
+                            ? 'لا يوجد مبلغ مستحق'
+                            : overpaidBy > 0
+                              ? `دفع زائد ${overpaidBy.toFixed(2)} ج.م`
+                              : remainingDue > 0
+                                ? `متبقي ${remainingDue.toFixed(2)} ج.م`
+                                : 'مكتمل الدفع'
+                        }
+                        color={
+                          effectiveBillTotal <= 0.005
+                            ? 'default'
+                            : overpaidBy > 0
+                              ? 'info'
+                              : remainingDue > 0
+                                ? 'warning'
+                                : 'success'
+                        }
                         sx={{ fontWeight: 700 }}
                       />
                     </Box>
@@ -1246,8 +1558,18 @@ const PatientRegistration: React.FC = () => {
                       size="small"
                       type="number"
                       label="إجمالي المبلغ"
-                      value={formData.total_amount}
+                      value={
+                        hasCatalogSelection
+                          ? (catalogBillTotal > 0 ? catalogBillTotal.toFixed(2) : '')
+                          : formData.total_amount
+                      }
                       onChange={(e) => handleInputChange('total_amount', e.target.value)}
+                      disabled={hasCatalogSelection}
+                      helperText={
+                        hasCatalogSelection
+                          ? 'يُحسب من التحاليل/الباقات المختارة؛ أزل الاختيارات لتعديل يدوي'
+                          : undefined
+                      }
                     />
                     <TextField
                       fullWidth
@@ -1299,7 +1621,11 @@ const PatientRegistration: React.FC = () => {
                     startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
                     sx={{ mt: 2, py: 1.35, fontWeight: 800, fontSize: '1rem' }}
                   >
-                    {submitting ? 'جاري الحفظ...' : 'حفظ وتسجيل المريض'}
+                    {submitting
+                      ? 'جاري الحفظ...'
+                      : registrationMode === 'returning'
+                        ? 'حفظ زيارة المريض المسجّل'
+                        : 'حفظ وتسجيل مريض جديد'}
                   </Button>
                 </Paper>
               </Grid>
@@ -1316,7 +1642,7 @@ const PatientRegistration: React.FC = () => {
           <DialogContent>
             <Box sx={{ textAlign: 'center', py: 2 }}>
               <Typography variant="h6" sx={{ mb: 3, color: '#333' }}>
-                تم تسجيل المريض بنجاح!
+                {credentialsModalMode === 'returning' ? 'تم تسجيل الزيارة بنجاح!' : 'تم تسجيل المريض بنجاح!'}
               </Typography>
               
               <Box sx={{ backgroundColor: '#f5f5f5', p: 3, borderRadius: 2, mb: 3 }}>
@@ -1608,16 +1934,17 @@ const PatientRegistration: React.FC = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  {/* Lab Number */}
+                  {/* Lab Number (patient already registered — display only) */}
                   <Grid item xs={6}>
                     <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
-                      Lab Number
+                      رقم المعمل
                     </Typography>
                     <TextField
                       fullWidth
-                      value={formData.lab_number}
-                      onChange={(e) => handleInputChange('lab_number', e.target.value)}
+                      value={formData.lab_number || '—'}
+                      InputProps={{ readOnly: true }}
                       size="small"
+                      helperText="من سجل المريض"
                       sx={{ '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8rem' } }}
                     />
                   </Grid>
@@ -1728,35 +2055,22 @@ const PatientRegistration: React.FC = () => {
                     </Typography>
                     <FormControl fullWidth size="small">
                       <Select
-                        value={formData.sample_size}
+                        value={
+                          sampleSizeMenuValues.includes(formData.sample_size)
+                            ? formData.sample_size
+                            : DEFAULT_SAMPLE_SIZE
+                        }
                         onChange={(e) => handleInputChange('sample_size', e.target.value)}
                         sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
                       >
-                        <MenuItem value="صغيرة جدا">صغيرة جدا</MenuItem>
-                        <MenuItem value="صغيرة">صغيرة</MenuItem>
-                        <MenuItem value="متوسطة">متوسطة</MenuItem>
-                        <MenuItem value="كبيرة">كبيرة</MenuItem>
-                        <MenuItem value="كبيرة جدا">كبيرة جدا</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  {/* Sample Type */}
-                  <Grid item xs={4}>
-                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 500, fontSize: '0.7rem', display: 'block' }}>
-                      نوع العينة
-                    </Typography>
-                    <FormControl fullWidth size="small">
-                      <Select
-                        value={formData.sample_type}
-                        onChange={(e) => handleInputChange('sample_type', e.target.value)}
-                        sx={{ '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' } }}
-                      >
-                        <MenuItem value="Pathology">Pathology</MenuItem>
-                        <MenuItem value="Pathology+IHC">Pathology+IHC</MenuItem>
-                        <MenuItem value="سائل">سائل</MenuItem>
-                        <MenuItem value="صبغة مناعية">صبغة مناعية</MenuItem>
-                        <MenuItem value="frozen">frozen</MenuItem>
-                        <MenuItem value="اخرى">اخرى</MenuItem>
+                        {sampleSizeMenuValues.map((val) => {
+                          const opt = SAMPLE_SIZE_OPTIONS.find((o) => o.value === val);
+                          return (
+                            <MenuItem key={val} value={val}>
+                              {opt?.label ?? val}
+                            </MenuItem>
+                          );
+                        })}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -2016,9 +2330,6 @@ const PatientRegistration: React.FC = () => {
                           <strong>Sample ID:</strong> {sampleLabel.sample_id}
                         </Typography>
                         <Typography variant="body2" gutterBottom>
-                          <strong>Sample Type:</strong> {sampleLabel.sample_type}
-                        </Typography>
-                        <Typography variant="body2" gutterBottom>
                           <strong>Sample Size:</strong> {sampleLabel.sample_size}
                         </Typography>
                         <Typography variant="body2" gutterBottom>
@@ -2077,9 +2388,6 @@ const PatientRegistration: React.FC = () => {
                           </div>
                           <div style="margin-bottom: 5px;">
                             <strong>Sample ID:</strong> ${sampleLabel.sample_id}
-                          </div>
-                          <div style="margin-bottom: 5px;">
-                            <strong>Sample Type:</strong> ${sampleLabel.sample_type}
                           </div>
                           <div style="margin-bottom: 5px;">
                             <strong>Sample Size:</strong> ${sampleLabel.sample_size}

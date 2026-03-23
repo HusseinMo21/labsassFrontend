@@ -74,7 +74,7 @@ const navigationItems: NavigationItem[] = [
 
   // Lab Admin only - lab operations (admin with lab_id)
   { path: '/admin/dashboard', labelKey: 'nav.admin_dashboard', icon: <Dashboard />, roles: ['admin'], labAdminOnly: true },
-  { path: '/admin/dashboard?tab=catalog', labelKey: 'nav.catalog_tests', icon: <Science />, roles: ['admin'], labAdminOnly: true },
+  { path: '/admin/lab-catalog', labelKey: 'nav.catalog_tests', icon: <Science />, roles: ['admin'], labAdminOnly: true },
   { path: '/patients', labelKey: 'nav.patients', icon: <People />, roles: ['admin'], labAdminOnly: true },
   { path: '/patient-registration', labelKey: 'nav.patient_registration', icon: <PersonAdd />, roles: ['admin'], labAdminOnly: true },
   { path: '/doctors', labelKey: 'nav.doctors', icon: <LocalHospital />, roles: ['admin'], labAdminOnly: true },
@@ -295,13 +295,7 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       >
         <List dense disablePadding>
           {filteredNavItems.map((item) => {
-            const tabParam = new URLSearchParams(location.search).get('tab');
-            let isActive = location.pathname === item.path;
-            if (item.path === '/admin/dashboard?tab=catalog') {
-              isActive = location.pathname === '/admin/dashboard' && tabParam === 'catalog';
-            } else if (item.path === '/admin/dashboard') {
-              isActive = location.pathname === '/admin/dashboard' && tabParam !== 'catalog';
-            }
+            const isActive = location.pathname === item.path;
             return (
               <ListItem key={`${item.path}__${item.labelKey}`} disablePadding sx={{ mb: 0.35 }}>
                 <ListItemButton
@@ -452,7 +446,8 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               drawerAnchor === 'left'
                 ? '8px 0 32px rgba(0,0,0,0.3)'
                 : '-8px 0 32px rgba(0,0,0,0.3)',
-            zIndex: 9998,
+            // Below theme.zIndex.modal (1300) so Dialogs/Modals portaled to body appear on top
+            zIndex: theme.zIndex.drawer,
           },
         }}
       >
@@ -473,7 +468,7 @@ const ERPLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               drawerAnchor === 'left'
                 ? '4px 0 24px rgba(0,0,0,0.15)'
                 : '-4px 0 24px rgba(0,0,0,0.15)',
-            zIndex: 9998,
+            zIndex: theme.zIndex.drawer,
             top: 0,
             height: '100vh',
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

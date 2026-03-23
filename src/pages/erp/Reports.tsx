@@ -525,23 +525,47 @@ const Reports: React.FC = () => {
   const fetchReportData = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      // Fetch summary data in parallel but don't block main loading
+      // Match /api/visits: this page hides completed visits, so summaries must too
+      const reportParams: Record<string, string> = {
+        exclude_completed: 'true',
+      };
+      if (dateRange.start_date && dateRange.end_date) {
+        reportParams.start_date = dateRange.start_date;
+        reportParams.end_date = dateRange.end_date;
+      }
+      const patientsParams =
+        dateRange.start_date && dateRange.end_date
+          ? { start_date: dateRange.start_date, end_date: dateRange.end_date }
+          : {};
+
       const [patientsResponse, testsResponse, financialResponse] = await Promise.all([
-        axios.get('/api/reports/patients'),
-        axios.get('/api/reports/tests'),
-        axios.get('/api/reports/financial')
+        axios.get('/api/reports/patients', { params: patientsParams }),
+        axios.get('/api/reports/tests', { params: reportParams }),
+        axios.get('/api/reports/financial', { params: reportParams }),
       ]);
 
-          setPatientsData(patientsResponse.data);
-          setTestsData(testsResponse.data);
-          setFinancialData(financialResponse.data);
+      setPatientsData(patientsResponse.data);
+      setTestsData(testsResponse.data);
+      setFinancialData(financialResponse.data);
     } catch (error) {
       console.error('Failed to fetch report data:', error);
       // Don't show error toast for summary data - it's not critical
     } finally {
       setLoadingSummary(false);
     }
-  }, []);
+  }, [dateRange.start_date, dateRange.end_date]);
+
+  const summaryDateEffectRan = useRef(false);
+  useEffect(() => {
+    if (!summaryDateEffectRan.current) {
+      summaryDateEffectRan.current = true;
+      return;
+    }
+    const t = setTimeout(() => {
+      fetchReportData();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [dateRange.start_date, dateRange.end_date, fetchReportData]);
 
   // Memoize sorted and formatted visits for performance
   const sortedVisits = useMemo(() => {

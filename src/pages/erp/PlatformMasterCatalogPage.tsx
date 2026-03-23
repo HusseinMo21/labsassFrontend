@@ -17,7 +17,7 @@ const PlatformMasterCatalogPage: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
   if (user.lab_id != null) {
-    return <Navigate to="/admin/dashboard?tab=catalog" replace />;
+    return <Navigate to="/admin/lab-catalog" replace />;
   }
 
   return (

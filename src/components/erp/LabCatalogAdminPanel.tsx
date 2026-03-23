@@ -29,8 +29,14 @@ import {
 import { Add, Delete, Edit, Save, DoneAll } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
-import MasterLabTestsTab, { type LabTestRow } from './MasterLabTestsTab';
+import { type LabTestRow } from './MasterLabTestsTab';
 import { useLanguage } from '../../contexts/LanguageContext';
+
+type CategorySettingPayload = {
+  is_hidden?: boolean;
+  display_name?: string | null;
+  sort_order?: number | null;
+};
 
 type TestCategoryRow = {
   id: number;
@@ -40,6 +46,8 @@ type TestCategoryRow = {
   lab_id?: number | null;
   is_active?: boolean;
   display_name?: string;
+  template_name?: string;
+  category_setting?: CategorySettingPayload | null;
 };
 
 type OfferingRow = {
@@ -66,12 +74,10 @@ export default function LabCatalogAdminPanel({ labId }: { labId: number }) {
     <Box sx={{ mt: 2 }}>
       <Tabs value={sub} onChange={(_, v) => setSub(v)} sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tab label={t('catalog.tab_categories')} />
-        <Tab label={t('catalog.tab_master_tests')} />
         <Tab label={t('catalog.tab_offerings')} />
       </Tabs>
       {sub === 0 && <CategoriesTab labId={labId} />}
-      {sub === 1 && <MasterLabTestsTab />}
-      {sub === 2 && <OfferingsTab labId={labId} />}
+      {sub === 1 && <OfferingsTab labId={labId} />}
     </Box>
   );
 }
@@ -121,7 +127,12 @@ function CategoriesTab({ labId }: { labId: number }) {
   const openOverride = (r: TestCategoryRow) => {
     if (r.lab_id != null) return;
     setEditRow(r);
-    setOverrideForm({ is_hidden: false, display_name: r.display_name || '', sort_order: '' });
+    const st = r.category_setting;
+    setOverrideForm({
+      is_hidden: st?.is_hidden ?? false,
+      display_name: st?.display_name ?? '',
+      sort_order: st?.sort_order ?? '',
+    });
     setDialog('override');
   };
 
@@ -266,7 +277,7 @@ function CategoriesTab({ labId }: { labId: number }) {
       </Dialog>
 
       <Dialog open={dialog === 'override'} onClose={() => setDialog(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{t('catalog.dialog_override_title', { name: editRow?.name ?? '' })}</DialogTitle>
+        <DialogTitle>{t('catalog.dialog_override_title', { name: editRow?.template_name ?? editRow?.name ?? '' })}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <FormControlLabel
             control={

@@ -112,7 +112,7 @@ const en: Messages = {
   'catalog.tooltip_override': 'Hide / display name / sort order',
   'catalog.customize_for_lab': 'Customize for lab',
   'catalog.categories_intro':
-    'Platform categories can be hidden or renamed for your lab only. Categories you create belong to your lab.',
+    'Platform categories can be hidden or renamed for your lab only; categories you create belong to your lab. Reference tests are maintained on the platform (Master catalog); use “Catalog prices” to choose which tests this lab offers and set sale prices.',
   'catalog.new_lab_category': 'New lab category',
   'catalog.dialog_new_category': 'New category',
   'catalog.dialog_edit_category': 'Edit category',
@@ -284,7 +284,7 @@ const ar: Messages = {
   'catalog.tooltip_override': 'إخفاء / اسم معروض / ترتيب',
   'catalog.customize_for_lab': 'تخصيص للمعمل',
   'catalog.categories_intro':
-    'تصنيفات المنصة يمكن إخفاؤها أو تغيير الاسم المعروض لمعملك فقط. التصنيفات التي تنشئها تخص معملك.',
+    'تصنيفات المنصة يمكن إخفاؤها أو تغيير الاسم المعروض لمعملك فقط؛ التصنيفات التي تنشئها تخص معملك. التحاليل المرجعية تُدار من المنصة (الكتالوج المرجعي)، ومن تبويب «أسعار الكتالوج» تختار ما يعرضه معملك وتضبط أسعار البيع.',
   'catalog.new_lab_category': 'تصنيف جديد للمعمل',
   'catalog.dialog_new_category': 'تصنيف جديد',
   'catalog.dialog_edit_category': 'تعديل تصنيف',

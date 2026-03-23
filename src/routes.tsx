@@ -8,6 +8,7 @@ import Contact from './components/Contact';
 import ERPLayout from './components/ERPLayout';
 import LoadingSpinner from './components/LoadingSpinner';
 import Dashboard from './pages/erp/Dashboard';
+import LabCatalogPage from './pages/erp/LabCatalogPage';
 import Patients from './pages/erp/Patients';
 import Doctors from './pages/erp/Doctors';
 import Organizations from './pages/erp/Organizations';
@@ -183,6 +184,16 @@ const router = createBrowserRouter([
       <ProtectedRoute>
         <ERPLayout>
           <Dashboard />
+        </ERPLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/lab-catalog',
+    element: (
+      <ProtectedRoute>
+        <ERPLayout>
+          <LabCatalogPage />
         </ERPLayout>
       </ProtectedRoute>
     ),

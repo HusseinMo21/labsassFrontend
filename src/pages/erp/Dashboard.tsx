@@ -18,8 +18,6 @@ import {
   Tooltip,
   useTheme,
   alpha,
-  Tab,
-  Tabs,
 } from '@mui/material';
 import {
   People,
@@ -40,7 +38,6 @@ import { toast } from 'react-toastify';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import LabCatalogAdminPanel from '../../components/erp/LabCatalogAdminPanel';
 
 interface DashboardStats {
   totalPatients: number;
@@ -67,12 +64,11 @@ interface RecentVisit {
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
   const numberLocale = locale === 'ar' ? 'ar-EG' : 'en-US';
   const [searchParams] = useSearchParams();
-  const [mainTab, setMainTab] = useState(0);
+  const navigate = useNavigate();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
@@ -88,9 +84,9 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (searchParams.get('tab') === 'catalog') {
-      setMainTab(1);
+      navigate('/admin/lab-catalog', { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -136,8 +132,6 @@ const Dashboard: React.FC = () => {
     return <Navigate to="/platform/dashboard" replace />;
   }
 
-  const labId = user.lab_id as number;
-
   const getStatusChip = (status: string) => {
     const config: Record<string, { color: 'success' | 'warning' | 'info' | 'error' | 'default'; labelKey: string }> = {
       pending: { color: 'warning', labelKey: 'dashboard.status_pending' },
@@ -172,24 +166,13 @@ const Dashboard: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
-      <Tabs
-        value={mainTab}
-        onChange={(_, v) => setMainTab(v)}
-        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label={t('dashboard.overview_tab')} />
-        <Tab label={t('dashboard.catalog_tab')} />
-      </Tabs>
-
-      {mainTab === 1 && <LabCatalogAdminPanel labId={labId} />}
-
-      {mainTab === 0 && loading && (
+      {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}>
           <CircularProgress size={48} />
         </Box>
       )}
 
-      {mainTab === 0 && !loading && (
+      {!loading && (
         <>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, flexWrap: 'wrap', gap: 2 }}>
