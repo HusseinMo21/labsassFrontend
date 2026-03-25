@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import axios from '../config/axios';
 import { toast } from 'react-toastify';
 
 // Export types and interfaces
@@ -44,7 +44,6 @@ export interface SearchResponse {
 
 export function useReportSearch() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,18 +57,12 @@ export function useReportSearch() {
       return;
     }
 
-    if (selectedFields.length === 0) {
-      toast.error('Please select at least one field to search in');
-      return;
-    }
-
     try {
       setLoading(true);
       setCurrentPage(page);
 
-      const params: any = {
+      const params: Record<string, string | number> = {
         search_term: searchTerm.trim(),
-        fields: selectedFields.join(','),
         page: page,
         per_page: perPage,
       };
@@ -96,7 +89,6 @@ export function useReportSearch() {
 
   const reset = () => {
     setSearchTerm('');
-    setSelectedFields([]);
     setResults([]);
     setHasSearched(false);
     setCurrentPage(1);
@@ -107,8 +99,6 @@ export function useReportSearch() {
   return {
     searchTerm,
     setSearchTerm,
-    selectedFields,
-    setSelectedFields,
     results,
     loading,
     currentPage,

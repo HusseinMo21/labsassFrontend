@@ -10,7 +10,7 @@ import {
   Alert,
 } from '@mui/material';
 import { ExpandMore, Search } from '@mui/icons-material';
-import { useReportSearch, searchFields } from '../../hooks/useReportSearch';
+import { useReportSearch } from '../../hooks/useReportSearch';
 import { SearchForm } from './SearchForm';
 import { ResultsTable } from './ResultsTable';
 import { useNavigate } from 'react-router-dom';
@@ -50,32 +50,6 @@ export function extractKeywords(reportData: ReportData): string {
   return keywords;
 }
 
-// Get pre-selected fields based on report data
-export function getPreSelectedFields(reportData: ReportData): string[] {
-  const fields: string[] = [];
-  
-  if (reportData.clinical_data && reportData.clinical_data.trim()) {
-    fields.push('clinical_data');
-  }
-  if (reportData.microscopic_examination && reportData.microscopic_examination.trim()) {
-    fields.push('microscopic_examination');
-  }
-  if (reportData.conclusion && reportData.conclusion.trim()) {
-    fields.push('conclusion');
-  }
-  if (reportData.recommendations && reportData.recommendations.trim()) {
-    fields.push('recommendations');
-  }
-  if (reportData.nature_of_specimen && reportData.nature_of_specimen.trim()) {
-    fields.push('nature_of_specimen');
-  }
-  if (reportData.gross_pathology && reportData.gross_pathology.trim()) {
-    fields.push('gross_pathology');
-  }
-  
-  return fields;
-}
-
 export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
   currentVisitId: _currentVisitId,
   reportData,
@@ -88,8 +62,6 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
   const {
     searchTerm,
     setSearchTerm,
-    selectedFields,
-    setSelectedFields,
     results,
     loading,
     currentPage,
@@ -100,37 +72,15 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
     reset,
   } = useReportSearch();
 
-  // Auto-populate on mount if report data is available
   useEffect(() => {
     if (!initialized && reportData) {
       const keywords = extractKeywords(reportData);
-      const preSelectedFields = getPreSelectedFields(reportData);
-      
       if (keywords) {
         setSearchTerm(keywords);
       }
-      if (preSelectedFields.length > 0) {
-        setSelectedFields(preSelectedFields);
-      }
       setInitialized(true);
     }
-  }, [reportData, initialized, setSearchTerm, setSelectedFields]);
-
-  const handleFieldToggle = (fieldKey: string) => {
-    setSelectedFields((prev) =>
-      prev.includes(fieldKey)
-        ? prev.filter((f) => f !== fieldKey)
-        : [...prev, fieldKey]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedFields.length === searchFields.length) {
-      setSelectedFields([]);
-    } else {
-      setSelectedFields(searchFields.map((f) => f.key));
-    }
-  };
+  }, [reportData, initialized, setSearchTerm]);
 
   const handleSearch = () => {
     // Don't exclude current visit - show all results including current one
@@ -139,14 +89,9 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
 
   const handleClear = () => {
     reset();
-    // Re-populate with keywords after reset
     const keywords = extractKeywords(reportData);
-    const preSelectedFields = getPreSelectedFields(reportData);
     if (keywords) {
       setSearchTerm(keywords);
-    }
-    if (preSelectedFields.length > 0) {
-      setSelectedFields(preSelectedFields);
     }
   };
 
@@ -181,9 +126,6 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
             <SearchForm
               searchTerm={searchTerm}
               onSearchTermChange={setSearchTerm}
-              selectedFields={selectedFields}
-              onFieldToggle={handleFieldToggle}
-              onSelectAll={handleSelectAll}
               onSearch={handleSearch}
               onClear={handleClear}
               loading={loading}
@@ -193,7 +135,7 @@ export const SimilarCasesPanel: React.FC<SimilarCasesPanelProps> = ({
 
             {hasSearched && results.length === 0 && !loading && (
               <Alert severity="info" sx={{ mt: 2 }}>
-                No similar cases found. Try adjusting your search term or selecting different fields.
+                No similar cases found. Try adjusting your search term.
               </Alert>
             )}
 

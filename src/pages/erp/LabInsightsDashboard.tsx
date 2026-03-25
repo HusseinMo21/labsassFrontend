@@ -22,6 +22,7 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  Stack,
 } from '@mui/material';
 import {
   AreaChart,
@@ -120,10 +121,17 @@ interface InsightsData {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
+interface LabInsightsMeta {
+  id: number;
+  name: string | null;
+  slug?: string | null;
+}
+
 const LabInsightsDashboard: React.FC = () => {
   useDocumentTitle('Lab Insights Dashboard - Lab System');
   
   const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
+  const [labMeta, setLabMeta] = useState<LabInsightsMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState('30');
@@ -141,6 +149,7 @@ const LabInsightsDashboard: React.FC = () => {
       
       if (response.data.success) {
         setInsightsData(response.data.data);
+        setLabMeta(response.data.lab ?? null);
       } else {
         throw new Error(response.data.message || 'Failed to fetch insights data');
       }
@@ -247,8 +256,15 @@ const LabInsightsDashboard: React.FC = () => {
             }}>
               Lab Insights Dashboard
             </Typography>
+            <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" sx={{ mb: 0.5 }}>
+              {labMeta?.name && (
+                <Chip label={labMeta.name} color="primary" variant="outlined" size="small" />
+              )}
+            </Stack>
             <Typography variant="body2" color="text.secondary">
-              Comprehensive analytics and performance metrics for your laboratory
+              Analytics for <strong>this lab only</strong> — visits, patients, tests, revenue, and activity are not mixed
+              with other labs. KPIs, revenue breakdown, top tests, and charts use the <strong>time period</strong> you
+              select; % change compares that window to the <strong>previous period of the same length</strong>.
             </Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={2}>

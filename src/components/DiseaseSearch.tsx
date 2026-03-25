@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Typography,
   TextField,
-  FormControlLabel,
-  Checkbox,
   Button,
   Table,
   TableBody,
@@ -17,11 +15,14 @@ import {
   Paper,
   CircularProgress,
   Alert,
-  FormGroup,
   Grid,
   Chip,
   Pagination,
   Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Search,
@@ -31,23 +32,28 @@ import {
   Visibility,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../config/axios';
 import { toast } from 'react-toastify';
+import { useAuth } from '../contexts/AuthContext';
 
-interface SearchField {
-  key: string;
-  label: string;
-  dbField: string;
-}
+type CatalogCategory = { id: number; name: string };
+type CatalogTestRow = {
+  lab_test_id: number;
+  name: string;
+  code: string;
+  category_id: number | null;
+  category_name: string | null;
+};
 
-const searchFields: SearchField[] = [
-  { key: 'clinical_data', label: 'Clinical Data', dbField: 'clinical' },
-  { key: 'nature_of_specimen', label: 'Nature of Specimen', dbField: 'nature' },
-  { key: 'gross_pathology', label: 'Gross Pathology', dbField: 'gross' },
-  { key: 'microscopic_examination', label: 'Microscopic Examination', dbField: 'micro' },
-  { key: 'conclusion', label: 'Conclusion', dbField: 'conc' },
-  { key: 'recommendations', label: 'Recommendations', dbField: 'reco' },
-];
+/** Labels for matched report keys in results (server searches all of these automatically). */
+const searchFieldLabels: Record<string, string> = {
+  clinical_data: 'Clinical Data',
+  nature_of_specimen: 'Nature of Specimen',
+  gross_pathology: 'Gross Pathology',
+  microscopic_examination: 'Microscopic Examination',
+  conclusion: 'Conclusion',
+  recommendations: 'Recommendations',
+};
 
 interface SearchResult {
   id: number;
@@ -75,8 +81,10 @@ interface SearchResponse {
 
 const DiseaseSearch: React.FC = () => {
   const navigate = useNavigate();
+  const { lab, user } = useAuth();
+  const labId = lab?.id ?? user?.lab_id ?? null;
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,21 +92,62 @@ const DiseaseSearch: React.FC = () => {
   const [totalResults, setTotalResults] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleFieldToggle = (fieldKey: string) => {
-    setSelectedFields((prev) =>
-      prev.includes(fieldKey)
-        ? prev.filter((f) => f !== fieldKey)
-        : [...prev, fieldKey]
-    );
-  };
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [catalogTests, setCatalogTests] = useState<CatalogTestRow[]>([]);
+  const [filterCategoryId, setFilterCategoryId] = useState<string>('');
+  const [filterLabTestId, setFilterLabTestId] = useState<string>('');
 
-  const handleSelectAll = () => {
-    if (selectedFields.length === searchFields.length) {
-      setSelectedFields([]);
-    } else {
-      setSelectedFields(searchFields.map((f) => f.key));
+  useEffect(() => {
+    if (labId == null) {
+      setCategories([]);
+      setCatalogTests([]);
+      setFilterCategoryId('');
+      setFilterLabTestId('');
+      return;
     }
-  };
+    let cancelled = false;
+    setCatalogLoading(true);
+    axios
+      .get<{ categories?: CatalogCategory[]; tests?: CatalogTestRow[] }>(`/api/labs/${labId}/catalog`)
+      .then((res) => {
+        if (cancelled) return;
+        setCategories(res.data.categories || []);
+        setCatalogTests(res.data.tests || []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategories([]);
+          setCatalogTests([]);
+          toast.error('Could not load lab catalog for filters.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [labId]);
+
+  const testsForFilter = useMemo(() => {
+    const cid = filterCategoryId === '' ? null : Number(filterCategoryId);
+    if (cid == null) return catalogTests;
+    return catalogTests.filter((t) => t.category_id === cid);
+  }, [catalogTests, filterCategoryId]);
+
+  useEffect(() => {
+    if (filterLabTestId === '') return;
+    const tid = Number(filterLabTestId);
+    const row = catalogTests.find((t) => t.lab_test_id === tid);
+    if (!row) {
+      setFilterLabTestId('');
+      return;
+    }
+    if (filterCategoryId !== '' && row.category_id !== Number(filterCategoryId)) {
+      setFilterLabTestId('');
+    }
+  }, [filterCategoryId, filterLabTestId, catalogTests]);
 
   const handleSearch = async (page: number = 1) => {
     if (!searchTerm.trim()) {
@@ -106,22 +155,24 @@ const DiseaseSearch: React.FC = () => {
       return;
     }
 
-    if (selectedFields.length === 0) {
-      toast.error('Please select at least one field to search in');
-      return;
-    }
-
     try {
       setLoading(true);
       setCurrentPage(page);
 
+      const params: Record<string, string | number> = {
+        search_term: searchTerm.trim(),
+        page: page,
+        per_page: 15,
+      };
+      if (labId != null && filterCategoryId !== '') {
+        params.category_id = Number(filterCategoryId);
+      }
+      if (labId != null && filterLabTestId !== '') {
+        params.lab_test_id = Number(filterLabTestId);
+      }
+
       const response = await axios.get<SearchResponse>('/api/reports/search', {
-        params: {
-          search_term: searchTerm.trim(),
-          fields: selectedFields.join(','),
-          page: page,
-          per_page: 15,
-        },
+        params,
       });
 
       setResults(response.data.data || []);
@@ -191,38 +242,71 @@ const DiseaseSearch: React.FC = () => {
             />
           </Box>
 
-          {/* Field Selection */}
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                Select Fields to Search In:
+          {labId != null && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                Lab catalog (optional)
               </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={handleSelectAll}
-              >
-                {selectedFields.length === searchFields.length ? 'Deselect All' : 'Select All'}
-              </Button>
-            </Box>
-            <FormGroup>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Your lab&apos;s <strong>test categories</strong> and <strong>catalog tests</strong> (e.g. Hematology,
+                CBC). Use this to only find reports for visits that included those tests. All results are still limited
+                to your lab.
+              </Typography>
               <Grid container spacing={2}>
-                {searchFields.map((field) => (
-                  <Grid item xs={12} sm={6} md={4} key={field.key}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={selectedFields.includes(field.key)}
-                          onChange={() => handleFieldToggle(field.key)}
-                        />
-                      }
-                      label={field.label}
-                    />
-                  </Grid>
-                ))}
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small" disabled={catalogLoading}>
+                    <InputLabel id="disease-search-category">Lab category</InputLabel>
+                    <Select
+                      labelId="disease-search-category"
+                      label="Lab category"
+                      value={filterCategoryId}
+                      onChange={(e) => {
+                        setFilterCategoryId(e.target.value as string);
+                        setFilterLabTestId('');
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>All categories</em>
+                      </MenuItem>
+                      {categories.map((c) => (
+                        <MenuItem key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small" disabled={catalogLoading}>
+                    <InputLabel id="disease-search-test">Catalog test</InputLabel>
+                    <Select
+                      labelId="disease-search-test"
+                      label="Catalog test"
+                      value={filterLabTestId}
+                      onChange={(e) => setFilterLabTestId(e.target.value as string)}
+                    >
+                      <MenuItem value="">
+                        <em>All tests in scope</em>
+                      </MenuItem>
+                      {testsForFilter.map((t) => (
+                        <MenuItem key={t.lab_test_id} value={String(t.lab_test_id)}>
+                          {t.name}
+                          {t.code ? ` (${t.code})` : ''}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
               </Grid>
-            </FormGroup>
-          </Box>
+            </Box>
+          )}
+
+          {labId == null && (
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              No lab is assigned to your account — report search is not limited to a single lab. Connect as a lab user
+              to scope results and enable category/test filters.
+            </Alert>
+          )}
 
           {/* Search Button */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
@@ -230,10 +314,11 @@ const DiseaseSearch: React.FC = () => {
               variant="outlined"
               onClick={() => {
                 setSearchTerm('');
-                setSelectedFields([]);
                 setResults([]);
                 setHasSearched(false);
                 setCurrentPage(1);
+                setFilterCategoryId('');
+                setFilterLabTestId('');
               }}
             >
               Clear
@@ -242,7 +327,7 @@ const DiseaseSearch: React.FC = () => {
               variant="contained"
               startIcon={<Search />}
               onClick={() => handleSearch(1)}
-              disabled={loading || !searchTerm.trim() || selectedFields.length === 0}
+              disabled={loading || !searchTerm.trim()}
             >
               Search
             </Button>
@@ -259,7 +344,7 @@ const DiseaseSearch: React.FC = () => {
 
       {!loading && hasSearched && results.length === 0 && (
         <Alert severity="info">
-          No results found. Try adjusting your search term or selecting different fields.
+          No results found. Try adjusting your search term or lab catalog filters.
         </Alert>
       )}
 
@@ -321,7 +406,7 @@ const DiseaseSearch: React.FC = () => {
                       <TableCell>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                           {result.matched_fields?.map((field, idx) => {
-                            const fieldLabel = searchFields.find((f) => f.key === field)?.label || field;
+                            const fieldLabel = searchFieldLabels[field] || field;
                             return (
                               <Chip
                                 key={idx}
@@ -351,7 +436,7 @@ const DiseaseSearch: React.FC = () => {
                                 }}
                               >
                                 <strong>
-                                  {searchFields.find((f) => f.key === field)?.label || field}:
+                                  {searchFieldLabels[field] || field}:
                                 </strong>{' '}
                                 {highlightText(truncateText(fieldData), searchTerm)}
                               </Typography>
