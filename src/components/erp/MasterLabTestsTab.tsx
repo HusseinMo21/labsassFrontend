@@ -48,6 +48,7 @@ export type LabTestRow = {
   preparation_instructions?: string | null;
   turnaround_time_hours: number;
   category_id: number;
+  lab_id?: number | null;
   is_active?: boolean;
   category?: { id: number; name: string };
 };

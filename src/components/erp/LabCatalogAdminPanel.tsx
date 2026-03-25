@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   Chip,
@@ -26,7 +29,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { Add, Delete, Edit, Save, DoneAll } from '@mui/icons-material';
+import { Add, Delete, Edit, ExpandMore, Save, DoneAll } from '@mui/icons-material';
 import axios from '../../config/axios';
 import { toast } from 'react-toastify';
 import { type LabTestRow } from './MasterLabTestsTab';
@@ -314,28 +317,54 @@ function CategoriesTab({ labId }: { labId: number }) {
   );
 }
 
+type CatalogCategoryRow = {
+  id: number;
+  name: string;
+  template_name?: string;
+  code: string;
+  lab_id?: number | null;
+};
+
 function OfferingsTab({ labId }: { labId: number }) {
   const { t, locale } = useLanguage();
+  const [categories, setCategories] = useState<CatalogCategoryRow[]>([]);
   const [rows, setRows] = useState<OfferingRow[]>([]);
-  const [tests, setTests] = useState<LabTestRow[]>([]);
+  const [masterTests, setMasterTests] = useState<LabTestRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addOpen, setAddOpen] = useState(false);
-  const [newTestId, setNewTestId] = useState<number | ''>('');
-  const [newPrice, setNewPrice] = useState('');
-  const [newDisplayName, setNewDisplayName] = useState('');
   const [drafts, setDrafts] = useState<Record<number, OfferingDraft>>({});
   const [savingAll, setSavingAll] = useState(false);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createCategoryId, setCreateCategoryId] = useState<number | null>(null);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    code: '',
+    price: '',
+    sale_price: '',
+    display_name: '',
+    unit: '',
+    turnaround_time_hours: '24',
+  });
+
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkCategoryId, setLinkCategoryId] = useState<number | null>(null);
+  const [linkTestId, setLinkTestId] = useState<number | ''>('');
+  const [linkPrice, setLinkPrice] = useState('');
+  const [linkDisplayName, setLinkDisplayName] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [offRes, testRes] = await Promise.all([
-        axios.get(`/api/labs/${labId}/offerings`, { params: { per_page: 200 } }),
-        axios.get('/api/tests', { params: { per_page: 200, active_only: true } }),
+      const [catRes, offRes, testRes] = await Promise.all([
+        axios.get('/api/test-categories'),
+        axios.get(`/api/labs/${labId}/offerings`, { params: { per_page: 500 } }),
+        axios.get('/api/tests', { params: { per_page: 500, active_only: true } }),
       ]);
+      const cdata = catRes.data?.data ?? catRes.data;
+      setCategories(Array.isArray(cdata) ? cdata : []);
       const list = paginatedItems<OfferingRow>(offRes);
       setRows(list);
-      setTests(paginatedItems<LabTestRow>(testRes));
+      setMasterTests(paginatedItems<LabTestRow>(testRes));
       const d: Record<number, OfferingDraft> = {};
       list.forEach((o) => {
         d[o.id] = {
@@ -356,6 +385,101 @@ function OfferingsTab({ labId }: { labId: number }) {
     load();
   }, [load]);
 
+  const offeredIds = new Set(rows.map((r) => r.lab_test_id));
+
+  const openCreate = (categoryId: number) => {
+    setCreateCategoryId(categoryId);
+    setCreateForm({
+      name: '',
+      code: '',
+      price: '',
+      sale_price: '',
+      display_name: '',
+      unit: '',
+      turnaround_time_hours: '24',
+    });
+    setCreateOpen(true);
+  };
+
+  const submitCreate = async () => {
+    if (!createCategoryId) return;
+    if (!createForm.name.trim() || !createForm.code.trim()) {
+      toast.warning(t('catalog.create_test_required'));
+      return;
+    }
+    const refPrice = parseFloat(String(createForm.price).replace(',', '.'));
+    if (Number.isNaN(refPrice) || refPrice < 0) {
+      toast.error(t('catalog.ref_price_invalid'));
+      return;
+    }
+    try {
+      const saleRaw = createForm.sale_price.trim();
+      const payload: Record<string, unknown> = {
+        category_id: createCategoryId,
+        name: createForm.name.trim(),
+        code: createForm.code.trim(),
+        price: refPrice,
+        display_name: createForm.display_name.trim() || undefined,
+        unit: createForm.unit.trim() || undefined,
+        turnaround_time_hours: parseInt(createForm.turnaround_time_hours, 10) || 24,
+      };
+      if (saleRaw !== '') {
+        const sp = parseFloat(saleRaw.replace(',', '.'));
+        if (!Number.isNaN(sp) && sp >= 0) {
+          payload.sale_price = sp;
+        }
+      }
+      await axios.post(`/api/labs/${labId}/catalog/tests`, payload);
+      toast.success(t('catalog.added_to_catalog'));
+      setCreateOpen(false);
+      setCreateCategoryId(null);
+      load();
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e)
+        ? e.response?.data?.message || JSON.stringify(e.response?.data?.errors)
+        : t('common.error');
+      toast.error(String(msg));
+    }
+  };
+
+  const openLink = (categoryId: number) => {
+    setLinkCategoryId(categoryId);
+    setLinkTestId('');
+    setLinkPrice('');
+    setLinkDisplayName('');
+    setLinkOpen(true);
+  };
+
+  const submitLink = async () => {
+    if (!linkTestId) {
+      toast.warning(t('catalog.select_test_warning'));
+      return;
+    }
+    try {
+      await axios.post(`/api/labs/${labId}/offerings`, {
+        lab_test_id: linkTestId,
+        price: linkPrice ? parseFloat(String(linkPrice).replace(',', '.')) : undefined,
+        is_active: true,
+        display_name: linkDisplayName.trim() || undefined,
+      });
+      toast.success(t('catalog.added_to_catalog'));
+      setLinkOpen(false);
+      setLinkCategoryId(null);
+      load();
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : t('common.error');
+      toast.error(String(msg));
+    }
+  };
+
+  const platformTestsToLink = (categoryId: number) =>
+    masterTests.filter(
+      (test) =>
+        (test.lab_id == null || test.lab_id === undefined) &&
+        test.category_id === categoryId &&
+        !offeredIds.has(test.id)
+    );
+
   const saveRow = async (id: number) => {
     const d = drafts[id];
     if (!d) return;
@@ -374,7 +498,6 @@ function OfferingsTab({ labId }: { labId: number }) {
     }
   };
 
-  /** حفظ كل الصفوف المعروضة دفعة واحدة (احتياطي بعد تعديلات كثيرة). */
   const saveAllRows = async () => {
     if (rows.length === 0) {
       toast.info(t('catalog.no_offerings'));
@@ -425,34 +548,6 @@ function OfferingsTab({ labId }: { labId: number }) {
     await load();
   };
 
-  const addOffering = async () => {
-    if (!newTestId) {
-      toast.warning(t('catalog.select_test_warning'));
-      return;
-    }
-    try {
-      const ndn = newDisplayName.trim();
-      await axios.post(`/api/labs/${labId}/offerings`, {
-        lab_test_id: newTestId,
-        price: newPrice ? parseFloat(newPrice) : undefined,
-        is_active: true,
-        display_name: ndn === '' ? undefined : ndn,
-      });
-      toast.success(t('catalog.added_to_catalog'));
-      setAddOpen(false);
-      setNewTestId('');
-      setNewPrice('');
-      setNewDisplayName('');
-      load();
-    } catch (e: unknown) {
-      const msg = axios.isAxiosError(e) ? e.response?.data?.message : t('common.error');
-      toast.error(String(msg));
-    }
-  };
-
-  const offeredIds = new Set(rows.map((r) => r.lab_test_id));
-  const testsNotOffered = tests.filter((t) => !offeredIds.has(t.id));
-
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -464,152 +559,255 @@ function OfferingsTab({ labId }: { labId: number }) {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1, alignItems: 'flex-start' }}>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
           {t('catalog.offerings_intro')}
         </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          <Tooltip title={t('catalog.save_all_tooltip')}>
-            <span>
-              <Button
-                variant="contained"
-                color="secondary"
-                startIcon={savingAll ? <CircularProgress size={18} color="inherit" /> : <DoneAll />}
-                onClick={saveAllRows}
-                disabled={savingAll || rows.length === 0}
-              >
-                {savingAll ? t('catalog.saving') : t('catalog.save_all')}
-              </Button>
-            </span>
-          </Tooltip>
-          <Button variant="outlined" startIcon={<Add />} onClick={() => setAddOpen(true)}>
-            {t('catalog.add_test_to_catalog')}
-          </Button>
-        </Box>
+        <Tooltip title={t('catalog.save_all_tooltip')}>
+          <span>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={savingAll ? <CircularProgress size={18} color="inherit" /> : <DoneAll />}
+              onClick={saveAllRows}
+              disabled={savingAll || rows.length === 0}
+            >
+              {savingAll ? t('catalog.saving') : t('catalog.save_all')}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>{t('catalog.col_reference_name')}</TableCell>
-            <TableCell>
-              <Tooltip title={t('catalog.helper_offering_display_name')}>
-                <span>{t('catalog.field_display_name')}</span>
-              </Tooltip>
-            </TableCell>
-            <TableCell>{t('common.code')}</TableCell>
-            <TableCell>{t('catalog.col_price')}</TableCell>
-            <TableCell>{t('common.active')}</TableCell>
-            <TableCell align="right">{t('common.save')}</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((o) => (
-            <TableRow key={o.id}>
-              <TableCell sx={{ maxWidth: 200 }}>{o.lab_test?.name ?? '—'}</TableCell>
-              <TableCell sx={{ minWidth: 220 }}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder={o.lab_test?.name ?? ''}
-                  value={drafts[o.id]?.display_name ?? ''}
-                  onChange={(e) =>
-                    setDrafts((prev) => ({
-                      ...prev,
-                      [o.id]: {
-                        price: prev[o.id]?.price ?? String(o.price),
-                        is_active: prev[o.id]?.is_active ?? o.is_active,
-                        display_name: e.target.value,
-                      },
-                    }))
-                  }
-                />
-              </TableCell>
-              <TableCell>{o.lab_test?.code}</TableCell>
-              <TableCell>
-                <TextField
-                  size="small"
-                  type="number"
-                  value={drafts[o.id]?.price ?? ''}
-                  onChange={(e) =>
-                    setDrafts((prev) => ({
-                      ...prev,
-                      [o.id]: {
-                        price: e.target.value,
-                        is_active: prev[o.id]?.is_active ?? o.is_active,
-                        display_name: prev[o.id]?.display_name ?? (o.display_name ?? ''),
-                      },
-                    }))
-                  }
-                  sx={{ width: 120 }}
-                />
-              </TableCell>
-              <TableCell>
-                <Switch
-                  checked={drafts[o.id]?.is_active ?? o.is_active}
-                  onChange={(e) =>
-                    setDrafts((prev) => ({
-                      ...prev,
-                      [o.id]: {
-                        price: prev[o.id]?.price ?? String(o.price),
-                        is_active: e.target.checked,
-                        display_name: prev[o.id]?.display_name ?? (o.display_name ?? ''),
-                      },
-                    }))
-                  }
-                />
-              </TableCell>
-              <TableCell align="right">
-                <Tooltip title={t('catalog.tooltip_save_row')}>
-                  <IconButton color="primary" onClick={() => saveRow(o.id)}>
-                    <Save />
-                  </IconButton>
-                </Tooltip>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
 
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{t('catalog.dialog_add_title')}</DialogTitle>
+      {categories.map((cat) => {
+        const catRows = rows.filter((o) => o.lab_test?.category_id === cat.id);
+        const toLink = platformTestsToLink(cat.id);
+
+        return (
+          <Accordion key={cat.id} defaultExpanded disableGutters sx={{ mb: 1, '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {cat.name}
+                </Typography>
+                <Chip size="small" label={cat.code} variant="outlined" />
+                {cat.lab_id === labId ? <Chip size="small" label={t('catalog.chip_lab')} /> : null}
+                {cat.lab_id == null ? <Chip size="small" label={t('catalog.chip_platform')} variant="outlined" /> : null}
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  {catRows.length} {t('catalog.tests_in_section')}
+                </Typography>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                <Button variant="contained" startIcon={<Add />} size="small" onClick={() => openCreate(cat.id)}>
+                  {t('catalog.add_new_test_in_category')}
+                </Button>
+                {toLink.length > 0 ? (
+                  <Button variant="outlined" size="small" onClick={() => openLink(cat.id)}>
+                    {t('catalog.link_platform_test')}
+                  </Button>
+                ) : null}
+              </Box>
+
+              {catRows.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                  {t('catalog.no_tests_in_category')}
+                </Typography>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t('catalog.col_reference_name')}</TableCell>
+                      <TableCell>
+                        <Tooltip title={t('catalog.helper_offering_display_name')}>
+                          <span>{t('catalog.field_display_name')}</span>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>{t('common.code')}</TableCell>
+                      <TableCell>{t('catalog.col_price')}</TableCell>
+                      <TableCell>{t('common.active')}</TableCell>
+                      <TableCell align="right">{t('common.save')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {catRows.map((o) => (
+                      <TableRow key={o.id}>
+                        <TableCell sx={{ maxWidth: 200 }}>{o.lab_test?.name ?? '—'}</TableCell>
+                        <TableCell sx={{ minWidth: 220 }}>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            placeholder={o.lab_test?.name ?? ''}
+                            value={drafts[o.id]?.display_name ?? ''}
+                            onChange={(e) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [o.id]: {
+                                  price: prev[o.id]?.price ?? String(o.price),
+                                  is_active: prev[o.id]?.is_active ?? o.is_active,
+                                  display_name: e.target.value,
+                                },
+                              }))
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>{o.lab_test?.code}</TableCell>
+                        <TableCell>
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={drafts[o.id]?.price ?? ''}
+                            onChange={(e) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [o.id]: {
+                                  price: e.target.value,
+                                  is_active: prev[o.id]?.is_active ?? o.is_active,
+                                  display_name: prev[o.id]?.display_name ?? (o.display_name ?? ''),
+                                },
+                              }))
+                            }
+                            sx={{ width: 120 }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={drafts[o.id]?.is_active ?? o.is_active}
+                            onChange={(e) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [o.id]: {
+                                  price: prev[o.id]?.price ?? String(o.price),
+                                  is_active: e.target.checked,
+                                  display_name: prev[o.id]?.display_name ?? (o.display_name ?? ''),
+                                },
+                              }))
+                            }
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title={t('catalog.tooltip_save_row')}>
+                            <IconButton color="primary" onClick={() => saveRow(o.id)}>
+                              <Save />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </AccordionDetails>
+          </Accordion>
+        );
+      })}
+
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('catalog.dialog_new_test_in_category')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <TextField
+            label={t('common.name')}
+            value={createForm.name}
+            onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+            fullWidth
+            required
+          />
+          <TextField
+            label={t('common.code')}
+            value={createForm.code}
+            onChange={(e) => setCreateForm((f) => ({ ...f, code: e.target.value }))}
+            fullWidth
+            required
+            helperText={t('catalog.helper_lab_test_code')}
+          />
+          <TextField
+            label={t('master.ref_price')}
+            type="number"
+            value={createForm.price}
+            onChange={(e) => setCreateForm((f) => ({ ...f, price: e.target.value }))}
+            fullWidth
+            required
+          />
+          <TextField
+            label={t('catalog.field_sale_price')}
+            type="number"
+            value={createForm.sale_price}
+            onChange={(e) => setCreateForm((f) => ({ ...f, sale_price: e.target.value }))}
+            fullWidth
+            helperText={t('catalog.helper_sale_default_ref')}
+          />
+          <TextField
+            label={t('catalog.field_display_name')}
+            value={createForm.display_name}
+            onChange={(e) => setCreateForm((f) => ({ ...f, display_name: e.target.value }))}
+            fullWidth
+          />
+          <TextField
+            label={t('master.unit')}
+            value={createForm.unit}
+            onChange={(e) => setCreateForm((f) => ({ ...f, unit: e.target.value }))}
+            fullWidth
+          />
+          <TextField
+            label={t('master.turnaround_hours')}
+            type="number"
+            value={createForm.turnaround_time_hours}
+            onChange={(e) => setCreateForm((f) => ({ ...f, turnaround_time_hours: e.target.value }))}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Button>
+          <Button variant="contained" onClick={submitCreate}>
+            {t('catalog.add')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={linkOpen} onClose={() => setLinkOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('catalog.dialog_link_platform')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <FormControl fullWidth>
             <InputLabel>{t('catalog.field_test')}</InputLabel>
             <Select
               label={t('catalog.field_test')}
-              value={newTestId === '' ? '' : newTestId}
-              onChange={(e) => setNewTestId(e.target.value === '' ? '' : (e.target.value as number))}
+              value={linkTestId === '' ? '' : linkTestId}
+              onChange={(e) => setLinkTestId(e.target.value === '' ? '' : (e.target.value as number))}
             >
-              {testsNotOffered.length === 0 ? (
+              {linkCategoryId != null && platformTestsToLink(linkCategoryId).length === 0 ? (
                 <MenuItem value="" disabled>
                   {t('catalog.all_tests_added')}
                 </MenuItem>
-              ) : (
-                testsNotOffered.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.name} ({t.code})
+              ) : null}
+              {linkCategoryId != null &&
+                platformTestsToLink(linkCategoryId).map((test) => (
+                  <MenuItem key={test.id} value={test.id}>
+                    {test.name} ({test.code})
                   </MenuItem>
-                ))
-              )}
+                ))}
             </Select>
           </FormControl>
           <TextField
             label={t('catalog.field_sale_price')}
             type="number"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
+            value={linkPrice}
+            onChange={(e) => setLinkPrice(e.target.value)}
             fullWidth
+            helperText={t('catalog.helper_link_price')}
           />
           <TextField
             label={t('catalog.field_display_name')}
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
+            value={linkDisplayName}
+            onChange={(e) => setLinkDisplayName(e.target.value)}
             fullWidth
-            helperText={t('catalog.helper_offering_display_name')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddOpen(false)}>{t('common.cancel')}</Button>
-          <Button variant="contained" onClick={addOffering} disabled={!testsNotOffered.length}>
+          <Button onClick={() => setLinkOpen(false)}>{t('common.cancel')}</Button>
+          <Button
+            variant="contained"
+            onClick={submitLink}
+            disabled={linkTestId === ''}
+          >
             {t('catalog.add')}
           </Button>
         </DialogActions>

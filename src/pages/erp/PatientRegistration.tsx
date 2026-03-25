@@ -21,8 +21,8 @@ import {
   Divider,
   Chip,
   useTheme,
-  Tabs,
-  Tab,
+  ToggleButton,
+  ToggleButtonGroup,
   IconButton,
   Tooltip,
   Alert,
@@ -244,7 +244,10 @@ const PatientRegistration: React.FC = () => {
     setIsEditing(false);
   }, []);
 
-  const handleRegistrationTabChange = (_: React.SyntheticEvent, value: RegistrationMode) => {
+  const handleRegistrationModeToggle = (_: React.MouseEvent<HTMLElement>, value: RegistrationMode | null) => {
+    if (value === null) {
+      return;
+    }
     setRegistrationMode(value);
     setExistingPatientId(null);
     clearStaleReceiptUi();
@@ -737,14 +740,18 @@ const PatientRegistration: React.FC = () => {
 
   const handleSearch = async () => {
     if (!searchValue.trim()) {
-      toast.warning('Please enter a lab number to search');
+      toast.warning('أدخل الاسم أو رقم الموبايل أو رقم المعمل (Lab no) للبحث.');
       return;
     }
 
     setSearching(true);
     try {
-      // Search for existing patient by lab number using the correct endpoint
-      const response = await axios.get(`/api/patients?search=${encodeURIComponent(searchValue)}`);
+      const response = await axios.get('/api/patients', {
+        params: {
+          search: searchValue.trim(),
+          per_page: 20,
+        },
+      });
       
       if (response.data && response.data.data && response.data.data.length > 0) {
         const patient = response.data.data[0];
@@ -860,7 +867,7 @@ const PatientRegistration: React.FC = () => {
 
     try {
       if (registrationMode === 'returning' && existingPatientId == null) {
-        toast.error('ابحث عن المريض برقم المعمل أو الموبايل واختر السجل قبل حفظ الزيارة.');
+        toast.error('ابحث عن المريض بالاسم أو الموبايل أو رقم المعمل ثم اختر السجل قبل حفظ الزيارة.');
         return;
       }
 
@@ -953,7 +960,12 @@ const PatientRegistration: React.FC = () => {
         bgcolor: alpha(theme.palette.primary.main, 0.04),
       }}
     >
-      <Box sx={{ maxWidth: 1280, mx: 'auto' }}>
+      <Box
+        sx={{
+          maxWidth: registrationMode === 'returning' ? '100%' : 1280,
+          mx: 'auto',
+        }}
+      >
         <Stack spacing={2}>
           <Paper
             elevation={0}
@@ -965,13 +977,8 @@ const PatientRegistration: React.FC = () => {
               background: `linear-gradient(135deg, ${alpha('#fff', 0.98)} 0%, ${alpha(theme.palette.primary.light, 0.14)} 100%)`,
             }}
           >
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={2}
-              alignItems={{ md: 'center' }}
-              justifyContent="space-between"
-            >
-              <Stack direction="row" spacing={1.5} alignItems="center">
+            <Stack spacing={2.25} sx={{ width: '100%' }}>
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: '100%' }}>
                 <Box
                   sx={{
                     width: 48,
@@ -982,6 +989,7 @@ const PatientRegistration: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'primary.main',
+                    flexShrink: 0,
                   }}
                 >
                   {registrationMode === 'returning' ? <PersonSearch /> : <PersonAdd />}
@@ -998,27 +1006,65 @@ const PatientRegistration: React.FC = () => {
                 </Box>
               </Stack>
 
-              <Tabs
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
                 value={registrationMode}
-                onChange={handleRegistrationTabChange}
-                variant="fullWidth"
+                onChange={handleRegistrationModeToggle}
+                aria-label="نوع التسجيل"
                 sx={{
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  '& .MuiTab-root': { textTransform: 'none', fontWeight: 700 },
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: 1,
+                  '& .MuiToggleButtonGroup-grouped': {
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: '10px !important',
+                    mx: 0,
+                  },
+                  '& .MuiToggleButton-root': {
+                    flex: 1,
+                    py: 1.35,
+                    px: 1.5,
+                    textTransform: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    gap: 1,
+                    minHeight: 48,
+                    '&:not(.Mui-selected)': {
+                      bgcolor: alpha(theme.palette.common.black, 0.03),
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      },
+                    },
+                    '&.Mui-selected': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.16),
+                      color: 'primary.dark',
+                      borderColor: alpha(theme.palette.primary.main, 0.45),
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.22),
+                      },
+                    },
+                  },
                 }}
               >
-                <Tab icon={<PersonAdd fontSize="small" />} iconPosition="start" label="مريض جديد" value="new" />
-                <Tab icon={<PersonSearch fontSize="small" />} iconPosition="start" label="مريض مسجّل (زيارة)" value="returning" />
-              </Tabs>
+                <ToggleButton value="new" aria-label="مريض جديد">
+                  <PersonAdd fontSize="small" />
+                  مريض جديد
+                </ToggleButton>
+                <ToggleButton value="returning" aria-label="مريض مسجل">
+                  <PersonSearch fontSize="small" />
+                  مريض مسجّل (زيارة)
+                </ToggleButton>
+              </ToggleButtonGroup>
 
               {registrationMode === 'returning' && (
-                <Stack spacing={1}>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                <Stack spacing={1.25} sx={{ width: '100%' }}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'stretch' }}>
                     <TextField
                       size="small"
                       fullWidth
-                      placeholder="رقم المعمل أو الموبايل أو جزء من الاسم..."
+                      placeholder="الاسم — الموبايل — رقم المعمل (Lab no)…"
                       value={searchValue}
                       onChange={(e) => setSearchValue(e.target.value)}
                       onKeyDown={(e) => {
@@ -1034,12 +1080,13 @@ const PatientRegistration: React.FC = () => {
                           </InputAdornment>
                         ),
                       }}
+                      sx={{ flex: 1 }}
                     />
                     <Button
                       variant="contained"
                       onClick={handleSearch}
                       disabled={searching}
-                      sx={{ minWidth: 96, flexShrink: 0 }}
+                      sx={{ minWidth: { sm: 120 }, flexShrink: 0, py: 1 }}
                     >
                       {searching ? <CircularProgress size={22} color="inherit" /> : 'بحث'}
                     </Button>
@@ -1060,7 +1107,7 @@ const PatientRegistration: React.FC = () => {
 
           <form onSubmit={handleSubmit}>
             <Grid container spacing={2} alignItems="flex-start">
-              <Grid item xs={12} lg={8}>
+              <Grid item xs={12} lg={registrationMode === 'returning' ? 12 : 8}>
                 <Stack spacing={2}>
                   {registrationMode === 'new' ? (
                     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
@@ -1375,13 +1422,13 @@ const PatientRegistration: React.FC = () => {
                 </Stack>
               </Grid>
 
-              <Grid item xs={12} lg={4}>
+              <Grid item xs={12} lg={registrationMode === 'returning' ? 12 : 4}>
                 <Paper
                   variant="outlined"
                   sx={{
                     p: 2,
                     borderRadius: 2,
-                    position: { lg: 'sticky' },
+                    position: { lg: registrationMode === 'returning' ? 'static' : 'sticky' },
                     top: { lg: 16 },
                     borderColor: alpha(theme.palette.primary.main, 0.28),
                     boxShadow: { lg: `0 8px 28px ${alpha('#000', 0.06)}` },
