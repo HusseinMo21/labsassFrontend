@@ -8,7 +8,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Tab,
   Table,
   TableBody,
@@ -32,7 +36,21 @@ type TestCategoryRow = {
   description?: string | null;
   lab_id?: number | null;
   is_active?: boolean;
+  report_type?: string | null;
 };
+
+const REPORT_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'numeric', label: 'Numeric table' },
+  { value: 'text', label: 'Text / descriptive' },
+  { value: 'culture', label: 'Culture & sensitivity' },
+  { value: 'paragraph', label: 'Paragraph (per-test fields)' },
+  {
+    value: 'pathology',
+    label: 'Pathology visit report (clinical, specimen, gross, micro, conclusion)',
+  },
+  { value: 'single', label: 'Single analyte' },
+  { value: 'pcr', label: 'Molecular / PCR' },
+];
 
 /**
  * منصة: التصنيفات والتحاليل المرجعية العامة (قوالب لكل المعامل).
@@ -64,7 +82,7 @@ function PlatformGlobalCategoriesTab() {
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<'create' | 'edit' | null>(null);
   const [editRow, setEditRow] = useState<TestCategoryRow | null>(null);
-  const [form, setForm] = useState({ name: '', code: '', description: '' });
+  const [form, setForm] = useState({ name: '', code: '', description: '', report_type: 'numeric' });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,13 +103,18 @@ function PlatformGlobalCategoriesTab() {
   }, [load]);
 
   const openCreate = () => {
-    setForm({ name: '', code: '', description: '' });
+    setForm({ name: '', code: '', description: '', report_type: 'numeric' });
     setDialog('create');
   };
 
   const openEdit = (r: TestCategoryRow) => {
     setEditRow(r);
-    setForm({ name: r.name, code: r.code, description: r.description || '' });
+    setForm({
+      name: r.name,
+      code: r.code,
+      description: r.description || '',
+      report_type: r.report_type || 'numeric',
+    });
     setDialog('edit');
   };
 
@@ -102,6 +125,7 @@ function PlatformGlobalCategoriesTab() {
         code: form.code,
         description: form.description || null,
         is_active: true,
+        report_type: form.report_type,
       });
       toast.success('تم إنشاء التصنيف');
       setDialog(null);
@@ -120,6 +144,7 @@ function PlatformGlobalCategoriesTab() {
         code: form.code,
         description: form.description || null,
         is_active: editRow.is_active ?? true,
+        report_type: form.report_type,
       });
       toast.success(t('catalog.updated'));
       setDialog(null);
@@ -165,7 +190,7 @@ function PlatformGlobalCategoriesTab() {
           <TableRow>
             <TableCell>{t('common.name')}</TableCell>
             <TableCell>{t('common.code')}</TableCell>
-            <TableCell>{t('platform_mc.col_type')}</TableCell>
+            <TableCell>{t('platform_mc.col_report_layout')}</TableCell>
             <TableCell align="right">{t('common.actions')}</TableCell>
           </TableRow>
         </TableHead>
@@ -175,7 +200,12 @@ function PlatformGlobalCategoriesTab() {
               <TableCell>{r.name}</TableCell>
               <TableCell>{r.code}</TableCell>
               <TableCell>
-                <Chip size="small" label={t('platform_mc.chip_template')} color="primary" variant="outlined" />
+                <Chip
+                  size="small"
+                  label={r.report_type || 'numeric'}
+                  color="primary"
+                  variant="outlined"
+                />
               </TableCell>
               <TableCell align="right">
                 <IconButton size="small" onClick={() => openEdit(r)}>
@@ -196,6 +226,21 @@ function PlatformGlobalCategoriesTab() {
           <TextField label={t('common.name')} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} fullWidth required />
           <TextField label={t('common.code')} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} fullWidth required />
           <TextField label={t('common.description')} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} fullWidth multiline rows={2} />
+          <FormControl fullWidth size="small">
+            <InputLabel id="mc-report-type-label">{t('platform_mc.report_layout')}</InputLabel>
+            <Select
+              labelId="mc-report-type-label"
+              label={t('platform_mc.report_layout')}
+              value={form.report_type}
+              onChange={(e) => setForm((f) => ({ ...f, report_type: e.target.value }))}
+            >
+              {REPORT_TYPE_OPTIONS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialog(null)}>{t('common.cancel')}</Button>

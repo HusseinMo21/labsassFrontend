@@ -39,6 +39,47 @@ import {
   Edit,
 } from '@mui/icons-material';
 import axios from 'axios';
+/** Opens a PDF blob and triggers the browser print dialog (thermal receipt). */
+function openPdfBlobForPrint(blob: Blob): void {
+  const blobUrl = URL.createObjectURL(blob);
+  const printFrame = document.createElement('iframe');
+  printFrame.setAttribute(
+    'style',
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;'
+  );
+  printFrame.src = blobUrl;
+  document.body.appendChild(printFrame);
+  printFrame.onload = () => {
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      } catch (e) {
+        console.error('Print failed:', e);
+      }
+      setTimeout(() => {
+        printFrame.remove();
+        URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    }, 500);
+  };
+  printFrame.onerror = () => {
+    printFrame.remove();
+    URL.revokeObjectURL(blobUrl);
+  };
+}
+
+interface LabReceiptBranding {
+  display_name?: string;
+  tagline?: string;
+  doc_label?: string;
+  currency_label?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  vat?: string;
+  website?: string;
+}
 
 interface Receipt {
   id: number;
@@ -89,6 +130,7 @@ interface Receipt {
     price: number;
   }>;
   paid_now?: number;
+  lab_branding?: LabReceiptBranding;
   visitTests: Array<{
     id: number;
     labTest?: {
@@ -627,238 +669,231 @@ const Receipts: React.FC = () => {
 
   const handlePrint = async (receipt: Receipt) => {
     try {
-      // Use the same PDF endpoint as unpaid invoices
       const response = await axios.get(`/api/check-in/visits/${receipt.id}/unpaid-invoice-receipt`, {
         responseType: 'blob'
       });
-      
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      
-      // Open PDF in new tab for viewing
-      const printWindow = window.open(url, '_blank');
-      if (!printWindow) {
-        alert('Popup blocked. Please allow popups for this site.');
-        return;
-      }
 
-      // Clean up the URL after a delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
-      
-      toast.success('Receipt opened in new tab. You can print or download from there.');
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      openPdfBlobForPrint(blob);
+      toast.success('Opening print dialog…');
     } catch (error: any) {
       console.error('Error generating receipt:', error);
       toast.error('Failed to generate receipt: ' + (error.message || 'Unknown error'));
     }
   };
 
-  const printReceipt = (receipt: Receipt) => {
+  const printReceipt = async (receipt: Receipt) => {
+    const esc = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    let branding: LabReceiptBranding = receipt.lab_branding || {};
+    if (!branding.display_name) {
+      try {
+        const { data } = await axios.get(`/api/check-in/visits/${receipt.id}/unpaid-invoice-receipt-data`);
+        branding = data.lab_branding || {};
+      } catch {
+        /* use fallbacks below */
+      }
+    }
+
+    const cur = branding.currency_label || 'جنيه';
+    const fmtAmt = (n: number) => `${Math.round(Number(n) || 0).toLocaleString('ar-EG')} ${esc(cur)}`;
+
+    const genderAr =
+      receipt.patient_gender === 'male'
+        ? 'ذكر'
+        : receipt.patient_gender === 'female'
+          ? 'أنثى'
+          : esc(receipt.patient_gender || '');
+
+    const testsRows = (receipt.tests || [])
+      .map((test: any) => {
+        const cat = test.category as string | undefined;
+        const catPart =
+          cat && cat !== 'Unknown' && cat !== 'Sample Type'
+            ? ` <span style="font-size:8px;color:#555">(${esc(cat)})</span>`
+            : '';
+        return `
+          <table class="payment-item">
+            <tr>
+              <td>• ${esc(test.name || '—')}${catPart}</td>
+              <td>${fmtAmt(test.price || 0)}</td>
+            </tr>
+          </table>`;
+      })
+      .join('');
+
+    const pb = receipt.payment_breakdown;
+    const pbRows =
+      pb && (pb.cash > 0 || pb.card > 0)
+        ? `${pb.cash > 0 ? `<table class="payment-item"><tr><td>نقدي:</td><td>${fmtAmt(pb.cash)}</td></tr></table>` : ''}
+           ${pb.card > 0 ? `<table class="payment-item"><tr><td>${esc(pb.card_method || 'بطاقة')}:</td><td>${fmtAmt(pb.card)}</td></tr></table>` : ''}`
+        : '';
+
+    const barcodeBlock = receipt.barcode
+      ? `<div class="barcode-wrap">
+           ${receipt.barcode.includes('<svg') ? receipt.barcode : `<span>${esc(receipt.barcode)}</span>`}
+         </div>`
+      : '';
+
+    const displayName = esc(branding.display_name || 'Laboratory');
+    const docLabel = esc(branding.doc_label || 'إيصال تسجيل / دفع');
+    const tagline = branding.tagline
+      ? `<div class="clinic-info-line">${esc(branding.tagline)}</div>`
+      : '';
+
+    const footerLines: string[] = [];
+    if (branding.address) {
+      footerLines.push(`<div class="footer-line">${esc(branding.address)}</div>`);
+    }
+    const contact = [branding.phone, branding.email, branding.website].filter(Boolean).join(' — ');
+    if (contact) {
+      footerLines.push(`<div class="footer-line">${esc(contact)}</div>`);
+    }
+    if (branding.vat) {
+      footerLines.push(`<div class="footer-line">الرقم الضريبي: ${esc(branding.vat)}</div>`);
+    }
+    const footerHtml = footerLines.join('');
+
+    const hasSpecimen =
+      !!(receipt.sample_type && String(receipt.sample_type).trim()) ||
+      !!(receipt.sample_size && String(receipt.sample_size).trim()) ||
+      receipt.number_of_samples != null;
+
+    const specimenBlock = hasSpecimen
+      ? `
+          <table class="rw rw-label-row"><tr><td colspan="2">العينة</td></tr></table>
+          <table class="rw"><tr><td>نوع العينة:</td><td>${esc(receipt.sample_type || '—')}</td></tr></table>
+          <table class="rw"><tr><td>حجم العينة:</td><td>${esc(receipt.sample_size || '—')}</td></tr></table>
+          <table class="rw"><tr><td>عدد العينات:</td><td>${esc(receipt.number_of_samples != null ? String(receipt.number_of_samples) : '—')}</td></tr></table>`
+      : '';
+
     const receiptHTML = `
       <!DOCTYPE html>
-      <html>
+      <html dir="rtl" lang="ar">
       <head>
-        <title>Receipt - ${receipt.receipt_number}</title>
+        <meta charset="UTF-8">
+        <title>${displayName} — ${docLabel}</title>
         <style>
-          @page { 
-            size: 80mm 200mm; 
-            margin: 5mm; 
-          }
-          body { 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 0; 
+          @page { size: 80mm 200mm; margin: 3mm 5mm 3mm 3mm; }
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.25;
+            margin: 0;
+            padding: 0 2mm 0 0;
             width: 70mm;
+            max-width: 70mm;
+            direction: rtl;
+            color: #000;
+            background: #fff;
           }
-          .header { 
-            text-align: center; 
-            border-bottom: 1px solid #000; 
-            padding-bottom: 8px; 
-            margin-bottom: 8px; 
+          .receipt-container { max-width: 70mm; margin: 0 auto; padding: 0 2mm 0 0; }
+          .header {
+            text-align: center;
+            margin-bottom: 6px;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 4px;
           }
-          .header h1 { 
-            font-size: 14px; 
-            margin: 0 0 4px 0; 
-            font-weight: bold;
-          }
-          .header p { 
-            margin: 2px 0; 
-            font-size: 10px; 
-          }
-          .section { 
-            margin-bottom: 8px; 
-          }
-          .section h3 { 
-            font-size: 11px; 
-            margin: 0 0 4px 0; 
-            font-weight: bold;
-            border-bottom: 1px dotted #000;
+          .lab-name { font-size: 12px; font-weight: 900; margin-bottom: 2px; }
+          .clinic-info { text-align: center; margin: 3px 0; font-size: 8.5px; font-weight: 700; line-height: 1.35; }
+          .clinic-info-line { margin-bottom: 2px; }
+          .receipt-doc-label { font-size: 9px; font-weight: 800; margin-top: 4px; color: #222; }
+          .receipt-title { font-size: 11px; font-weight: 900; margin-top: 6px; margin-bottom: 2px; }
+          .receipt-number { font-size: 10px; color: #444; font-weight: 800; }
+          .receipt-body { margin: 6px 0; }
+          .rw { width: 100%; border-collapse: collapse; margin-bottom: 3px; font-size: 10px; font-weight: 700; }
+          .rw td { padding: 1px 0 1px 2mm; vertical-align: top; }
+          .rw td:first-child { text-align: right; white-space: nowrap; width: 40%; }
+          .rw td:last-child { text-align: left; font-weight: 700; word-wrap: break-word; }
+          .rw-label-row td {
+            font-weight: 900;
+            border-bottom: 1px dotted #ccc;
             padding-bottom: 2px;
-          }
-          .row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 2px; 
-            font-size: 10px;
-          }
-          .row .label { 
-            flex: 1; 
-          }
-          .row .value { 
-            flex: 1; 
-            text-align: right; 
-            font-weight: bold;
-          }
-          .total { 
-            font-weight: bold; 
-            border-top: 1px solid #000; 
-            padding-top: 4px; 
-            margin-top: 4px;
-          }
-          .total .row { 
-            font-size: 11px; 
-          }
-          .barcode { 
-            text-align: center; 
-            font-family: 'Courier New', monospace; 
-            font-size: 8px; 
-            margin: 4px 0; 
-            padding: 2px; 
-            background: #f0f0f0; 
-            border: 1px solid #000;
-          }
-          .footer { 
-            text-align: center; 
-            font-size: 8px; 
-            margin-top: 8px; 
-            border-top: 1px dotted #000; 
-            padding-top: 4px;
-          }
-          .test-item { 
-            margin-bottom: 1px; 
             font-size: 9px;
           }
-          .test-name { 
-            display: inline-block; 
-            width: 60%; 
+          .separator { border-top: 1px dashed #000; margin: 4px 0; }
+          .payment-breakdown { margin: 4px 0; padding: 2px 0; }
+          .payment-item { width: 100%; border-collapse: collapse; margin-bottom: 2px; font-size: 9.5px; font-weight: 700; }
+          .payment-item td { padding: 2px 0; }
+          .payment-item td:first-child { text-align: right; }
+          .payment-item td:last-child { text-align: left; }
+          .total-section {
+            border-top: 2px solid #000;
+            padding-top: 5px;
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 900;
+            text-align: center;
           }
-          .test-price { 
-            display: inline-block; 
-            width: 35%; 
-            text-align: right; 
+          .footer {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 8px;
+            font-weight: 700;
+            color: #333;
+            border-top: 1px dashed #000;
+            padding-top: 5px;
           }
-          @media print { 
-            body { margin: 0; padding: 0; }
-            .no-print { display: none; }
-          }
+          .footer-line { margin: 2px 0; line-height: 1.25; }
+          .thank-you { text-align: center; margin: 8px 0; font-weight: 900; font-size: 12px; }
+          .barcode-wrap { text-align: center; margin: 6px 0; padding: 4px 0; border-top: 1px dashed #000; }
+          @media print { body { margin: 0; padding: 0; } .no-print { display: none; } }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>${receipt.billing_status === 'paid' ? 'FINAL PAYMENT RECEIPT' : 'PATHOLOGY LAB RECEIPT'}</h1>
-          <p>Date: ${receipt.date}</p>
-          <p>Receipt #: ${receipt.receipt_number}</p>
-          <p>Lab #: ${receipt.lab_number || 'N/A'}</p>
-        </div>
-        
-        <div class="section">
-          <h3>PATIENT INFO</h3>
-          <div class="row">
-            <span class="label">Name:</span>
-            <span class="value" style="direction: rtl; text-align: right; unicode-bidi: bidi-override; font-weight: bold;">${receipt.patient_name}</span>
-          </div>
-          ${receipt.patient_age ? `
-          <div class="row">
-            <span class="label">Age:</span>
-            <span class="value">${receipt.patient_age}</span>
-          </div>
-          ` : ''}
-          <div class="row">
-            <span class="label">Phone:</span>
-            <span class="value">${receipt.patient_phone}</span>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>TESTS (${receipt.tests?.length || 0})</h3>
-          ${(receipt.tests || []).map((test: any) => `
-            <div class="test-item">
-              <span class="test-name">${test.name || 'Unknown Test'}</span>
-              <span class="test-price">${formatCurrency(test.price || 0)}</span>
+        <div class="receipt-container">
+          <div class="header">
+            <div class="lab-name">${displayName}</div>
+            <div class="clinic-info">
+              ${tagline}
+              <div class="receipt-doc-label">${docLabel}</div>
             </div>
-          `).join('')}
-        </div>
-        
-        <div class="section total">
-          <div class="row">
-            <span class="label">Total:</span>
-            <span class="value">${formatCurrency(receipt.total_amount)}</span>
+            <div class="receipt-title">رقم الزيارة</div>
+            <div class="receipt-number">${esc(receipt.receipt_number || receipt.visit_number)}</div>
+            <div class="receipt-number" style="margin-top:3px;color:#000;">رقم العينة: ${esc(receipt.lab_number || '—')}</div>
           </div>
-          <div class="row">
-            <span class="label">Discount:</span>
-            <span class="value">${formatCurrency(receipt.discount_amount || 0)}</span>
+
+          <div class="receipt-body">
+            <table class="rw"><tr><td>التاريخ:</td><td>${esc(receipt.date || receipt.visit_date?.split('T')[0] || '')}</td></tr></table>
+            <table class="rw"><tr><td>اسم المريض:</td><td>${esc(receipt.patient_name || receipt.patient?.name)}</td></tr></table>
+            ${receipt.patient_age ? `<table class="rw"><tr><td>السن:</td><td>${esc(receipt.patient_age)}</td></tr></table>` : ''}
+            <table class="rw"><tr><td>الجوال:</td><td>${esc(receipt.patient_phone || receipt.patient?.phone)}</td></tr></table>
+            ${receipt.patient_gender ? `<table class="rw"><tr><td>النوع:</td><td>${genderAr}</td></tr></table>` : ''}
+            ${receipt.organization ? `<table class="rw"><tr><td>الجهة:</td><td>${esc(receipt.organization)}</td></tr></table>` : ''}
+            ${receipt.referring_doctor ? `<table class="rw"><tr><td>الطبيب المحيل:</td><td>${esc(receipt.referring_doctor)}</td></tr></table>` : ''}
+            ${receipt.attendance_day ? `<table class="rw"><tr><td>يوم الحضور:</td><td>${esc(receipt.attendance_day)}</td></tr></table>` : ''}
+            ${receipt.expected_delivery_date ? `<table class="rw"><tr><td>ميعاد التسليم:</td><td>${esc(new Date(receipt.expected_delivery_date).toLocaleDateString('ar-EG'))}</td></tr></table>` : ''}
+            ${specimenBlock}
           </div>
-          <div class="row">
-            <span class="label">Final:</span>
-            <span class="value">${formatCurrency(receipt.final_amount)}</span>
+
+          <div class="separator"></div>
+
+          ${(receipt.tests || []).length ? `<table class="rw rw-label-row"><tr><td colspan="2">الخدمات / التحاليل</td></tr></table>${testsRows}<div class="separator"></div>` : ''}
+
+          <table class="rw rw-label-row"><tr><td colspan="2">تفاصيل الدفع</td></tr></table>
+          <div class="payment-breakdown">
+            <table class="payment-item"><tr><td>إجمالي المبلغ:</td><td>${fmtAmt(receipt.total_amount)}</td></tr></table>
+            ${(receipt.discount_amount || 0) > 0 ? `<table class="payment-item"><tr><td>الخصم:</td><td>${fmtAmt(receipt.discount_amount || 0)}</td></tr></table>` : ''}
+            <table class="payment-item"><tr><td>المدفوع:</td><td>${fmtAmt(receipt.paid_now ?? receipt.upfront_payment)}</td></tr></table>
+            ${pbRows}
+            <table class="payment-item"><tr><td>المتبقي:</td><td>${fmtAmt(receipt.remaining_balance)}</td></tr></table>
+            <table class="payment-item"><tr><td>الحالة:</td><td>${esc((receipt.billing_status || receipt.payment_status || '—').toString())}</td></tr></table>
+            <table class="payment-item"><tr><td>طريقة الدفع:</td><td>${esc(receipt.payment_method || '—')}</td></tr></table>
           </div>
-          <div class="row">
-            <span class="label">Paid:</span>
-            <span class="value">${formatCurrency(receipt.paid_now || receipt.upfront_payment)}</span>
-          </div>
-          <div class="row">
-            <span class="label">Remaining:</span>
-            <span class="value">${formatCurrency(receipt.remaining_balance)}</span>
-          </div>
-        </div>
-        
-        ${receipt.payment_breakdown && (receipt.payment_breakdown.cash > 0 || receipt.payment_breakdown.card > 0) ? `
-        <div class="section">
-          <h3>PAYMENT BREAKDOWN</h3>
-          ${receipt.payment_breakdown.cash > 0 ? `
-          <div class="row">
-            <span class="label">Paid Cash:</span>
-            <span class="value">${formatCurrency(receipt.payment_breakdown.cash)}</span>
-          </div>
-          ` : ''}
-          ${receipt.payment_breakdown.card > 0 ? `
-          <div class="row">
-            <span class="label">Paid with ${receipt.payment_breakdown.card_method || 'Card'}:</span>
-            <span class="value">${formatCurrency(receipt.payment_breakdown.card)}</span>
-          </div>
-          ` : ''}
-        </div>
-        ` : ''}
-        
-        <div class="section">
-          <div class="row">
-            <span class="label">Status:</span>
-            <span class="value">${(receipt.billing_status || receipt.payment_status || 'PENDING').toUpperCase()}</span>
-          </div>
-          ${receipt.processed_by ? `
-          <div class="row">
-            <span class="label">Processed by:</span>
-            <span class="value">${receipt.processed_by}</span>
-          </div>
-          ` : ''}
-        </div>
-        
-        ${receipt.barcode ? `
-        <div class="barcode">
-          ${receipt.barcode.includes('<svg') ? 
-            receipt.barcode : 
-            `<img src="data:image/png;base64,${receipt.barcode}" alt="Barcode" style="max-width: 200px; height: auto;" />`
-          }
-        </div>
-        ` : ''}
-        
-        <div class="footer">
-          <p>Thank you for choosing our lab!</p>
-          <p>Visit: ${receipt.visit_number}</p>
-          <p>Expected: ${receipt.expected_delivery_date ? new Date(receipt.expected_delivery_date).toLocaleDateString() : 'N/A'}</p>
+
+          <div class="total-section">المبلغ النهائي: ${fmtAmt(receipt.final_amount)}</div>
+
+          ${barcodeBlock}
+
+          <div class="thank-you">شكراً لثقتكم</div>
+
+          <div class="footer">${footerHtml}</div>
         </div>
       </body>
       </html>
@@ -1917,15 +1952,29 @@ const Receipts: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Print Dialog */}
-      <Dialog open={printOpen} onClose={() => setPrintOpen(false)} maxWidth="sm" fullWidth>
+      {/* Print dialog: 80mm paper, ~70mm content (levelsderm-style thermal) */}
+      <Dialog open={printOpen} onClose={() => setPrintOpen(false)} maxWidth={false} PaperProps={{ sx: { width: 'min(80mm, 100vw)', maxWidth: '100vw' } }}>
         <DialogTitle>Print Receipt - {selectedReceipt?.receipt_number}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Receipt printing functionality will be implemented here. This would typically open a print dialog or generate a PDF.
+            Preview matches 80&nbsp;mm thermal width. Use &quot;Print Receipt&quot; for the browser print dialog, or print from the PDF opened by the main Print button.
           </Typography>
           {selectedReceipt && (
-            <Box sx={{ p: 2, border: '1px dashed #ccc', borderRadius: 1 }}>
+            <Box
+              sx={{
+                p: 1.5,
+                border: '1px dashed #ccc',
+                borderRadius: 1,
+                width: '70mm',
+                maxWidth: '100%',
+                mx: 'auto',
+                fontFamily: '"Courier New", monospace',
+                fontSize: '12px',
+                fontWeight: 600,
+                lineHeight: 1.2,
+                boxSizing: 'border-box',
+              }}
+            >
               <Typography variant="h6" align="center" gutterBottom>
                 RECEIPT
               </Typography>
@@ -1958,8 +2007,8 @@ const Receipts: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<Print />}
-            onClick={() => {
-              printReceipt(selectedReceipt!);
+            onClick={async () => {
+              await printReceipt(selectedReceipt!);
               setPrintOpen(false);
             }}
           >

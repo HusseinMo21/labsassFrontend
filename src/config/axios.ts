@@ -13,6 +13,10 @@ axios.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const labId = localStorage.getItem('lab_id');
+    if (labId && /^\d+$/.test(labId)) {
+      config.headers['X-Lab-ID'] = labId;
+    }
     return config;
   },
   (error) => {

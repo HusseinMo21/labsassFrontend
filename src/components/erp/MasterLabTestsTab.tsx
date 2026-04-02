@@ -51,6 +51,8 @@ export type LabTestRow = {
   lab_id?: number | null;
   is_active?: boolean;
   category?: { id: number; name: string };
+  /** Clinical lab report layout: { layout: "parameter_table", title?: string, parameters: [{ key, label, unit?, reference?, unit_options?, reference_options?, input?, options? }] } */
+  report_template?: Record<string, unknown> | null;
 };
 
 function paginatedItems<T>(res: { data?: { data?: T[] } }): T[] {
@@ -87,6 +89,7 @@ export default function MasterLabTestsTab({
     turnaround_time_hours: '24',
     category_id: '' as string | number,
     is_active: true,
+    report_template_json: '',
   });
 
   const load = useCallback(async () => {
@@ -127,6 +130,7 @@ export default function MasterLabTestsTab({
       turnaround_time_hours: '24',
       category_id: categories[0]?.id ?? '',
       is_active: true,
+      report_template_json: '',
     });
     setDialogOpen(true);
   };
@@ -144,11 +148,25 @@ export default function MasterLabTestsTab({
       turnaround_time_hours: String(r.turnaround_time_hours),
       category_id: r.category_id,
       is_active: r.is_active !== false,
+      report_template_json:
+        r.report_template && typeof r.report_template === 'object'
+          ? JSON.stringify(r.report_template, null, 2)
+          : '',
     });
     setDialogOpen(true);
   };
 
   const save = async () => {
+    let parsedTemplate: Record<string, unknown> | null = null;
+    const raw = form.report_template_json.trim();
+    if (raw) {
+      try {
+        parsedTemplate = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        toast.error('Report template JSON is invalid');
+        return;
+      }
+    }
     const payload = {
       name: form.name,
       code: form.code,
@@ -160,6 +178,7 @@ export default function MasterLabTestsTab({
       turnaround_time_hours: parseInt(String(form.turnaround_time_hours), 10) || 24,
       category_id: Number(form.category_id),
       is_active: form.is_active,
+      report_template: parsedTemplate,
     };
     try {
       if (editId) {
@@ -224,7 +243,7 @@ export default function MasterLabTestsTab({
         </TableBody>
       </Table>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>{editId ? t('master.dialog_edit') : t('master.dialog_new')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField label={t('common.name')} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} fullWidth required />
@@ -249,6 +268,16 @@ export default function MasterLabTestsTab({
           <TextField label={t('master.reference_range')} value={form.reference_range} onChange={(e) => setForm((f) => ({ ...f, reference_range: e.target.value }))} fullWidth />
           <TextField label={t('master.preparation')} value={form.preparation_instructions} onChange={(e) => setForm((f) => ({ ...f, preparation_instructions: e.target.value }))} fullWidth multiline rows={2} />
           <TextField label={t('common.description')} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} fullWidth multiline rows={2} />
+          <TextField
+            label="Report template (JSON, optional)"
+            value={form.report_template_json}
+            onChange={(e) => setForm((f) => ({ ...f, report_template_json: e.target.value }))}
+            fullWidth
+            multiline
+            minRows={4}
+            placeholder='{"layout":"parameter_table","title":"My panel","parameters":[{"key":"alt","label":"ALT","unit":"U/L","unit_options":["U/L","IU/L"],"reference":"7-40","reference_options":["7-40","0-40"]}]}'
+            helperText="Leave empty to use name/code presets (e.g. CBC, H. pylori) or a single result field."
+          />
           <FormControlLabel
             control={<Switch checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />}
             label={t('common.active')}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createFilterOptions } from '@mui/material/useAutocomplete';
 import {
   Autocomplete,
   Box,
@@ -112,6 +113,23 @@ export default function CatalogTestPicker({
     return list;
   }, [tests, activeCategoryId, searchInput]);
 
+  /** Avoid feeding hundreds of options into MUI Autocomplete (very slow). */
+  const filterLimited = useMemo(
+    () => createFilterOptions<CatalogTestRow>({ limit: 80 }),
+    []
+  );
+
+  const searchReady = searchInput.trim().length >= 2;
+  const autocompleteOptionsForUi = searchReady ? autocompleteOptions : [];
+
+  /** Cap scrollable browse grid — full list still searchable above. */
+  const BROWSE_MAX = 160;
+  const testsForBrowseLimited = useMemo(
+    () => testsForBrowse.slice(0, BROWSE_MAX),
+    [testsForBrowse]
+  );
+  const browseOverflow = testsForBrowse.length - testsForBrowseLimited.length;
+
   const addTest = (t: CatalogTestRow) => {
     if (selectedTests.some((x) => x.offering_id === t.offering_id)) return;
     onTestsChange([...selectedTests, t]);
@@ -160,7 +178,8 @@ export default function CatalogTestPicker({
         بحث سريع — اكتب اسم أو كود ثم Enter
       </Typography>
       <Autocomplete
-        options={autocompleteOptions}
+        options={autocompleteOptionsForUi}
+        filterOptions={(opts, state) => filterLimited(opts, state)}
         getOptionLabel={(o) => `${o.name} (${o.code}) — ${Number(o.price).toFixed(2)} ج.م`}
         inputValue={searchInput}
         onInputChange={(_, v) => setSearchInput(v)}
@@ -175,13 +194,14 @@ export default function CatalogTestPicker({
           <TextField
             {...params}
             label="ابحث وأضف تحليلاً"
-            placeholder="مثال: CBP أو سكر"
+            placeholder="اكتب حرفين على الأقل (مثال: CBP)"
             size="medium"
-            autoFocus
           />
         )}
         loading={loading}
-        noOptionsText="لا نتائج — غيّر التصنيف أو النص"
+        noOptionsText={
+          searchReady ? 'لا نتائج — غيّر التصنيف أو النص' : 'اكتب حرفين على الأقل للبحث السريع'
+        }
       />
 
       <Box>
@@ -249,6 +269,7 @@ export default function CatalogTestPicker({
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {testsForBrowse.length} تحليل
+            {browseOverflow > 0 ? ` · عرض ${testsForBrowseLimited.length} (استخدم البحث أو التصنيف)` : ''}
           </Typography>
         </Stack>
         <Box
@@ -268,7 +289,7 @@ export default function CatalogTestPicker({
             </Typography>
           ) : (
             <Grid container spacing={1}>
-              {testsForBrowse.map((t) => {
+              {testsForBrowseLimited.map((t) => {
                 const sel = isSelected(t.offering_id);
                 return (
                   <Grid item xs={12} sm={6} key={t.offering_id}>

@@ -19,6 +19,8 @@ import {
   Paper,
   Chip,
   Grid,
+  Card,
+  CardContent,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -33,6 +35,13 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import {
+  parseStructuredResultValue,
+  structuredReferenceKey,
+  structuredUnitKey,
+  resolveLabReportTemplate,
+} from '../../constants/labReportTemplatePresets';
+import StructuredLabTestResultCard from '../../components/erp/StructuredLabTestResultCard';
 
 interface Visit {
   id: number;
@@ -79,11 +88,16 @@ interface Visit {
   };
   visit_tests: Array<{
     id: number;
+    test_name?: string;
+    test_name_snapshot?: string;
     lab_test: {
       id: number;
       name: string;
       code: string;
       reference_range?: string;
+      unit?: string;
+      category?: { id: number; name: string; code?: string; report_type?: string | null };
+      report_template?: unknown;
     };
     result_value?: string;
     result_status?: string;
@@ -111,6 +125,73 @@ interface ReportData {
   [key: string]: any; // Allow additional properties
 }
 
+/** Surgical / specialty pathology categories (legacy ERP). Not master clinical `clin_*` departments. */
+const SURGICAL_PATHOLOGY_CATEGORY_CODES = new Set([
+  'path',
+  'cytho',
+  'ihc',
+  'path_ihc',
+  'rev',
+  'other',
+]);
+
+const PATHOLOGY_CATEGORY_SUBSTRINGS = ['immunohistochemistry', 'ihc', 'fnac'];
+
+function categoryNameLooksPathological(name: string | undefined): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase().trim();
+  if (n.includes('histopathology')) return false;
+  if (n.includes('clinical chemistry') || n.startsWith('clin')) return false;
+  return (
+    PATHOLOGY_CATEGORY_SUBSTRINGS.some((k) => n.includes(k)) ||
+    (n.includes('pathology') && !n.includes('histopathology'))
+  );
+}
+
+const PATHOLOGY_ANALYSIS_TYPES = new Set([
+  'Pathology',
+  'Cytology',
+  'FNAC',
+  'Immunohistochemistry',
+  'Others',
+]);
+
+/** DB `report_type`: full pathology report (clinical / specimen / gross / micro / conclusion), same as dryasser. */
+const PATHOLOGY_VISIT_REPORT_TYPES = new Set(['pathology']);
+
+function inferPathologyVisit(visitData: Visit, reportData: ReportData): boolean {
+  const tests = visitData.visit_tests || [];
+  for (const t of tests) {
+    const cat = t.lab_test?.category;
+    const code = (cat?.code || '').toLowerCase();
+    const rt = (cat?.report_type || '').toLowerCase();
+    if (code && SURGICAL_PATHOLOGY_CATEGORY_CODES.has(code)) {
+      return true;
+    }
+    if (rt && PATHOLOGY_VISIT_REPORT_TYPES.has(rt)) {
+      return true;
+    }
+    if (code.startsWith('clin_')) {
+      continue;
+    }
+    if (categoryNameLooksPathological(cat?.name)) {
+      return true;
+    }
+  }
+  const toa = (reportData?.type_of_analysis || '').trim();
+  if (toa && PATHOLOGY_ANALYSIS_TYPES.has(toa)) {
+    return true;
+  }
+  return false;
+}
+
+type LabResultRow = {
+  result_value: string;
+  result_status: string;
+  result_notes: string;
+  status: string;
+};
+
 const PathologyRecordForm: React.FC = () => {
   const { visitId } = useParams<{ visitId: string }>();
   const navigate = useNavigate();
@@ -121,6 +202,10 @@ const PathologyRecordForm: React.FC = () => {
   const returnUrl = (location.state as { returnUrl?: string })?.returnUrl || '/reports';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isPathologyMode, setIsPathologyMode] = useState(false);
+  const [resultsData, setResultsData] = useState<Record<number, LabResultRow>>({});
+  const [structuredResults, setStructuredResults] = useState<Record<number, Record<string, string>>>({});
+  const [legacySingleByTest, setLegacySingleByTest] = useState<Record<number, string>>({});
   const [visit, setVisit] = useState<Visit | null>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -434,6 +519,50 @@ const PathologyRecordForm: React.FC = () => {
       }
       
       console.log('Final referred_by value:', referredBy);
+
+      const pathologyMode = inferPathologyVisit(visitData as Visit, reportData);
+      setIsPathologyMode(pathologyMode);
+
+      const nextResults: Record<number, LabResultRow> = {};
+      (visitData.visit_tests || []).forEach((t: Visit['visit_tests'][number]) => {
+        nextResults[t.id] = {
+          result_value: t.result_value || '',
+          result_status: t.result_status || 'normal',
+          result_notes: t.result_notes || '',
+          status: t.status || 'pending',
+        };
+      });
+      setResultsData(nextResults);
+
+      const nextStructured: Record<number, Record<string, string>> = {};
+      const nextLegacy: Record<number, string> = {};
+      (visitData.visit_tests || []).forEach((t: Visit['visit_tests'][number]) => {
+        const tpl = resolveLabReportTemplate(t.lab_test, {
+          categoryReportType: t.lab_test.category?.report_type,
+        });
+        if (!tpl) return;
+        const { structured, legacySingle } = parseStructuredResultValue(t.result_value);
+        nextStructured[t.id] = {};
+        for (const p of tpl.parameters) {
+          nextStructured[t.id][p.key] = structured[p.key] ?? '';
+          const uk = structuredUnitKey(p.key);
+          const rk = structuredReferenceKey(p.key);
+          if (p.unit_options?.length) {
+            nextStructured[t.id][uk] =
+              structured[uk] ?? (p.unit != null && p.unit !== '' ? p.unit : p.unit_options[0] ?? '');
+          }
+          if (p.reference_options?.length) {
+            nextStructured[t.id][rk] =
+              structured[rk] ??
+              (p.reference != null && p.reference !== '' ? p.reference : p.reference_options[0] ?? '');
+          }
+        }
+        if (legacySingle) {
+          nextLegacy[t.id] = legacySingle;
+        }
+      });
+      setStructuredResults(nextStructured);
+      setLegacySingleByTest(nextLegacy);
       
       // Build form data object
       const newFormData = {
@@ -492,7 +621,7 @@ const PathologyRecordForm: React.FC = () => {
           : (visitData.recommendations || ''),
         
         // Document Type
-        type_of_analysis: reportData.type_of_analysis || 'Pathology',
+        type_of_analysis: reportData.type_of_analysis || (pathologyMode ? 'Pathology' : 'Clinical Laboratory'),
         test_status: visitData.test_status || 'pending',
         image: null,
         image_placement: reportData.image_placement || 'end_of_report',
@@ -736,23 +865,80 @@ const PathologyRecordForm: React.FC = () => {
     return true;
   };
 
+  const saveLabResults = async (): Promise<boolean> => {
+    if (!visitId || !visit) {
+      toast.error('Visit not loaded');
+      return false;
+    }
+    const visit_tests = (visit.visit_tests || []).map((t) => {
+      const row = resultsData[t.id];
+      const tpl = resolveLabReportTemplate(t.lab_test, {
+        categoryReportType: t.lab_test.category?.report_type,
+      });
+      const structured = structuredResults[t.id];
+      const resultValue =
+        tpl && structured
+          ? JSON.stringify(structured)
+          : row?.result_value ?? '';
+      return {
+        id: t.id,
+        result_value: resultValue,
+        result_status: row?.result_status ?? 'normal',
+        result_notes: row?.result_notes ?? '',
+        status: row?.status ?? t.status ?? 'pending',
+      };
+    });
+    await axios.put(`/api/visits/${visitId}/results`, { visit_tests });
+    return true;
+  };
+
+  const handleLabResultChange = (testId: number, field: keyof LabResultRow, value: string) => {
+    setResultsData((prev) => {
+      const cur = prev[testId] || {
+        result_value: '',
+        result_status: 'normal',
+        result_notes: '',
+        status: 'pending',
+      };
+      return {
+        ...prev,
+        [testId]: { ...cur, [field]: value },
+      };
+    });
+  };
+
+  const handleStructuredCellChange = (testId: number, key: string, value: string) => {
+    setStructuredResults((prev) => {
+      const cur = { ...(prev[testId] || {}) };
+      cur[key] = value;
+      return { ...prev, [testId]: cur };
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     setSaving(true);
 
     try {
-      const success = await saveReport();
-      if (success) {
-      toast.success('Report saved successfully!');
-      // Navigate to documents page for this visit
-      navigate(`/documents/${visitId}`, {
-        state: { returnUrl: returnUrl }
-      });
+      if (isPathologyMode) {
+        const success = await saveReport();
+        if (success) {
+          toast.success('Report saved successfully!');
+          navigate(`/documents/${visitId}`, {
+            state: { returnUrl: returnUrl }
+          });
+        }
+      } else {
+        await saveLabResults();
+        toast.success('Test results saved successfully!');
+        navigate(`/documents/${visitId}`, {
+          state: { returnUrl: returnUrl }
+        });
       }
     } catch (error) {
       console.error('Failed to save report:', error);
-      toast.error('Failed to save report');
+      toast.error(isPathologyMode ? 'Failed to save report' : 'Failed to save test results');
     } finally {
       setSaving(false);
     }
@@ -791,10 +977,13 @@ const PathologyRecordForm: React.FC = () => {
     setSaving(true);
 
     try {
-      // First save the report
-      const success = await saveReport();
-      if (!success) {
-        return;
+      if (isPathologyMode) {
+        const success = await saveReport();
+        if (!success) {
+          return;
+        }
+      } else {
+        await saveLabResults();
       }
 
       toast.success('Report saved! Opening print dialog...');
@@ -1090,12 +1279,12 @@ const PathologyRecordForm: React.FC = () => {
         </IconButton>
         <Box>
           <Typography variant="h4" component="h1" sx={{ textDecoration: 'underline', color: 'primary.main' }}>
-            Pathology Record +
+            {isPathologyMode ? 'Pathology Record +' : 'Laboratory Report +'}
           </Typography>
         </Box>
       </Box>
 
-      {/* Pathology Record Form */}
+      {/* Visit report form (pathology narrative or clinical lab results) */}
       <Paper sx={{ p: 3, bgcolor: 'white' }}>
         <Box component="form" onSubmit={handleSubmit}>
           {/* Patient and Administrative Information */}
@@ -1197,44 +1386,65 @@ const PathologyRecordForm: React.FC = () => {
                   placeholder="mm/dd/yyyy"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Type of Analysis</InputLabel>
-                  <Select
-                    value={formData.type_of_analysis}
-                    onChange={(e) => handleInputChange('type_of_analysis', e.target.value)}
-                    label="Type of Analysis"
-                  >
-                    <MenuItem value="Pathology">Pathology</MenuItem>
-                    <MenuItem value="Cytology">Cytology</MenuItem>
-                    <MenuItem value="FNAC">FNAC</MenuItem>
-                    <MenuItem value="Immunohistochemistry">Immunohistochemistry</MenuItem>
-                    <MenuItem value="Others">Others</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Test Status</InputLabel>
-                  <Select
-                    value={formData.test_status}
-                    onChange={(e) => handleInputChange('test_status', e.target.value)}
-                    label="Test Status"
-                  >
-                    <MenuItem value="pending">Pending</MenuItem>
-                    <MenuItem value="in_progress">In Progress</MenuItem>
-                    {/* Doctors can see Approved status */}
-                    {((user?.role === 'doctor' || user?.role === 'admin') && (
-                      <MenuItem key="approved" value="approved">Approved</MenuItem>
-                    ))}
-                    {/* Only admins can see Completed and Cancelled */}
-                    {user?.role === 'admin' && [
-                      <MenuItem key="completed" value="completed">Completed</MenuItem>,
-                      <MenuItem key="cancelled" value="cancelled">Cancelled</MenuItem>
-                    ]}
-                  </Select>
-                </FormControl>
-              </Grid>
+              {isPathologyMode ? (
+                <Grid item xs={12} sm={6} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>Type of Analysis</InputLabel>
+                    <Select
+                      value={formData.type_of_analysis}
+                      onChange={(e) => handleInputChange('type_of_analysis', e.target.value)}
+                      label="Type of Analysis"
+                    >
+                      <MenuItem value="Pathology">Pathology</MenuItem>
+                      <MenuItem value="Cytology">Cytology</MenuItem>
+                      <MenuItem value="FNAC">FNAC</MenuItem>
+                      <MenuItem value="Immunohistochemistry">Immunohistochemistry</MenuItem>
+                      <MenuItem value="Others">Others</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              ) : (
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    fullWidth
+                    label="Report type"
+                    value="Clinical laboratory tests"
+                    InputProps={{ readOnly: true }}
+                  />
+                </Grid>
+              )}
+              {isPathologyMode ? (
+                <Grid item xs={12} sm={6} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>Test Status</InputLabel>
+                    <Select
+                      value={formData.test_status}
+                      onChange={(e) => handleInputChange('test_status', e.target.value)}
+                      label="Test Status"
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="in_progress">In Progress</MenuItem>
+                      {((user?.role === 'doctor' || user?.role === 'admin') && (
+                        <MenuItem key="approved" value="approved">Approved</MenuItem>
+                      ))}
+                      {user?.role === 'admin' && [
+                        <MenuItem key="completed" value="completed">Completed</MenuItem>,
+                        <MenuItem key="cancelled" value="cancelled">Cancelled</MenuItem>
+                      ]}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              ) : (
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    fullWidth
+                    label="Visit test status"
+                    value={visit.test_status || '—'}
+                    InputProps={{ readOnly: true }}
+                    helperText="Use line status on each test below"
+                  />
+                </Grid>
+              )}
             </Grid>
 
             {/* Fourth Row: Checked By (for doctors only) */}
@@ -1279,6 +1489,8 @@ const PathologyRecordForm: React.FC = () => {
             )}
           </Box>
 
+          {isPathologyMode ? (
+          <>
           {/* Pathology Details */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -1615,8 +1827,125 @@ const PathologyRecordForm: React.FC = () => {
               />
             </Box>
           </Box>
+          </>
+          ) : (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+              Test results
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Tests such as CBC or H.&nbsp;pylori use a parameter table defined on the catalog test (or built-in presets).
+              Simple tests use a single result value with reference range from the catalog.
+            </Typography>
+            {!visit.visit_tests?.length ? (
+              <Alert severity="info">This visit has no line items. Add tests from check-in or the visit screen.</Alert>
+            ) : (
+              visit.visit_tests.map((test) => {
+                const displayName =
+                  test.test_name ||
+                  test.test_name_snapshot ||
+                  test.lab_test?.name ||
+                  'Test';
+                const tpl = resolveLabReportTemplate(test.lab_test, {
+                  categoryReportType: test.lab_test.category?.report_type,
+                });
+                if (tpl) {
+                  return (
+                    <StructuredLabTestResultCard
+                      key={test.id}
+                      displayName={displayName}
+                      code={test.lab_test.code}
+                      template={tpl}
+                      values={structuredResults[test.id] || {}}
+                      onChange={(key, v) => handleStructuredCellChange(test.id, key, v)}
+                      legacySingle={legacySingleByTest[test.id]}
+                      resultStatus={resultsData[test.id]?.result_status || 'normal'}
+                      resultNotes={resultsData[test.id]?.result_notes ?? ''}
+                      lineStatus={resultsData[test.id]?.status || test.status || 'pending'}
+                      onResultStatus={(v) => handleLabResultChange(test.id, 'result_status', v)}
+                      onResultNotes={(v) => handleLabResultChange(test.id, 'result_notes', v)}
+                      onLineStatus={(v) => handleLabResultChange(test.id, 'status', v)}
+                      showAdminCompleted={user?.role === 'admin'}
+                    />
+                  );
+                }
+                return (
+                  <Card key={test.id} sx={{ mb: 2 }}>
+                    <CardContent>
+                      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        {displayName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                        Code: {test.lab_test.code}
+                        {test.lab_test.unit ? ` · Unit: ${test.lab_test.unit}` : ''}
+                        {test.lab_test.reference_range
+                          ? ` · Reference: ${test.lab_test.reference_range}`
+                          : ''}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={4}>
+                          <TextField
+                            fullWidth
+                            label="Result value"
+                            value={resultsData[test.id]?.result_value ?? ''}
+                            onChange={(e) => handleLabResultChange(test.id, 'result_value', e.target.value)}
+                            placeholder="e.g. 5.2"
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <FormControl fullWidth>
+                            <InputLabel>Result status</InputLabel>
+                            <Select
+                              label="Result status"
+                              value={resultsData[test.id]?.result_status || 'normal'}
+                              onChange={(e) => handleLabResultChange(test.id, 'result_status', e.target.value)}
+                            >
+                              <MenuItem value="normal">Normal</MenuItem>
+                              <MenuItem value="abnormal">Abnormal</MenuItem>
+                              <MenuItem value="critical">Critical</MenuItem>
+                              <MenuItem value="high">High</MenuItem>
+                              <MenuItem value="low">Low</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <FormControl fullWidth>
+                            <InputLabel>Line status</InputLabel>
+                            <Select
+                              label="Line status"
+                              value={resultsData[test.id]?.status || test.status || 'pending'}
+                              onChange={(e) => handleLabResultChange(test.id, 'status', e.target.value)}
+                            >
+                              <MenuItem value="pending">Pending</MenuItem>
+                              <MenuItem value="under_review">Under review</MenuItem>
+                              {user?.role === 'admin' && (
+                                <MenuItem value="completed">Completed</MenuItem>
+                              )}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </Grid>
+                      <TextField
+                        fullWidth
+                        sx={{ mt: 2 }}
+                        label="Notes"
+                        value={resultsData[test.id]?.result_notes ?? ''}
+                        onChange={(e) => handleLabResultChange(test.id, 'result_notes', e.target.value)}
+                        placeholder="Optional comments"
+                        multiline
+                        minRows={2}
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </Box>
+          )}
 
           {/* Image Upload Section */}
+          {isPathologyMode && (
+          <>
           <Typography variant="h6" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
             Image Upload
           </Typography>
@@ -1738,12 +2067,18 @@ const PathologyRecordForm: React.FC = () => {
               </Grid>
             </Grid>
           </Box>
+          </>
+          )}
 
           {/* Status and Action Buttons */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Chip
-                label={`Status: ${formData.test_status.charAt(0).toUpperCase() + formData.test_status.slice(1)}`}
+                label={
+                  isPathologyMode
+                    ? `Status: ${formData.test_status.charAt(0).toUpperCase() + formData.test_status.slice(1)}`
+                    : `Tests: ${visit.visit_tests?.length ?? 0}`
+                }
                 color={formData.test_status === 'completed' ? 'success' : 'warning'}
                 size="small"
               />
@@ -1763,7 +2098,13 @@ const PathologyRecordForm: React.FC = () => {
               }}
               disabled={saving}
             >
-              {saving ? <CircularProgress size={24} color="inherit" /> : 'Record Now'}
+              {saving ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : isPathologyMode ? (
+                'Record Now'
+              ) : (
+                'Save results'
+              )}
             </Button>
               {/* Hide "Record and Print" button for doctors */}
               {user?.role !== 'doctor' && (
@@ -1789,8 +2130,8 @@ const PathologyRecordForm: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* Similar Cases Panel */}
-      {visitId && visit && (
+      {/* Similar Cases Panel (pathology narrative search) */}
+      {visitId && visit && isPathologyMode && (
         <SimilarCasesPanel
           currentVisitId={Number(visitId)}
           reportData={{

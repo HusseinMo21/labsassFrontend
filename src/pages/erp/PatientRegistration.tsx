@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -46,7 +46,9 @@ import { toast } from 'react-toastify';
 import axios from '../../config/axios';
 import { config } from '../../config/environment';
 import { useAuth } from '../../contexts/AuthContext';
-import CatalogTestPicker, { type CatalogTestRow, type CatalogPackageRow } from '../../components/erp/CatalogTestPicker';
+import type { CatalogTestRow, CatalogPackageRow } from '../../components/erp/CatalogTestPicker';
+
+const CatalogTestPicker = lazy(() => import('../../components/erp/CatalogTestPicker'));
 
 interface PatientFormData {
   name: string;
@@ -1409,15 +1411,26 @@ const PatientRegistration: React.FC = () => {
                       بحث فوري، تصنيفات المعمل، اختصارات بالكود، وقائمة على عمودين — اضغط للإضافة أو لإزالة التحديد. المختار
                       يظهر في «الدفع والتسجيل».
                     </Typography>
-                    <CatalogTestPicker
-                      labId={labIdForCatalog}
-                      selectedTests={selectedCatalogTests}
-                      selectedPackages={selectedCatalogPackages}
-                      onTestsChange={setSelectedCatalogTests}
-                      onPackagesChange={setSelectedCatalogPackages}
-                      showPackages={true}
-                      showSelectedChips={false}
-                    />
+                    <Suspense
+                      fallback={
+                        <Box sx={{ py: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CircularProgress size={22} />
+                          <Typography variant="body2" color="text.secondary">
+                            جاري تحميل كتالوج التحاليل…
+                          </Typography>
+                        </Box>
+                      }
+                    >
+                      <CatalogTestPicker
+                        labId={labIdForCatalog}
+                        selectedTests={selectedCatalogTests}
+                        selectedPackages={selectedCatalogPackages}
+                        onTestsChange={setSelectedCatalogTests}
+                        onPackagesChange={setSelectedCatalogPackages}
+                        showPackages={true}
+                        showSelectedChips={false}
+                      />
+                    </Suspense>
                   </Paper>
                 </Stack>
               </Grid>

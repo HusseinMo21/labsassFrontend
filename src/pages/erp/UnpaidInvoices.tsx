@@ -48,6 +48,35 @@ import {
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+function openPdfBlobForPrint(blob: Blob): void {
+  const blobUrl = URL.createObjectURL(blob);
+  const printFrame = document.createElement('iframe');
+  printFrame.setAttribute(
+    'style',
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;'
+  );
+  printFrame.src = blobUrl;
+  document.body.appendChild(printFrame);
+  printFrame.onload = () => {
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      } catch (e) {
+        console.error('Print failed:', e);
+      }
+      setTimeout(() => {
+        printFrame.remove();
+        URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    }, 500);
+  };
+  printFrame.onerror = () => {
+    printFrame.remove();
+    URL.revokeObjectURL(blobUrl);
+  };
+}
+
 interface Invoice {
   id: number;
   invoice_number: string;
@@ -341,21 +370,8 @@ const UnpaidInvoices: React.FC = () => {
       });
       
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      
-      // Open PDF in new tab for viewing
-      const printWindow = window.open(url, '_blank');
-      if (!printWindow) {
-        alert('Popup blocked. Please allow popups for this site.');
-        return;
-      }
-
-      // Clean up the URL after a delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
-      
-      toast.success('Receipt opened in new tab. You can print or download from there.');
+      openPdfBlobForPrint(blob);
+      toast.success('Opening print dialog…');
     } catch (error: any) {
       console.error('Error generating receipt:', error);
       toast.error('Failed to generate receipt: ' + (error.message || 'Unknown error'));
@@ -375,21 +391,8 @@ const UnpaidInvoices: React.FC = () => {
       });
       
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      
-      // Open PDF in new tab for viewing
-      const printWindow = window.open(url, '_blank');
-    if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site.');
-      return;
-    }
-
-      // Clean up the URL after a delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
-      
-      toast.success('Final payment receipt opened in new tab. You can print or download from there.');
+      openPdfBlobForPrint(blob);
+      toast.success('Opening print dialog…');
     } catch (error: any) {
       console.error('Error generating final payment receipt:', error);
       toast.error('Failed to generate final payment receipt: ' + (error.message || 'Unknown error'));
